@@ -17,7 +17,16 @@ nonisolated enum SampleProjects {
                 slides: [
                     Slide(id: sampleID(11), layout: .single, cells: [photo(101, 2048, 2730)]),
                     Slide(id: sampleID(12), layout: .twoColumns, cells: [photo(102, 2048, 1536), Cell()]),
-                    Slide(id: sampleID(13), layout: .grid, cells: [photo(103, 2048, 2048), photo(104, 1536, 2048), photo(105, 2048, 1365), Cell()])
+                    Slide(
+                        id: sampleID(13),
+                        layout: .grid,
+                        cells: [
+                            photo(103, 2048, 2048),
+                            photo(104, 1536, 2048, assetIdentifier: "5E7A5E70-0000-4000-8000-000000000104/L0/001"),
+                            photo(105, 2048, 1365),
+                            Cell()
+                        ]
+                    )
                 ],
                 createdAt: date(daysAgo: 3)
             ),
@@ -32,13 +41,17 @@ nonisolated enum SampleProjects {
         ]
     }
 
+    /// The photo `-DebugMissingImages` leaves without a copy. It names a library original that
+    /// doesn't exist, so restoring it shows how a missing original reads.
+    static let missingImageID = sampleID(104)
+
     /// IDs that stay the same between launches, so a debug launch argument can name a project.
     static func sampleID(_ number: UInt16) -> UUID {
         UUID(uuid: (0x5E, 0x7A, 0x5E, 0x70, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, UInt8(number >> 8), UInt8(number & 0xFF)))
     }
 
-    private static func photo(_ number: UInt16, _ width: Int, _ height: Int) -> Cell {
-        Cell(image: PlacedImage(id: sampleID(number), assetIdentifier: nil, pixelWidth: width, pixelHeight: height))
+    private static func photo(_ number: UInt16, _ width: Int, _ height: Int, assetIdentifier: String? = nil) -> Cell {
+        Cell(image: PlacedImage(id: sampleID(number), assetIdentifier: assetIdentifier, pixelWidth: width, pixelHeight: height))
     }
 
     private static func date(daysAgo: Double) -> Date {

@@ -146,6 +146,8 @@ struct LibraryFailure: Identifiable {
         case write
         /// A photo that couldn't be read or copied in.
         case importPhoto
+        /// A missing photo that couldn't come back from the library.
+        case restorePhoto
     }
 
     let id = UUID()
@@ -156,6 +158,7 @@ struct LibraryFailure: Identifiable {
         switch kind {
         case .write: "Couldn't Save Changes"
         case .importPhoto: "Couldn't Add Photo"
+        case .restorePhoto: "Couldn't Restore Photo"
         }
     }
 
@@ -163,6 +166,12 @@ struct LibraryFailure: Identifiable {
         switch kind {
         case .write: "Swipeset couldn't save your latest changes. \(error.localizedDescription)"
         case .importPhoto: "Swipeset couldn't read that photo. Try another, or the same one again."
+        case .restorePhoto:
+            switch error as? RestoreError {
+            case .denied: "Swipeset can't see your photo library. Allow access in Settings to restore this photo."
+            case .originalGone: "The original is no longer in your photo library. Choose another photo, or remove this one."
+            case nil: "Swipeset couldn't read the original from your photo library. Try again later."
+            }
         }
     }
 }

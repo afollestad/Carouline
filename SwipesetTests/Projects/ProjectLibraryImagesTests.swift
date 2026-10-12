@@ -6,6 +6,7 @@
 import CoreGraphics
 import Foundation
 import Testing
+import UIKit
 @testable import Swipeset
 
 @MainActor
@@ -169,6 +170,87 @@ struct ProjectLibraryImagesTests {
         #expect(library.photo(at: address) == nil)
         #expect(library.failure?.kind == .importPhoto)
         #expect(library.importingCells.isEmpty)
+    }
+
+    // MARK: Restoring
+
+    /// A library whose cell at `address` holds `missing`, a photo from asset "A/L0/001" whose
+    /// copy was deleted.
+    private struct MissingCopy {
+        let library: ProjectLibrary
+        let address: CellAddress
+        let missing: PlacedImage
+    }
+
+    private func makeLibraryMissingACopy() async throws -> MissingCopy {
+        let (library, address) = try await makeLibrary()
+        let picked = try pickedPhoto()
+        await library.importPhoto(into: address, assetIdentifier: "A/L0/001") { .file(picked) }
+        library.setCrop(ImageCrop(scale: 2, centerX: 0.3, centerY: 0.5), at: address)
+        await library.flush()
+        let image = try #require(library.photo(at: address))
+        try FileManager.default.removeItem(at: paths.imageFile(image.id, in: address.projectID))
+        return MissingCopy(library: library, address: address, missing: image)
+    }
+
+    @Test func restoresAMissingCopyKeepingItsFraming() async throws {
+        let copy = try await makeLibraryMissingACopy()
+        let library = copy.library, address = copy.address, missing = copy.missing
+
+        let outcome = await library.restorePhoto(at: address, from: MockPhotoLibrary(assets: ["A/L0/001"]), asking: false)
+        await library.flush()
+
+        let restored = try #require(library.photo(at: address))
+        #expect(outcome == .restored)
+        #expect(restored.id != missing.id)
+        #expect(restored.assetIdentifier == "A/L0/001")
+        #expect(restored.crop == missing.crop)
+        #expect(copyExists(restored, in: address.projectID))
+    }
+
+    /// A photo removed while its restore was out stays removed.
+    @Test func aRestoreLeavesARemovedPhotoRemoved() async throws {
+        let copy = try await makeLibraryMissingACopy()
+        let library = copy.library, address = copy.address
+
+        await library.importPhoto(into: address, assetIdentifier: "A/L0/001", replacing: copy.missing.id) {
+            library.removePhoto(at: address)
+            return .image(UIImage(cgImage: try #require(SampleImages.image(for: UUID(), width: 100, height: 100))))
+        }
+        await library.flush()
+
+        #expect(library.photo(at: address) == nil)
+        #expect(contents(of: paths.imagesFolder(for: address.projectID)).isEmpty)
+    }
+
+    @Test func restoringOnSightNeverAsksForAccess() async throws {
+        let copy = try await makeLibraryMissingACopy()
+        let library = copy.library, address = copy.address, missing = copy.missing
+        let photos = MockPhotoLibrary(canReadWithoutAsking: false, assets: ["A/L0/001"])
+
+        #expect(await library.restorePhoto(at: address, from: photos, asking: false) == .needsAccess)
+        #expect(library.photo(at: address) == missing)
+        #expect(library.failure == nil)
+    }
+
+    @Test func reportsAccessTheUserRefused() async throws {
+        let copy = try await makeLibraryMissingACopy()
+        let library = copy.library, address = copy.address
+        let photos = MockPhotoLibrary(canReadWithoutAsking: false, grantsAccess: false, assets: ["A/L0/001"])
+
+        #expect(await library.restorePhoto(at: address, from: photos, asking: true) == .denied)
+        #expect(library.failure?.kind == .restorePhoto)
+    }
+
+    @Test func reportsAGoneOriginalOnlyWhenAsked() async throws {
+        let copy = try await makeLibraryMissingACopy()
+        let library = copy.library, address = copy.address, missing = copy.missing
+
+        #expect(await library.restorePhoto(at: address, from: MockPhotoLibrary(), asking: false) == .unavailable)
+        #expect(library.failure == nil)
+        #expect(await library.restorePhoto(at: address, from: MockPhotoLibrary(), asking: true) == .unavailable)
+        #expect(library.failure?.kind == .restorePhoto)
+        #expect(library.photo(at: address) == missing)
     }
 
     private func contents(of folder: URL) -> [String] {

@@ -10,12 +10,13 @@ import SwiftUI
 struct CellPhoto<Missing: View>: View {
     let image: PlacedImage
     let projectID: UUID
+    /// Whether the copy turned out unreadable, for the cell to offer what it can do about it.
+    @Binding var isMissing: Bool
     @ViewBuilder let missing: () -> Missing
     @Environment(\.imageLoader) private var loader
     @Environment(\.displayScale) private var displayScale
     /// The last decode, kept on screen while a sharper one loads for a bigger size.
     @State private var loaded: CGImage?
-    @State private var isMissing = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -52,13 +53,16 @@ struct CellPhoto<Missing: View>: View {
 extension CellPhoto where Missing == EmptyView {
     /// The photo with nothing in its place when it's missing, as thumbnails show it.
     init(image: PlacedImage, projectID: UUID) {
-        self.init(image: image, projectID: projectID) {
+        self.init(image: image, projectID: projectID, isMissing: .constant(false)) {
             EmptyView()
         }
     }
 }
 
 #Preview {
-    CellPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 3072, pixelHeight: 2048), projectID: UUID())
-        .frame(width: 200, height: 300)
+    @Previewable @State var isMissing = false
+    CellPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 3072, pixelHeight: 2048), projectID: UUID(), isMissing: $isMissing) {
+        Text("Missing")
+    }
+    .frame(width: 200, height: 300)
 }

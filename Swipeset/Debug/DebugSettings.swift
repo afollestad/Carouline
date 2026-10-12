@@ -19,6 +19,8 @@ final class DebugSettings {
 
     /// Swaps the real projects for `SampleProjects` in a store of their own.
     let usesSampleProjects: Bool
+    /// Leaves one sample photo's copy unwritten, so it shows as missing.
+    let missesSampleImage: Bool
     /// The project, by its place in the list, to open on launch.
     let openProjectIndex: Int?
     /// A photo in the open project to select on launch, by slide and cell index.
@@ -26,12 +28,14 @@ final class DebugSettings {
     let sheet: Sheet?
 
     /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, leaving the real ones alone),
+    /// `-DebugMissingImages` (`YES` leaves a sample photo's copy out, so it shows as missing),
     /// `-DebugOpenProject` (a project's index in the list, from 0), `-DebugSelectCell` (a photo
     /// to frame in it, as slide and cell indexes like `2,0`) and `-DebugSheet` (`newProject` on
     /// the list, or `layout` for a new slide in the open project) from `arguments`, ignoring
     /// values it can't parse.
     init(arguments: [String: Any] = [:]) {
         usesSampleProjects = (arguments["DebugSampleProjects"] as? String).map(Self.isTrue) ?? false
+        missesSampleImage = (arguments["DebugMissingImages"] as? String).map(Self.isTrue) ?? false
         openProjectIndex = (arguments["DebugOpenProject"] as? String).flatMap { Int($0) }
         let cell = (arguments["DebugSelectCell"] as? String)?.split(separator: ",").compactMap { Int($0) } ?? []
         selectedCell = cell.count == 2 ? (cell[0], cell[1]) : nil

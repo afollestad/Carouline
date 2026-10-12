@@ -14,13 +14,20 @@ struct CellActions {
     /// Selects the photo to frame it.
     let select: (CellAddress) -> Void
     let setCrop: (ImageCrop, CellAddress) -> Void
+    /// Brings a missing photo back from the library, asking for access if need be.
+    let restorePhoto: (CellAddress) -> Void
+    /// Brings a missing photo back from the library if that needs no asking, as when one is
+    /// found missing.
+    let restorePhotoQuietly: (CellAddress) -> Void
 
     static let preview = CellActions(
         choosePhoto: { _ in },
         takePhoto: { _ in },
         removePhoto: { _ in },
         select: { _ in },
-        setCrop: { _, _ in }
+        setCrop: { _, _ in },
+        restorePhoto: { _ in },
+        restorePhotoQuietly: { _ in }
     )
 }
 
@@ -38,6 +45,7 @@ struct CellView: View {
     @State private var size: CGSize = .zero
     /// The crop when the current drag or pinch began, which the gesture's values build on.
     @State private var gestureStart: ImageCrop?
+    @State private var isMissing = false
 
     var body: some View {
         ZStack {
@@ -88,8 +96,11 @@ struct CellView: View {
         if isSelected, let liveCrop = session.liveCrop {
             shown.crop = liveCrop
         }
-        return CellPhoto(image: shown, projectID: address.projectID) {
-            MissingPhoto(position: position, menu: photoMenu)
+        let photo = CellPhoto(image: shown, projectID: address.projectID, isMissing: $isMissing) {
+            MissingPhoto(menu: missingMenu(image))
+                .task {
+                    actions.restorePhotoQuietly(address)
+                }
         }
         .id(image.id)
         .overlay {
@@ -101,33 +112,49 @@ struct CellView: View {
         }
         .gesture(cropGesture(for: image), isEnabled: isSelected)
         .onTapGesture {
-            if !isSelected {
+            // A missing photo has nothing to frame; its own menu offers what can be done.
+            if !isSelected, !isMissing {
                 select()
             }
         }
-        .accessibilityElement()
-        .accessibilityLabel(position.capitalizingFirstLetter)
-        .accessibilityAddTraits(isSelected ? [.isImage, .isSelected] : [.isImage])
-        .accessibilityHint(isSelected ? "" : "Selects the photo to move and zoom it")
-        .accessibilityAction {
-            select()
-        }
-        .accessibilityActions {
-            if isSelected {
-                Button("Move Photo Left") { nudge(image, x: -1, y: 0) }
-                Button("Move Photo Right") { nudge(image, x: 1, y: 0) }
-                Button("Move Photo Up") { nudge(image, x: 0, y: -1) }
-                Button("Move Photo Down") { nudge(image, x: 0, y: 1) }
+        return accessible(photo, image: image, isSelected: isSelected)
+    }
+
+    /// `photo` as one element for VoiceOver, with the menu's choices as its actions and, while
+    /// it's selected, steps to move it in place of dragging.
+    private func accessible(_ photo: some View, image: PlacedImage, isSelected: Bool) -> some View {
+        photo
+            .accessibilityElement()
+            .accessibilityLabel(isMissing ? "\(position.capitalizingFirstLetter), unavailable" : position.capitalizingFirstLetter)
+            .accessibilityAddTraits(isMissing ? [] : isSelected ? [.isImage, .isSelected] : [.isImage])
+            .accessibilityHint(isSelected || isMissing ? "" : "Selects the photo to move and zoom it")
+            .accessibilityAction {
+                if !isMissing {
+                    select()
+                }
             }
-            photoMenu
-        }
-        // No menu while framing, where a long press is the start of a drag, and the bar below
-        // offers the same choices.
-        .contextMenu {
-            if !isSelected {
-                photoMenu
+            .accessibilityActions {
+                if isMissing {
+                    missingMenu(image)
+                } else {
+                    if isSelected {
+                        Button("Move Photo Left") { nudge(image, x: -1, y: 0) }
+                        Button("Move Photo Right") { nudge(image, x: 1, y: 0) }
+                        Button("Move Photo Up") { nudge(image, x: 0, y: -1) }
+                        Button("Move Photo Down") { nudge(image, x: 0, y: 1) }
+                    }
+                    photoMenu
+                }
             }
-        }
+            // No menu while framing, where a long press is the start of a drag, and the bar below
+            // offers the same choices.
+            .contextMenu {
+                if isMissing {
+                    missingMenu(image)
+                } else if !isSelected {
+                    photoMenu
+                }
+            }
     }
 
     private func select() {
@@ -190,6 +217,16 @@ struct CellView: View {
     }
 
     @ViewBuilder
+    private func missingMenu(_ image: PlacedImage) -> some View {
+        if image.assetIdentifier != nil {
+            Button("Restore from Photos", systemImage: "arrow.clockwise") {
+                actions.restorePhoto(address)
+            }
+        }
+        photoMenu
+    }
+
+    @ViewBuilder
     private var photoMenu: some View {
         Section("Replace Photo") {
             sourceButtons
@@ -234,9 +271,9 @@ private struct AddPhotoButton<Sources: View>: View {
     }
 }
 
-/// What a cell shows when its photo's copy can't be read: a warning, and the ways to fill it again.
+/// What a cell shows when its photo's copy can't be read: a warning, and the ways to fill it
+/// again. VoiceOver reads the cell's own label and actions instead.
 private struct MissingPhoto<MenuContent: View>: View {
-    let position: String
     let menu: MenuContent
 
     var body: some View {
@@ -254,10 +291,9 @@ private struct MissingPhoto<MenuContent: View>: View {
                     .minimumScaleFactor(0.8)
             }
             .buttonStyle(.glass)
-            .accessibilityLabel("\(position.capitalizingFirstLetter), unavailable")
-            .accessibilityHint("Replace or remove the missing photo")
         }
         .padding(8)
+        .accessibilityHidden(true)
     }
 }
 

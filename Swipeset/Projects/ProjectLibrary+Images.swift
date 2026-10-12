@@ -10,12 +10,17 @@ extension ProjectLibrary {
         cell(at: address)?.image
     }
 
-    /// Copies the photo `source` produces into the cell at `address`, replacing any photo there.
-    /// `source` runs first, so a slow load from the picker shows as importing too, and a nil from
-    /// it, as from a picker that hands back nothing, leaves the cell as it was.
+    /// Copies the photo `source` produces into the cell at `address`, replacing any photo there,
+    /// framed by `crop`. `source` runs first, so a slow load from the picker shows as importing
+    /// too, and a nil from it, as from a picker that hands back nothing, leaves the cell as it was.
+    /// A failure shows as `failureKind`, or not at all when that's nil, and `replacing`, when
+    /// given, is the only photo the copy may take the place of.
     func importPhoto(
         into address: CellAddress,
         assetIdentifier: String?,
+        crop: ImageCrop = ImageCrop(),
+        failingAs failureKind: LibraryFailure.Kind? = .importPhoto,
+        replacing expectedImageID: UUID? = nil,
         from source: @escaping @Sendable () async throws -> PhotoSource?
     ) async {
         let token = UUID()
@@ -49,15 +54,68 @@ extension ProjectLibrary {
                   try await store.adoptImage(at: staging, as: imageID, in: address.projectID) else {
                 return
             }
-            let image = PlacedImage(id: imageID, assetIdentifier: assetIdentifier, pixelWidth: Int(size.width), pixelHeight: Int(size.height))
-            // The cell may have gone, or a newer pick replaced this one, while the copy was written.
-            guard importTokens[address] == token, place(image, at: address) else {
+            let image = PlacedImage(
+                id: imageID,
+                assetIdentifier: assetIdentifier,
+                pixelWidth: Int(size.width),
+                pixelHeight: Int(size.height),
+                crop: crop
+            )
+            // The cell may have gone, a newer pick replaced this one, or the photo it was meant
+            // for been removed or replaced, while the copy was written.
+            guard importTokens[address] == token,
+                  expectedImageID == nil || self.photo(at: address)?.id == expectedImageID,
+                  place(image, at: address) else {
                 write { await $0.deleteImages([imageID], in: address.projectID) }
                 return
             }
         } catch {
-            failure = LibraryFailure(kind: .importPhoto, error: error)
+            if let failureKind {
+                failure = LibraryFailure(kind: failureKind, error: error)
+            }
         }
+    }
+
+    /// How a restore went.
+    enum RestoreOutcome: Equatable {
+        case restored
+        /// The library can't be read without asking, which only the user's tap should do.
+        case needsAccess
+        case denied
+        /// The photo has no library original, or the original is gone.
+        case unavailable
+    }
+
+    /// Copies the photo at `address` in again from its library original, keeping its framing,
+    /// when its own copy went missing. Asks for access to the library only when `asking`, so a
+    /// restore on sight never prompts; one that asks reports what went wrong.
+    @discardableResult
+    func restorePhoto(at address: CellAddress, from photos: any PhotoLibrarySource, asking: Bool) async -> RestoreOutcome {
+        guard let image = photo(at: address), let assetIdentifier = image.assetIdentifier else {
+            return .unavailable
+        }
+        if !photos.canReadWithoutAsking {
+            guard asking else {
+                return .needsAccess
+            }
+            guard await photos.requestReadAccess() else {
+                failure = LibraryFailure(kind: .restorePhoto, error: RestoreError.denied)
+                return .denied
+            }
+        }
+        await importPhoto(
+            into: address,
+            assetIdentifier: assetIdentifier,
+            crop: image.crop,
+            failingAs: asking ? .restorePhoto : nil,
+            replacing: image.id
+        ) {
+            guard let original = await photos.image(for: assetIdentifier, maxPixelSize: ImageImporter.maximumPixelSize) else {
+                throw RestoreError.originalGone
+            }
+            return .image(original)
+        }
+        return photo(at: address)?.id == image.id ? .unavailable : .restored
     }
 
     func removePhoto(at address: CellAddress) {
@@ -100,4 +158,10 @@ extension ProjectLibrary {
         }
         return slide.cells[address.index]
     }
+}
+
+/// Why a photo couldn't come back from the library.
+nonisolated enum RestoreError: Error {
+    case denied
+    case originalGone
 }

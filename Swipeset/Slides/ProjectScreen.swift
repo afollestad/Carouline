@@ -19,6 +19,9 @@ struct ProjectScreen: View {
     @State private var pickedItem: PhotosPickerItem?
     @State private var cameraTarget: CellAddress?
     @State private var session: CropSession
+    /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
+    @State private var quietRestores: Set<UUID> = []
+    @Environment(\.photoLibrary) private var photoLibrary
     #if DEBUG
     @Environment(DebugSettings.self) private var debug: DebugSettings?
     #endif
@@ -131,6 +134,20 @@ struct ProjectScreen: View {
             select: { select($0) },
             setCrop: { crop, address in
                 library.setCrop(crop, at: address)
+            },
+            restorePhoto: { address in
+                Task {
+                    await library.restorePhoto(at: address, from: photoLibrary, asking: true)
+                }
+            },
+            restorePhotoQuietly: { address in
+                guard let imageID = library.photo(at: address)?.id, !quietRestores.contains(imageID) else {
+                    return
+                }
+                quietRestores.insert(imageID)
+                Task {
+                    await library.restorePhoto(at: address, from: photoLibrary, asking: false)
+                }
             }
         )
     }

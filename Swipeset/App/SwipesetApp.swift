@@ -26,7 +26,7 @@ struct SwipesetApp: App {
         #if DEBUG
         let debug = DebugSettings.fromLaunchArguments()
         _debug = State(initialValue: debug)
-        let store = debug.usesSampleProjects ? SampleStore.make() : ProjectStore()
+        let store = debug.usesSampleProjects ? SampleStore.make(missingImage: debug.missesSampleImage) : ProjectStore()
         #else
         let store = ProjectStore()
         #endif
