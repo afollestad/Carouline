@@ -26,6 +26,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5E7A5E700000000000000019 /* Exceptions for "Swipeset" folder in "Swipeset" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Storage/AGENTS.md,
+				Storage/CLAUDE.md,
+			);
+			target = 5E7A5E700000000000000010 /* Swipeset */;
+		};
 		5E7A5E700000000000000029 /* Exceptions for "SwipesetTests" folder in "SwipesetTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -39,6 +47,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5E7A5E700000000000000012 /* Swipeset */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5E7A5E700000000000000019 /* Exceptions for "Swipeset" folder in "Swipeset" target */,
+			);
 			path = Swipeset;
 			sourceTree = "<group>";
 		};
