@@ -67,10 +67,11 @@ extension ScreenSnapshotting {
         )
     }
 
-    /// `project`'s screen in its navigation stack, from a library holding just it.
-    func projectScreen(_ project: Project) -> some View {
+    /// `project`'s screen in its navigation stack, from a library holding just it, with
+    /// `selection` selected to frame.
+    func projectScreen(_ project: Project, selection: CellAddress? = nil) -> some View {
         NavigationStack {
-            ProjectScreen(library: library([project]), projectID: project.id)
+            ProjectScreen(library: library([project]), projectID: project.id, selection: selection)
         }
         .environment(\.imageLoader, imageLoader)
     }

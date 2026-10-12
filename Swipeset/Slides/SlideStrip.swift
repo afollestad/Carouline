@@ -17,6 +17,9 @@ struct SlideStrip: View {
     @Binding var position: StripItem?
     let importingCells: Set<CellAddress>
     let cellActions: CellActions
+    let session: CropSession
+    /// Taps between the slides, which finish framing a photo.
+    let onBackgroundTap: () -> Void
     let onAddSlide: () -> Void
     let onChangeLayout: (UUID) -> Void
     let onMove: (UUID, Int) -> Void
@@ -33,6 +36,7 @@ struct SlideStrip: View {
         Group {
             if project.slides.isEmpty {
                 GhostSlide(size: slideSize, onAdd: onAddSlide)
+                    .padding(.bottom, SelectionBar.reservedHeight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 strip
@@ -58,6 +62,7 @@ struct SlideStrip: View {
                         size: slideSize,
                         importingCells: importingCells,
                         cellActions: cellActions,
+                        session: session,
                         onChangeLayout: { onChangeLayout(slide.id) },
                         onMove: { onMove(slide.id, $0) },
                         onDelete: { onDelete(slide.id) }
@@ -74,9 +79,14 @@ struct SlideStrip: View {
             // shift a centered `scrollPosition` off the middle of the screen.
             .padding(.leading, max(0, (size.width - slideSize.width) / 2))
             .padding(.trailing, max(0, (size.width - Self.addButtonSize) / 2))
+            .padding(.bottom, SelectionBar.reservedHeight)
             .frame(maxHeight: .infinity)
+            .contentShape(.rect)
+            .onTapGesture(perform: onBackgroundTap)
         }
         .scrollTargetBehavior(snapping)
+        // A drag on the selected photo frames it rather than scrolling past it.
+        .scrollDisabled(session.selection != nil)
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
@@ -96,7 +106,7 @@ struct SlideStrip: View {
     private var slideSize: CGSize {
         let ratio = project.aspectRatio.widthOverHeight
         let maxWidth = size.width * (horizontalSizeClass == .regular ? 0.7 : 0.82)
-        let maxHeight = max(0, size.height - Self.captionSpace - 32)
+        let maxHeight = max(0, size.height - Self.captionSpace - SelectionBar.reservedHeight - 32)
         let width = max(0, min(maxWidth, maxHeight * ratio))
         return CGSize(width: width, height: width / ratio)
     }
@@ -135,6 +145,7 @@ private struct SlideCard: View {
     let size: CGSize
     let importingCells: Set<CellAddress>
     let cellActions: CellActions
+    let session: CropSession
     let onChangeLayout: () -> Void
     let onMove: (Int) -> Void
     let onDelete: () -> Void
@@ -150,7 +161,8 @@ private struct SlideCard: View {
                     background: style.background,
                     position: "slide \(number), photo \(index + 1) of \(slide.cells.count)",
                     isImporting: importingCells.contains(address),
-                    actions: cellActions
+                    actions: cellActions,
+                    session: session
                 )
             }
             .frame(width: size.width, height: size.height)
@@ -264,6 +276,8 @@ private struct GhostSlide: View {
         position: $position,
         importingCells: [],
         cellActions: .preview,
+        session: CropSession(),
+        onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },
         onMove: { _, _ in },
@@ -279,6 +293,8 @@ private struct GhostSlide: View {
         position: $position,
         importingCells: [],
         cellActions: .preview,
+        session: CropSession(),
+        onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },
         onMove: { _, _ in },

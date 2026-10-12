@@ -89,6 +89,22 @@ struct ProjectLibraryImagesTests {
         #expect(!copyExists(image, in: address.projectID))
     }
 
+    @Test func savesANewCropAndIgnoresAnUnchangedOne() async throws {
+        let (library, address) = try await makeLibrary()
+        let picked = try pickedPhoto()
+        await library.importPhoto(into: address, assetIdentifier: nil) { .file(picked) }
+        let modified = library.project(address.projectID)?.modifiedAt
+        let crop = ImageCrop(scale: 2, centerX: 0.4, centerY: 0.5)
+
+        library.setCrop(ImageCrop(), at: address)
+        #expect(library.project(address.projectID)?.modifiedAt == modified)
+        library.setCrop(crop, at: address)
+        await library.flush()
+
+        #expect(library.photo(at: address)?.crop == crop)
+        #expect(await ProjectStore(paths: paths).loadAll().projects.first?.images.first?.crop == crop)
+    }
+
     @Test func anImportIntoADeletedSlideLeavesNoCopy() async throws {
         let (library, address) = try await makeLibrary()
         let picked = try pickedPhoto()

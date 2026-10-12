@@ -24,6 +24,12 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(gridFirst))
     }
 
+    @Test func selectedPhoto() async {
+        let project = projects[0]
+        let selection = CellAddress(projectID: project.id, slideID: project.slides[0].id, index: 0)
+        await assertScreenSnapshot(of: projectScreen(project, selection: selection))
+    }
+
     @Test func newSlideSheet() async {
         await assertScreenSnapshot(of: LayoutSheet(aspectRatio: .portrait, current: nil) { _ in 0 } onChoose: { _ in })
     }

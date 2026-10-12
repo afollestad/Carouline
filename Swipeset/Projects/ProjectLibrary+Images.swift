@@ -64,6 +64,19 @@ extension ProjectLibrary {
         place(nil, at: address)
     }
 
+    /// Frames the photo at `address` with `crop`, if there is one and it moved.
+    func setCrop(_ crop: ImageCrop, at address: CellAddress) {
+        guard let image = photo(at: address), image.crop != crop else {
+            return
+        }
+        update(address.projectID) { project in
+            guard let slideIndex = project.slides.firstIndex(where: { $0.id == address.slideID }) else {
+                return
+            }
+            project.slides[slideIndex].cells[address.index].image?.crop = crop
+        }
+    }
+
     /// Puts `image` in the cell at `address`, deleting the copy it replaces once that's saved.
     /// Returns false, changing nothing, when the cell no longer exists.
     @discardableResult

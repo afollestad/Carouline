@@ -11,8 +11,17 @@ struct CellActions {
     /// Nil without a camera, as in the simulator.
     let takePhoto: ((CellAddress) -> Void)?
     let removePhoto: (CellAddress) -> Void
+    /// Selects the photo to frame it.
+    let select: (CellAddress) -> Void
+    let setCrop: (ImageCrop, CellAddress) -> Void
 
-    static let preview = CellActions(choosePhoto: { _ in }, takePhoto: { _ in }, removePhoto: { _ in })
+    static let preview = CellActions(
+        choosePhoto: { _ in },
+        takePhoto: { _ in },
+        removePhoto: { _ in },
+        select: { _ in },
+        setCrop: { _, _ in }
+    )
 }
 
 /// One cell of a slide on the project screen: a button to fill it, its photo, or what's left
@@ -25,24 +34,16 @@ struct CellView: View {
     let position: String
     let isImporting: Bool
     let actions: CellActions
+    let session: CropSession
+    @State private var size: CGSize = .zero
+    /// The crop when the current drag or pinch began, which the gesture's values build on.
+    @State private var gestureStart: ImageCrop?
 
     var body: some View {
         ZStack {
             PlaceholderCell(background: background)
             if let image = cell.image {
-                CellPhoto(image: image, projectID: address.projectID) {
-                    MissingPhoto(position: position, menu: photoMenu)
-                }
-                .id(image.id)
-                .accessibilityElement()
-                .accessibilityLabel(position.capitalizingFirstLetter)
-                .accessibilityAddTraits(.isImage)
-                .accessibilityActions {
-                    photoMenu
-                }
-                .contextMenu {
-                    photoMenu
-                }
+                photo(image)
             } else if !isImporting {
                 AddPhotoButton(position: position, offersSources: actions.takePhoto != nil) {
                     sourceButtons
@@ -57,9 +58,123 @@ struct CellView: View {
                     .accessibilityLabel("Adding \(position)")
             }
         }
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            self.size = size
+            if isSelected {
+                session.cellSize = size
+            }
+        }
+        // A selection made elsewhere, as on launch, still needs the cell's size for the zoom slider.
+        .onChange(of: isSelected, initial: true) { _, isSelected in
+            if isSelected {
+                session.cellSize = size
+            }
+        }
         // Glass over the slide takes its scheme from the slide's background rather than the
         // system's, or a dark-mode button on a white slide turns pale gray under a white symbol.
         .environment(\.colorScheme, background.isLight ? .light : .dark)
+    }
+
+    private var isSelected: Bool {
+        session.selection == address
+    }
+
+    private func photo(_ image: PlacedImage) -> some View {
+        let isSelected = isSelected
+        var shown = image
+        // Only the selected cell reads the live crop, so a drag redraws it alone.
+        if isSelected, let liveCrop = session.liveCrop {
+            shown.crop = liveCrop
+        }
+        return CellPhoto(image: shown, projectID: address.projectID) {
+            MissingPhoto(position: position, menu: photoMenu)
+        }
+        .id(image.id)
+        .overlay {
+            if isSelected {
+                Rectangle()
+                    .strokeBorder(.tint, lineWidth: 3)
+                    .accessibilityHidden(true)
+            }
+        }
+        .gesture(cropGesture(for: image), isEnabled: isSelected)
+        .onTapGesture {
+            if !isSelected {
+                select()
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(position.capitalizingFirstLetter)
+        .accessibilityAddTraits(isSelected ? [.isImage, .isSelected] : [.isImage])
+        .accessibilityHint(isSelected ? "" : "Selects the photo to move and zoom it")
+        .accessibilityAction {
+            select()
+        }
+        .accessibilityActions {
+            if isSelected {
+                Button("Move Photo Left") { nudge(image, x: -1, y: 0) }
+                Button("Move Photo Right") { nudge(image, x: 1, y: 0) }
+                Button("Move Photo Up") { nudge(image, x: 0, y: -1) }
+                Button("Move Photo Down") { nudge(image, x: 0, y: 1) }
+            }
+            photoMenu
+        }
+        // No menu while framing, where a long press is the start of a drag, and the bar below
+        // offers the same choices.
+        .contextMenu {
+            if !isSelected {
+                photoMenu
+            }
+        }
+    }
+
+    private func select() {
+        session.cellSize = size
+        actions.select(address)
+    }
+
+    /// Drags pan and pinches zoom about where they started, together in one gesture, each
+    /// measured from the crop at the gesture's start so the photo tracks the fingers exactly.
+    private func cropGesture(for image: PlacedImage) -> some Gesture {
+        SimultaneousGesture(DragGesture(minimumDistance: 0), MagnifyGesture())
+            .onChanged { value in
+                let start = gestureStart ?? session.liveCrop ?? image.crop
+                gestureStart = start
+                var crop = start
+                if let magnify = value.second {
+                    crop = CropGeometry.zoomed(
+                        crop,
+                        by: magnify.magnification,
+                        about: magnify.startLocation,
+                        imageSize: image.pixelSize,
+                        cellSize: size
+                    )
+                }
+                if let drag = value.first {
+                    crop = CropGeometry.panned(crop, by: drag.translation, imageSize: image.pixelSize, cellSize: size)
+                }
+                session.liveCrop = crop
+            }
+            .onEnded { _ in
+                if let crop = session.liveCrop {
+                    actions.setCrop(crop, address)
+                }
+                session.liveCrop = nil
+                gestureStart = nil
+            }
+    }
+
+    /// Moves the photo a tenth of the cell, for VoiceOver, which can't drag.
+    private func nudge(_ image: PlacedImage, x: CGFloat, y: CGFloat) {
+        let crop = CropGeometry.panned(
+            image.crop,
+            by: CGSize(width: x * size.width / 10, height: y * size.height / 10),
+            imageSize: image.pixelSize,
+            cellSize: size
+        )
+        actions.setCrop(crop, address)
     }
 
     @ViewBuilder
@@ -167,7 +282,8 @@ private extension String {
             background: .white,
             position: "photo \(index + 1) of 4",
             isImporting: index == 3,
-            actions: .preview
+            actions: .preview,
+            session: CropSession(selection: CellAddress(projectID: projectID, slideID: slide.id, index: 0))
         )
     }
     .frame(width: 320, height: 400)

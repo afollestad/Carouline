@@ -21,15 +21,20 @@ final class DebugSettings {
     let usesSampleProjects: Bool
     /// The project, by its place in the list, to open on launch.
     let openProjectIndex: Int?
+    /// A photo in the open project to select on launch, by slide and cell index.
+    let selectedCell: (slide: Int, cell: Int)?
     let sheet: Sheet?
 
     /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, leaving the real ones alone),
-    /// `-DebugOpenProject` (a project's index in the list, from 0) and `-DebugSheet` (`newProject`
-    /// on the list, or `layout` for a new slide in the open project) from `arguments`, ignoring
+    /// `-DebugOpenProject` (a project's index in the list, from 0), `-DebugSelectCell` (a photo
+    /// to frame in it, as slide and cell indexes like `2,0`) and `-DebugSheet` (`newProject` on
+    /// the list, or `layout` for a new slide in the open project) from `arguments`, ignoring
     /// values it can't parse.
     init(arguments: [String: Any] = [:]) {
         usesSampleProjects = (arguments["DebugSampleProjects"] as? String).map(Self.isTrue) ?? false
         openProjectIndex = (arguments["DebugOpenProject"] as? String).flatMap { Int($0) }
+        let cell = (arguments["DebugSelectCell"] as? String)?.split(separator: ",").compactMap { Int($0) } ?? []
+        selectedCell = cell.count == 2 ? (cell[0], cell[1]) : nil
         sheet = (arguments["DebugSheet"] as? String).flatMap(Sheet.init(rawValue:))
     }
 
