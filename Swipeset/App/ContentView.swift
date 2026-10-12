@@ -7,20 +7,27 @@ import SwiftUI
 
 struct ContentView: View {
     let library: ProjectLibrary
+    @State private var path: [UUID] = []
     @State private var isChoosingShape = false
+    /// A project created in the shape sheet, opened once the sheet is gone, since a push while it
+    /// slides away can be dropped.
+    @State private var createdProjectID: UUID?
     #if DEBUG
     @Environment(DebugSettings.self) private var debug: DebugSettings?
     #endif
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ProjectsScreen(library: library) {
                 isChoosingShape = true
             }
+            .navigationDestination(for: UUID.self) { projectID in
+                ProjectScreen(library: library, projectID: projectID)
+            }
         }
-        .sheet(isPresented: $isChoosingShape) {
+        .sheet(isPresented: $isChoosingShape, onDismiss: openCreatedProject) {
             AspectRatioSheet { ratio in
-                _ = library.createProject(aspectRatio: ratio)
+                createdProjectID = library.createProject(aspectRatio: ratio).id
             }
         }
         .alert("Couldn't Save Changes", isPresented: showsWriteFailure, presenting: library.writeFailure) { _ in
@@ -31,7 +38,7 @@ struct ContentView: View {
         .task {
             await library.load()
             #if DEBUG
-            await openDebugSheet()
+            await applyDebugSettings()
             #endif
         }
     }
@@ -46,16 +53,26 @@ struct ContentView: View {
         }
     }
 
+    private func openCreatedProject() {
+        guard let createdProjectID else {
+            return
+        }
+        self.createdProjectID = nil
+        path.append(createdProjectID)
+    }
+
     #if DEBUG
-    /// Opens `-DebugSheet`'s sheet after a moment, since a presentation on the first frame doesn't render.
-    private func openDebugSheet() async {
-        guard let sheet = debug?.sheet else {
+    /// Opens `-DebugOpenProject`'s project, and `-DebugSheet`'s sheet after a moment, since a
+    /// presentation on the first frame doesn't render.
+    private func applyDebugSettings() async {
+        if let index = debug?.openProjectIndex, library.projects.indices.contains(index) {
+            path = [library.projects[index].id]
+        }
+        guard debug?.sheet == .newProject else {
             return
         }
         try? await Task.sleep(for: .milliseconds(500))
-        switch sheet {
-        case .newProject: isChoosingShape = true
-        }
+        isChoosingShape = true
     }
     #endif
 }

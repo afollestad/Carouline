@@ -72,18 +72,19 @@ private struct ProjectRow: View {
     @State private var isConfirmingDelete = false
 
     var body: some View {
-        HStack(spacing: 14) {
-            ProjectThumbnail(project: project)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(project.name)
-                    .font(.headline)
-                    .foregroundStyle(Color.primary)
-                Text(project.summary)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
+        NavigationLink(value: project.id) {
+            HStack(spacing: 14) {
+                ProjectThumbnail(project: project)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(project.name)
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+                    Text(project.summary)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                }
             }
         }
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(project.name), \(project.spokenSummary)")
         // Without the destructive role, which would start removing the row before the confirmation.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -119,17 +120,27 @@ private struct ProjectRow: View {
     }
 }
 
-/// A small picture of the project's slide shape.
+/// The project's first slide, or its empty shape before it has one.
 private struct ProjectThumbnail: View {
     let project: Project
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(.fill.tertiary)
-            .strokeBorder(.separator)
-            .aspectRatio(project.aspectRatio.widthOverHeight, contentMode: .fit)
-            .frame(width: 56, height: 56)
-            .accessibilityHidden(true)
+        Group {
+            if let slide = project.slides.first {
+                SlideView(slide: slide, style: project.style)
+                    .overlay {
+                        Rectangle()
+                            .strokeBorder(.separator, lineWidth: 0.5)
+                    }
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(.fill.tertiary)
+                    .strokeBorder(.separator)
+            }
+        }
+        .aspectRatio(project.aspectRatio.widthOverHeight, contentMode: .fit)
+        .frame(width: 56, height: 56)
+        .accessibilityHidden(true)
     }
 }
 

@@ -1,0 +1,242 @@
+//
+//  SlideStrip.swift
+//  Swipeset
+//
+
+import SwiftUI
+
+/// Something the strip can scroll to: a slide, or the button after the last one.
+enum StripItem: Hashable {
+    case slide(UUID)
+    case add
+}
+
+/// A project's slides side by side, with the button for another after the last.
+struct SlideStrip: View {
+    let project: Project
+    @Binding var position: StripItem?
+    let onAddSlide: () -> Void
+    let onChangeLayout: (UUID) -> Void
+    let onMove: (UUID, Int) -> Void
+    let onDelete: (UUID) -> Void
+    @State private var size: CGSize = .zero
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// The caption's height and the gap above it, which the slide makes room for.
+    private static let captionSpace: CGFloat = 56
+    private static let spacing: CGFloat = 20
+    private static let addButtonSize: CGFloat = 56
+
+    var body: some View {
+        Group {
+            if project.slides.isEmpty {
+                GhostSlide(size: slideSize, onAdd: onAddSlide)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                strip
+            }
+        }
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            self.size = size
+        }
+    }
+
+    private var strip: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(alignment: .slideCenter, spacing: Self.spacing) {
+                ForEach(Array(project.slides.enumerated()), id: \.element.id) { index, slide in
+                    SlideCard(
+                        slide: slide,
+                        number: index + 1,
+                        count: project.slides.count,
+                        style: project.style,
+                        size: slideSize,
+                        onChangeLayout: { onChangeLayout(slide.id) },
+                        onMove: { onMove(slide.id, $0) },
+                        onDelete: { onDelete(slide.id) }
+                    )
+                    .id(StripItem.slide(slide.id))
+                }
+                AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
+                    .id(StripItem.add)
+            }
+            .scrollTargetLayout()
+            // Room for the first slide and the add button each to reach the middle. Padding
+            // rather than `contentMargins`, which would center scroll targets between uneven
+            // margins instead of on screen.
+            .padding(.leading, max(16, (size.width - slideSize.width) / 2))
+            .padding(.trailing, max(16, (size.width - Self.addButtonSize) / 2))
+            .frame(maxHeight: .infinity)
+        }
+        .scrollTargetBehavior(.viewAligned(anchor: .center))
+        .scrollPosition(id: $position, anchor: .center)
+        .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+    }
+
+    /// The project's shape fitted to the screen, leaving the slides either side peeking in at
+    /// the edges so the strip reads as one to scroll.
+    private var slideSize: CGSize {
+        let ratio = project.aspectRatio.widthOverHeight
+        let maxWidth = size.width * (horizontalSizeClass == .regular ? 0.7 : 0.82)
+        let maxHeight = max(0, size.height - Self.captionSpace - 32)
+        let width = max(0, min(maxWidth, maxHeight * ratio))
+        return CGSize(width: width, height: width / ratio)
+    }
+}
+
+extension VerticalAlignment {
+    /// The middle of the slides, so the add button beside them lines up with the slides
+    /// rather than with the slides and their captions.
+    private enum SlideCenter: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat {
+            context[VerticalAlignment.center]
+        }
+    }
+
+    static let slideCenter = VerticalAlignment(SlideCenter.self)
+}
+
+private struct SlideCard: View {
+    let slide: Slide
+    let number: Int
+    let count: Int
+    let style: SlideStyle
+    let size: CGSize
+    let onChangeLayout: () -> Void
+    let onMove: (Int) -> Void
+    let onDelete: () -> Void
+    @State private var isConfirmingDelete = false
+
+    var body: some View {
+        VStack(spacing: 12) {
+            SlideView(slide: slide, style: style)
+                .frame(width: size.width, height: size.height)
+                // A hairline, so a slide the color of the screen still shows its edges.
+                .overlay {
+                    Rectangle()
+                        .strokeBorder(.separator, lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+                .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Slide \(number) of \(count), \(slide.layout.name)")
+            HStack(spacing: 8) {
+                Text("Slide \(number)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.secondary)
+                    .accessibilityHidden(true)
+                Menu {
+                    Button("Change Layout…", systemImage: "rectangle.split.2x2", action: onChangeLayout)
+                    Button("Move Left", systemImage: "arrow.left") {
+                        onMove(-1)
+                    }
+                    .disabled(number == 1)
+                    Button("Move Right", systemImage: "arrow.right") {
+                        onMove(1)
+                    }
+                    .disabled(number == count)
+                    Divider()
+                    Button("Delete Slide", systemImage: "trash", role: .destructive) {
+                        isConfirmingDelete = true
+                    }
+                } label: {
+                    Label("Slide \(number) Options", systemImage: "ellipsis")
+                        .labelStyle(.iconOnly)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+            }
+            .frame(height: 44)
+        }
+        .confirmationDialog("Delete Slide \(number)?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+            Button("Delete Slide", role: .destructive, action: onDelete)
+        } message: {
+            Text(deletionMessage)
+        }
+    }
+
+    private var deletionMessage: String {
+        switch slide.cells.compactMap(\.image).count {
+        case 0: "This slide has no photos yet."
+        case 1: "Its photo is removed from the project. The original stays in your photo library."
+        case let count: "Its \(count) photos are removed from the project. The originals stay in your photo library."
+        }
+    }
+}
+
+private struct AddSlideButton: View {
+    let size: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Add Slide", systemImage: "plus")
+                .labelStyle(.iconOnly)
+                .font(.title2.weight(.semibold))
+                .frame(width: size - 16, height: size - 16)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .accessibilityHint("Choose a layout for a new slide")
+        .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
+    }
+}
+
+/// Where the first slide will go, in the project's shape.
+private struct GhostSlide: View {
+    let size: CGSize
+    let onAdd: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.secondary, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                .frame(width: size.width, height: size.height)
+                .overlay {
+                    Button(action: onAdd) {
+                        Label("Add Slide", systemImage: "plus")
+                            .labelStyle(.iconOnly)
+                            .font(.title.weight(.semibold))
+                            .frame(width: 48, height: 48)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.circle)
+                    .accessibilityHint("Choose a layout for the first slide")
+                }
+            Text("Add a slide to start your carousel.")
+                .font(.subheadline)
+                .foregroundStyle(Color.secondary)
+        }
+        .padding(.bottom, 40)
+    }
+}
+
+#Preview("Slides") {
+    @Previewable @State var position: StripItem?
+    SlideStrip(
+        project: SampleProjects.all[0],
+        position: $position,
+        onAddSlide: {},
+        onChangeLayout: { _ in },
+        onMove: { _, _ in },
+        onDelete: { _ in }
+    )
+    .background(Color(.systemGroupedBackground))
+}
+
+#Preview("Empty") {
+    @Previewable @State var position: StripItem?
+    SlideStrip(
+        project: SampleProjects.all[2],
+        position: $position,
+        onAddSlide: {},
+        onChangeLayout: { _ in },
+        onMove: { _, _ in },
+        onDelete: { _ in }
+    )
+    .background(Color(.systemGroupedBackground))
+}

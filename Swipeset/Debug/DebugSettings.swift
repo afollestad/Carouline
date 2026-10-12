@@ -14,17 +14,22 @@ final class DebugSettings {
     /// A sheet to open on launch, since `simctl` can't tap to one.
     enum Sheet: String {
         case newProject
+        case layout
     }
 
     /// Swaps the real projects for `SampleProjects` in a store of their own.
     let usesSampleProjects: Bool
+    /// The project, by its place in the list, to open on launch.
+    let openProjectIndex: Int?
     let sheet: Sheet?
 
-    /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, leaving the real ones alone)
-    /// and `-DebugSheet` (`newProject` opens the new project sheet) from `arguments`, ignoring
+    /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, leaving the real ones alone),
+    /// `-DebugOpenProject` (a project's index in the list, from 0) and `-DebugSheet` (`newProject`
+    /// on the list, or `layout` for a new slide in the open project) from `arguments`, ignoring
     /// values it can't parse.
     init(arguments: [String: Any] = [:]) {
         usesSampleProjects = (arguments["DebugSampleProjects"] as? String).map(Self.isTrue) ?? false
+        openProjectIndex = (arguments["DebugOpenProject"] as? String).flatMap { Int($0) }
         sheet = (arguments["DebugSheet"] as? String).flatMap(Sheet.init(rawValue:))
     }
 

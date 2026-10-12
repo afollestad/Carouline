@@ -3,7 +3,7 @@
 //  SwipesetTests
 //
 
-import Foundation
+import SwiftUI
 import Testing
 @testable import Swipeset
 
@@ -43,6 +43,28 @@ extension ScreenSnapshotting {
             Project(id: fixtureID(3), name: "Coastline", aspectRatio: .landscape, createdAt: created),
             Project(id: fixtureID(4), name: "Square One", aspectRatio: .square, createdAt: created)
         ]
+    }
+
+    /// A landscape project with a slide in each of a few layouts, several to a screen.
+    var landscapeProject: Project {
+        Project(
+            id: fixtureID(5),
+            name: "Coastline",
+            aspectRatio: .landscape,
+            slides: [
+                Slide(id: fixtureID(51), layout: .threeColumns),
+                Slide(id: fixtureID(52), layout: .oneLeftTwoRight),
+                Slide(id: fixtureID(53), layout: .twoRows)
+            ],
+            createdAt: created
+        )
+    }
+
+    /// `project`'s screen in its navigation stack, from a library holding just it.
+    func projectScreen(_ project: Project) -> some View {
+        NavigationStack {
+            ProjectScreen(library: library([project]), projectID: project.id)
+        }
     }
 
     var unreadableProject: UnreadableProject {
