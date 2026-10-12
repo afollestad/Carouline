@@ -170,7 +170,7 @@ struct ProjectScreen: View {
     }
 
     private func strip(_ project: Project) -> some View {
-        SlideStrip(
+        let strip = SlideStrip(
             project: project,
             position: $stripPosition,
             importingCells: library.importingCells,
@@ -192,6 +192,8 @@ struct ProjectScreen: View {
                 }
             }
         )
+        // Slides leave fixed room for their captions and buttons, which larger text overflows.
+        return strip.dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     private var cellActions: CellActions {
