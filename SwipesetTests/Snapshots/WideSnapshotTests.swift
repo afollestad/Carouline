@@ -9,4 +9,4 @@ import Testing
 /// screen like `SnapshotTests`.
 @MainActor
 @Suite(.serialized)
-struct WideSnapshotTests {}
+struct WideSnapshotTests: ScreenSnapshotting {}

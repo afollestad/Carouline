@@ -9,6 +9,15 @@ import Testing
 
 extension WideSnapshotTests {
     @Test func emptyProjects() async {
-        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen {} }, on: .wide)
+        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library([])) {} }, on: .wide)
+    }
+
+    @Test func projectList() async {
+        let library = library(projects, unreadable: [unreadableProject])
+        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }, on: .wide)
+    }
+
+    @Test func newProjectSheet() async {
+        await assertScreenSnapshot(of: AspectRatioSheet { _ in }, on: .wide)
     }
 }

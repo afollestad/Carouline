@@ -29,6 +29,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 
 - Every visible change is checked in the simulator, not just compiled: launch it with `./scripts/run.sh -b` and capture with `xcrun simctl io <udid> screenshot`.
 - Every visible change also runs `./scripts/snapshots.sh verify`. When the change is intended, `record` the affected baselines and look at the new images.
+- Reach other states with debug launch arguments after `--`, e.g. `./scripts/run.sh -b -- -DebugSampleProjects YES -DebugSheet newProject`. `DebugSettings` documents each one; open sheets through `-DebugSheet`, since a presentation on the first frame doesn't render.
 - `simctl` cannot tap or drag, so use `axe touch --down --up --delay 0.1`, `axe drag` and `axe describe-ui` with `--udid`, which reach the simulator without the host's cursor. Never post host mouse events, which take over the user's.
 - Restore every temporary patch before finishing. Keep a backup copy and confirm with `git diff`.
 
