@@ -71,7 +71,7 @@ struct StyleSheet: View {
             }
             Text(value.wrappedValue, format: .percent.precision(.fractionLength(1)))
                 .monospacedDigit()
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(Color.primary)
                 .frame(minWidth: 48, alignment: .trailing)
                 .accessibilityHidden(true)
         }

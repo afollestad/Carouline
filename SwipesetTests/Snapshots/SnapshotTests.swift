@@ -11,11 +11,16 @@ import Testing
 /// since each snapshot puts its own window over the whole screen.
 @MainActor
 @Suite(.serialized)
-struct SnapshotTests: ScreenSnapshotting {}
+struct SnapshotTests: ScreenSnapshotting {
+    let temporary = TemporaryDirectory("SnapshotTests")
+}
 
 /// The fixtures both snapshot suites build their screens from.
 @MainActor
-protocol ScreenSnapshotting {}
+protocol ScreenSnapshotting {
+    /// Where screens that write files, like the export sheet, write them.
+    var temporary: TemporaryDirectory { get }
+}
 
 extension ScreenSnapshotting {
     /// A library of `projects` that never touches the disk.
@@ -88,6 +93,20 @@ extension ScreenSnapshotting {
         var project = gridFirst
         project.style = SlideStyle(spacing: 0.03, border: 0.05, background: .black)
         return project
+    }
+
+    /// `project`'s export sheet, which renders the fixture photos as drawn, but for the missing one.
+    func exportSheet(_ project: Project) -> some View {
+        let missing = fixtureID(missingPhotoNumber)
+        let exporter = SlideExporter(paths: ProjectPaths(root: temporary.url, temporary: temporary.url)) { image, _, size in
+            guard image.id != missing else {
+                return nil
+            }
+            let maxPixelSize = Int(max(size.width, size.height))
+            return SampleImages.image(for: image.id, width: image.pixelWidth, height: image.pixelHeight, maxPixelSize: maxPixelSize)
+        }
+        return ExportSheet(project: project, exporter: exporter)
+            .environment(\.photoSaver, MockPhotoSaver())
     }
 
     /// Draws every fixture photo but one, whose copy reads as missing.

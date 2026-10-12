@@ -19,6 +19,7 @@ struct ProjectScreen: View {
     @State private var pickedItem: PhotosPickerItem?
     @State private var cameraTarget: CellAddress?
     @State private var session: CropSession
+    @State private var isExporting = false
     @State private var isStyling = false
     /// The style being edited, which the slides draw while the style sheet is open.
     @State private var styleDraft: SlideStyle?
@@ -72,6 +73,11 @@ struct ProjectScreen: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     styleButton(project)
+                }
+                // Apart, so the two read as separate actions rather than one control.
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+                ToolbarItem(placement: .primaryAction) {
+                    shareButton(project)
                 }
             }
             .onChange(of: isStyling) { _, isStyling in
@@ -133,6 +139,19 @@ struct ProjectScreen: View {
         .popover(isPresented: $isStyling) {
             StyleSheet(style: styleDraftBinding(project), onCommit: saveStyleDraft)
                 .frame(idealWidth: 380, idealHeight: 540)
+        }
+    }
+
+    private func shareButton(_ project: Project) -> some View {
+        Button("Share Slides", systemImage: "square.and.arrow.up") {
+            select(nil)
+            isExporting = true
+        }
+        .disabled(project.slides.isEmpty)
+        .accessibilityHint("Saves the slides to Photos or shares them to another app")
+        .popover(isPresented: $isExporting) {
+            ExportSheet(project: project, exporter: SlideExporter(paths: library.store.paths))
+                .frame(idealWidth: 420, idealHeight: 480)
         }
     }
 
@@ -316,11 +335,15 @@ struct ProjectScreen: View {
         if let (slide, cell) = debug?.selectedCell, slides.indices.contains(slide) {
             select(CellAddress(projectID: projectID, slideID: slides[slide].id, index: cell))
         }
-        guard debug?.sheet == .layout else {
+        guard debug?.sheet == .layout || debug?.sheet == .export else {
             return
         }
         try? await Task.sleep(for: .milliseconds(500))
-        layoutPurpose = .newSlide
+        if debug?.sheet == .export {
+            isExporting = true
+        } else {
+            layoutPurpose = .newSlide
+        }
     }
     #endif
 }

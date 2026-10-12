@@ -59,7 +59,6 @@ private struct RatioTile: View {
                 .font(.headline)
             Text(ratio.name)
                 .font(.caption)
-                .foregroundStyle(Color.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)

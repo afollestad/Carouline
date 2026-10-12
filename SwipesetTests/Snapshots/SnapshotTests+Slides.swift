@@ -38,6 +38,10 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: StyleSheet(style: .constant(styledProject.style)) {})
     }
 
+    @Test func exportSlides() async {
+        await assertScreenSnapshot(of: exportSheet(projects[0]))
+    }
+
     @Test func newSlideSheet() async {
         await assertScreenSnapshot(of: LayoutSheet(aspectRatio: .portrait, current: nil) { _ in 0 } onChoose: { _ in })
     }

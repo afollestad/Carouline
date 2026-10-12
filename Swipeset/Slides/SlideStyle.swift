@@ -33,6 +33,10 @@ nonisolated struct RGBColor: Codable, Hashable, Sendable {
 }
 
 nonisolated extension RGBColor {
+    var uiColor: UIColor {
+        UIColor(red: red, green: green, blue: blue, alpha: 1)
+    }
+
     /// `color` in sRGB, clamped, since a wide-gamut pick reads past 0...1 there. Read through
     /// `UIColor` rather than `Color.Resolved`, whose components are linear.
     init(_ color: UIColor) {

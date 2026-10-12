@@ -15,6 +15,7 @@ final class DebugSettings {
     enum Sheet: String {
         case newProject
         case layout
+        case export
     }
 
     /// Swaps the real projects for `SampleProjects` in a store of their own.
@@ -31,7 +32,7 @@ final class DebugSettings {
     /// `-DebugMissingImages` (`YES` leaves a sample photo's copy out, so it shows as missing),
     /// `-DebugOpenProject` (a project's index in the list, from 0), `-DebugSelectCell` (a photo
     /// to frame in it, as slide and cell indexes like `2,0`) and `-DebugSheet` (`newProject` on
-    /// the list, or `layout` for a new slide in the open project) from `arguments`, ignoring
+    /// the list, or `layout` or `export` in the open project) from `arguments`, ignoring
     /// values it can't parse.
     init(arguments: [String: Any] = [:]) {
         usesSampleProjects = (arguments["DebugSampleProjects"] as? String).map(Self.isTrue) ?? false

@@ -360,6 +360,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Swipeset uses the camera to take photos for your slides.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Swipeset saves your slides to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swipeset reads your photo library to bring back a photo whose copy in a project has gone missing.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -395,6 +396,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Swipeset uses the camera to take photos for your slides.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Swipeset saves your slides to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swipeset reads your photo library to bring back a photo whose copy in a project has gone missing.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

@@ -9,4 +9,6 @@ import Testing
 /// screen like `SnapshotTests`.
 @MainActor
 @Suite(.serialized)
-struct WideSnapshotTests: ScreenSnapshotting {}
+struct WideSnapshotTests: ScreenSnapshotting {
+    let temporary = TemporaryDirectory("WideSnapshotTests")
+}
