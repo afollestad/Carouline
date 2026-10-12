@@ -55,6 +55,13 @@ extension ProjectLibrary {
         }
     }
 
+    func setStyle(_ style: SlideStyle, of projectID: UUID) {
+        guard let project = project(projectID), project.style != style else {
+            return
+        }
+        update(projectID) { $0.style = style }
+    }
+
     /// How many of `slide`'s photos `layout` has no cell for.
     static func photosLost(changing slide: Slide, to layout: SlideLayout) -> Int {
         cells(of: slide, in: layout).dropped.count

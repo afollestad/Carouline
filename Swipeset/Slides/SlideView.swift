@@ -62,7 +62,7 @@ struct SlideCells: Layout {
     }
 }
 
-extension RGBColor {
+nonisolated extension RGBColor {
     var color: Color {
         Color(.sRGB, red: red, green: green, blue: blue)
     }

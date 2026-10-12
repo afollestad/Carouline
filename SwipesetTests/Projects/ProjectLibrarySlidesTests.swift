@@ -86,6 +86,19 @@ struct ProjectLibrarySlidesTests {
         #expect(!exists(paths.imageFile(dropped.id, in: projectID)))
     }
 
+    @Test func savesANewStyleAndIgnoresTheSameOne() async throws {
+        let (library, projectID) = await makeLibrary()
+        let modified = library.project(projectID)?.modifiedAt
+        let style = SlideStyle(spacing: 0.02, border: 0.03, background: .black)
+
+        library.setStyle(.standard, of: projectID)
+        #expect(library.project(projectID)?.modifiedAt == modified)
+        library.setStyle(style, of: projectID)
+        await library.flush()
+
+        #expect(await ProjectStore(paths: paths).loadAll().projects.first?.style == style)
+    }
+
     // MARK: Helpers
 
     /// Puts a copy on disk and in cell `cell` of the slide, as an import would.

@@ -83,6 +83,13 @@ extension ScreenSnapshotting {
         return project
     }
 
+    /// The grid on black, with wide spacing and a border.
+    var styledProject: Project {
+        var project = gridFirst
+        project.style = SlideStyle(spacing: 0.03, border: 0.05, background: .black)
+        return project
+    }
+
     /// Draws every fixture photo but one, whose copy reads as missing.
     var imageLoader: MockImageLoader {
         MockImageLoader(missing: [fixtureID(missingPhotoNumber)])

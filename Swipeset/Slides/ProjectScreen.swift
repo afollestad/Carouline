@@ -19,6 +19,9 @@ struct ProjectScreen: View {
     @State private var pickedItem: PhotosPickerItem?
     @State private var cameraTarget: CellAddress?
     @State private var session: CropSession
+    @State private var isStyling = false
+    /// The style being edited, which the slides draw while the style sheet is open.
+    @State private var styleDraft: SlideStyle?
     /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
     @State private var quietRestores: Set<UUID> = []
     @Environment(\.photoLibrary) private var photoLibrary
@@ -43,7 +46,7 @@ struct ProjectScreen: View {
     }
 
     private func content(_ project: Project) -> some View {
-        strip(project)
+        let screen = strip(shown(project))
             .overlay(alignment: .bottom) {
                 selectionBar
             }
@@ -66,6 +69,23 @@ struct ProjectScreen: View {
             .toolbarTitleMenu {
                 RenameButton()
             }
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    styleButton(project)
+                }
+            }
+            .onChange(of: isStyling) { _, isStyling in
+                if !isStyling {
+                    saveStyleDraft()
+                    styleDraft = nil
+                }
+            }
+        return presentations(over: screen, project: project)
+    }
+
+    /// The layout sheet, the photo picker and the camera, which open over the screen.
+    private func presentations(over screen: some View, project: Project) -> some View {
+        screen
             .sheet(item: $layoutPurpose) { purpose in
                 layoutSheet(for: purpose, in: project)
             }
@@ -92,6 +112,42 @@ struct ProjectScreen: View {
                 await openDebugSheet()
             }
             #endif
+    }
+
+    /// `project` as the strip draws it, in the style being edited.
+    private func shown(_ project: Project) -> Project {
+        var project = project
+        if let styleDraft {
+            project.style = styleDraft
+        }
+        return project
+    }
+
+    private func styleButton(_ project: Project) -> some View {
+        Button("Style", systemImage: "slider.horizontal.3") {
+            styleDraft = project.style
+            isStyling = true
+        }
+        .accessibilityHint("Sets the spacing, border and background of every slide")
+        // A sheet on iPhone, and on iPad a popover, which leaves the slides in view beside it.
+        .popover(isPresented: $isStyling) {
+            StyleSheet(style: styleDraftBinding(project), onCommit: saveStyleDraft)
+                .frame(idealWidth: 380, idealHeight: 540)
+        }
+    }
+
+    private func styleDraftBinding(_ project: Project) -> Binding<SlideStyle> {
+        Binding {
+            styleDraft ?? project.style
+        } set: { style in
+            styleDraft = style
+        }
+    }
+
+    private func saveStyleDraft() {
+        if let styleDraft {
+            library.setStyle(styleDraft, of: projectID)
+        }
     }
 
     private func strip(_ project: Project) -> some View {

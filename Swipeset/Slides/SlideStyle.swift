@@ -3,6 +3,8 @@
 //  Swipeset
 //
 
+import UIKit
+
 /// The space between and around a project's cells, and the color showing through it.
 nonisolated struct SlideStyle: Codable, Hashable, Sendable {
     /// The gap between cells, as a fraction of the slide's width, so it looks the same on screen
@@ -28,4 +30,17 @@ nonisolated struct RGBColor: Codable, Hashable, Sendable {
 
     static let white = RGBColor(red: 1, green: 1, blue: 1)
     static let black = RGBColor(red: 0, green: 0, blue: 0)
+}
+
+nonisolated extension RGBColor {
+    /// `color` in sRGB, clamped, since a wide-gamut pick reads past 0...1 there. Read through
+    /// `UIColor` rather than `Color.Resolved`, whose components are linear.
+    init(_ color: UIColor) {
+        let sRGB = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let components = color.cgColor.converted(to: sRGB, intent: .defaultIntent, options: nil)?.components ?? [1, 1, 1, 1]
+        func channel(_ index: Int) -> Double {
+            min(max(Double(components.count >= 3 ? components[index] : components[0]), 0), 1)
+        }
+        self.init(red: channel(0), green: channel(1), blue: channel(2))
+    }
 }
