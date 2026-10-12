@@ -39,6 +39,7 @@ struct ProjectLibraryTests {
         #expect(first.name == "Untitled")
         #expect(second.name == "Untitled 2")
         #expect(library.createProject(aspectRatio: .landscape).name == "Untitled 2")
+        await library.flush()
     }
 
     @Test func savesChangesInTheOrderTheyWereMade() async {
@@ -58,6 +59,7 @@ struct ProjectLibraryTests {
         library.rename(project.id, to: "   ")
 
         #expect(library.project(project.id)?.name == "Lisbon")
+        await library.flush()
     }
 
     @Test func keepsTheLatestChangeFirst() async {
@@ -67,6 +69,7 @@ struct ProjectLibraryTests {
         library.rename(older.id, to: "Changed")
 
         #expect(library.projects.map(\.id) == [older.id, newer.id])
+        await library.flush()
     }
 
     @Test func deletingBeforeTheFirstSaveLandsLeavesNothing() async {
@@ -117,7 +120,7 @@ struct ProjectLibraryTests {
         _ = library.createProject(aspectRatio: .portrait)
         await library.flush()
 
-        #expect(library.writeFailure != nil)
+        #expect(library.failure?.kind == .write)
     }
 }
 

@@ -15,6 +15,8 @@ enum StripItem: Hashable {
 struct SlideStrip: View {
     let project: Project
     @Binding var position: StripItem?
+    let importingCells: Set<CellAddress>
+    let cellActions: CellActions
     let onAddSlide: () -> Void
     let onChangeLayout: (UUID) -> Void
     let onMove: (UUID, Int) -> Void
@@ -49,10 +51,13 @@ struct SlideStrip: View {
                 ForEach(Array(project.slides.enumerated()), id: \.element.id) { index, slide in
                     SlideCard(
                         slide: slide,
+                        projectID: project.id,
                         number: index + 1,
                         count: project.slides.count,
                         style: project.style,
                         size: slideSize,
+                        importingCells: importingCells,
+                        cellActions: cellActions,
                         onChangeLayout: { onChangeLayout(slide.id) },
                         onMove: { onMove(slide.id, $0) },
                         onDelete: { onDelete(slide.id) }
@@ -62,18 +67,28 @@ struct SlideStrip: View {
                 AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
                     .id(StripItem.add)
             }
+            // Where `scrollPosition` finds the slides and the add button by ID.
             .scrollTargetLayout()
             // Room for the first slide and the add button each to reach the middle. Padding
-            // rather than `contentMargins`, which would center scroll targets between uneven
-            // margins instead of on screen.
-            .padding(.leading, max(16, (size.width - slideSize.width) / 2))
-            .padding(.trailing, max(16, (size.width - Self.addButtonSize) / 2))
+            // rather than `contentMargins`, which stop view-aligned scrolling from snapping and
+            // shift a centered `scrollPosition` off the middle of the screen.
+            .padding(.leading, max(0, (size.width - slideSize.width) / 2))
+            .padding(.trailing, max(0, (size.width - Self.addButtonSize) / 2))
             .frame(maxHeight: .infinity)
         }
-        .scrollTargetBehavior(.viewAligned(anchor: .center))
+        .scrollTargetBehavior(snapping)
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
+    }
+
+    /// Rests the strip with a slide, or the add button, in the middle of the screen. View-aligned
+    /// scrolling would rest a slide's leading edge on the screen's instead, whatever its anchor.
+    private var snapping: StripSnapping {
+        let pitch = slideSize.width + Self.spacing
+        let slides = (0..<project.slides.count).map { CGFloat($0) * pitch }
+        let add = CGFloat(project.slides.count) * pitch + (Self.addButtonSize - slideSize.width) / 2
+        return StripSnapping(offsets: slides + [add])
     }
 
     /// The project's shape fitted to the screen, leaving the slides either side peeking in at
@@ -84,6 +99,18 @@ struct SlideStrip: View {
         let maxHeight = max(0, size.height - Self.captionSpace - 32)
         let width = max(0, min(maxWidth, maxHeight * ratio))
         return CGSize(width: width, height: width / ratio)
+    }
+}
+
+/// Snaps a scroll to the nearest of `offsets`.
+private struct StripSnapping: ScrollTargetBehavior {
+    let offsets: [CGFloat]
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        let proposed = target.rect.minX
+        if let nearest = offsets.min(by: { abs($0 - proposed) < abs($1 - proposed) }) {
+            target.rect.origin.x = nearest
+        }
     }
 }
 
@@ -101,10 +128,13 @@ extension VerticalAlignment {
 
 private struct SlideCard: View {
     let slide: Slide
+    let projectID: UUID
     let number: Int
     let count: Int
     let style: SlideStyle
     let size: CGSize
+    let importingCells: Set<CellAddress>
+    let cellActions: CellActions
     let onChangeLayout: () -> Void
     let onMove: (Int) -> Void
     let onDelete: () -> Void
@@ -112,17 +142,27 @@ private struct SlideCard: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            SlideView(slide: slide, style: style)
-                .frame(width: size.width, height: size.height)
-                // A hairline, so a slide the color of the screen still shows its edges.
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(.separator, lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
-                .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Slide \(number) of \(count), \(slide.layout.name)")
+            SlideView(slide: slide, style: style) { index in
+                let address = CellAddress(projectID: projectID, slideID: slide.id, index: index)
+                CellView(
+                    cell: slide.cells[index],
+                    address: address,
+                    background: style.background,
+                    position: "slide \(number), photo \(index + 1) of \(slide.cells.count)",
+                    isImporting: importingCells.contains(address),
+                    actions: cellActions
+                )
+            }
+            .frame(width: size.width, height: size.height)
+            // A hairline, so a slide the color of the screen still shows its edges.
+            .overlay {
+                Rectangle()
+                    .strokeBorder(.separator, lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+            .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Slide \(number) of \(count), \(slide.layout.name)")
             HStack(spacing: 8) {
                 Text("Slide \(number)")
                     .font(.subheadline.weight(.medium))
@@ -182,6 +222,8 @@ private struct AddSlideButton: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .accessibilityHint("Choose a layout for a new slide")
+        // Exactly `size` across, which the strip's snapping counts on to center it.
+        .frame(width: size, height: size)
         .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
     }
 }
@@ -220,6 +262,8 @@ private struct GhostSlide: View {
     SlideStrip(
         project: SampleProjects.all[0],
         position: $position,
+        importingCells: [],
+        cellActions: .preview,
         onAddSlide: {},
         onChangeLayout: { _ in },
         onMove: { _, _ in },
@@ -233,6 +277,8 @@ private struct GhostSlide: View {
     SlideStrip(
         project: SampleProjects.all[2],
         position: $position,
+        importingCells: [],
+        cellActions: .preview,
         onAddSlide: {},
         onChangeLayout: { _ in },
         onMove: { _, _ in },

@@ -16,6 +16,8 @@ struct SwipesetApp: App {
     /// One library for every window, so two iPad windows on the same project never save over
     /// each other's changes.
     @State private var library: ProjectLibrary
+    /// One decode cache for every window, reading the library's store.
+    @State private var imageLoader: DiskImageLoader
     #if DEBUG
     @State private var debug: DebugSettings
     #endif
@@ -24,10 +26,12 @@ struct SwipesetApp: App {
         #if DEBUG
         let debug = DebugSettings.fromLaunchArguments()
         _debug = State(initialValue: debug)
-        _library = State(initialValue: ProjectLibrary(store: debug.usesSampleProjects ? SampleStore.make() : ProjectStore()))
+        let store = debug.usesSampleProjects ? SampleStore.make() : ProjectStore()
         #else
-        _library = State(initialValue: ProjectLibrary(store: ProjectStore()))
+        let store = ProjectStore()
         #endif
+        _library = State(initialValue: ProjectLibrary(store: store))
+        _imageLoader = State(initialValue: DiskImageLoader(paths: store.paths))
     }
 
     var body: some Scene {
@@ -44,9 +48,11 @@ struct SwipesetApp: App {
     private var content: some View {
         #if DEBUG
         ContentView(library: library)
+            .environment(\.imageLoader, imageLoader)
             .environment(debug)
         #else
         ContentView(library: library)
+            .environment(\.imageLoader, imageLoader)
         #endif
     }
 }

@@ -52,6 +52,7 @@ struct ProjectLibrarySlidesTests {
         library.moveSlide(third, in: projectID, by: -1)
         library.moveSlide(second, in: projectID, by: 1)
         #expect(slides(library, projectID).map(\.id) == [third, first, second])
+        await library.flush()
     }
 
     @Test func deletingASlideDeletesItsPhotos() async throws {

@@ -5,7 +5,8 @@
 
 import Foundation
 
-/// Projects with something in them, for previews and the debug sample store.
+/// Projects with something in them, for previews and the debug sample store. Their photos are
+/// `SampleImages`, which `MockImageLoader` draws and `SampleStore` writes out.
 nonisolated enum SampleProjects {
     static var all: [Project] {
         [
@@ -14,9 +15,9 @@ nonisolated enum SampleProjects {
                 name: "Lisbon",
                 aspectRatio: .portrait,
                 slides: [
-                    Slide(id: sampleID(11), layout: .single),
-                    Slide(id: sampleID(12), layout: .twoColumns),
-                    Slide(id: sampleID(13), layout: .grid)
+                    Slide(id: sampleID(11), layout: .single, cells: [photo(101, 2048, 2730)]),
+                    Slide(id: sampleID(12), layout: .twoColumns, cells: [photo(102, 2048, 1536), Cell()]),
+                    Slide(id: sampleID(13), layout: .grid, cells: [photo(103, 2048, 2048), photo(104, 1536, 2048), photo(105, 2048, 1365), Cell()])
                 ],
                 createdAt: date(daysAgo: 3)
             ),
@@ -24,7 +25,7 @@ nonisolated enum SampleProjects {
                 id: sampleID(2),
                 name: "Story Ideas",
                 aspectRatio: .story,
-                slides: [Slide(id: sampleID(21), layout: .threeRows)],
+                slides: [Slide(id: sampleID(21), layout: .threeRows, cells: [photo(201, 2048, 1365), Cell(), photo(202, 2048, 1536)])],
                 createdAt: date(daysAgo: 5)
             ),
             Project(id: sampleID(3), name: "Coastline", aspectRatio: .landscape, createdAt: date(daysAgo: 8))
@@ -32,8 +33,12 @@ nonisolated enum SampleProjects {
     }
 
     /// IDs that stay the same between launches, so a debug launch argument can name a project.
-    static func sampleID(_ number: UInt8) -> UUID {
-        UUID(uuid: (0x5E, 0x7A, 0x5E, 0x70, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, number))
+    static func sampleID(_ number: UInt16) -> UUID {
+        UUID(uuid: (0x5E, 0x7A, 0x5E, 0x70, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, UInt8(number >> 8), UInt8(number & 0xFF)))
+    }
+
+    private static func photo(_ number: UInt16, _ width: Int, _ height: Int) -> Cell {
+        Cell(image: PlacedImage(id: sampleID(number), assetIdentifier: nil, pixelWidth: width, pixelHeight: height))
     }
 
     private static func date(daysAgo: Double) -> Date {

@@ -30,14 +30,21 @@ extension ScreenSnapshotting {
                 id: fixtureID(1),
                 name: "Lisbon",
                 aspectRatio: .portrait,
-                slides: [Slide(id: fixtureID(11), layout: .single), Slide(id: fixtureID(12), layout: .grid)],
+                slides: [
+                    Slide(id: fixtureID(11), layout: .single, cells: [photo(111, 2048, 2730)]),
+                    Slide(
+                        id: fixtureID(12),
+                        layout: .grid,
+                        cells: [photo(121, 2048, 1536), Cell(), photo(missingPhotoNumber, 2048, 2048), photo(124, 1536, 2048)]
+                    )
+                ],
                 createdAt: created
             ),
             Project(
                 id: fixtureID(2),
                 name: "Story Ideas",
                 aspectRatio: .story,
-                slides: [Slide(id: fixtureID(21), layout: .threeRows)],
+                slides: [Slide(id: fixtureID(21), layout: .threeRows, cells: [photo(211, 2048, 1365), Cell(), photo(213, 2048, 1536)])],
                 createdAt: created
             ),
             Project(id: fixtureID(3), name: "Coastline", aspectRatio: .landscape, createdAt: created),
@@ -65,6 +72,27 @@ extension ScreenSnapshotting {
         NavigationStack {
             ProjectScreen(library: library([project]), projectID: project.id)
         }
+        .environment(\.imageLoader, imageLoader)
+    }
+
+    /// Lisbon with its grid first, filled, empty and missing cells side by side.
+    var gridFirst: Project {
+        var project = projects[0]
+        project.slides.reverse()
+        return project
+    }
+
+    /// Draws every fixture photo but one, whose copy reads as missing.
+    var imageLoader: MockImageLoader {
+        MockImageLoader(missing: [fixtureID(missingPhotoNumber)])
+    }
+
+    private var missingPhotoNumber: UInt8 {
+        123
+    }
+
+    private func photo(_ number: UInt8, _ width: Int, _ height: Int) -> Cell {
+        Cell(image: PlacedImage(id: fixtureID(number), assetIdentifier: nil, pixelWidth: width, pixelHeight: height))
     }
 
     var unreadableProject: UnreadableProject {

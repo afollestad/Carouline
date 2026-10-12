@@ -14,7 +14,7 @@ extension SnapshotTests {
 
     @Test func projectList() async {
         let library = library(projects, unreadable: [unreadableProject])
-        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} })
+        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader))
     }
 
     @Test func newProjectSheet() async {

@@ -14,7 +14,7 @@ extension WideSnapshotTests {
 
     @Test func projectList() async {
         let library = library(projects, unreadable: [unreadableProject])
-        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }, on: .wide)
+        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader), on: .wide)
     }
 
     @Test func newProjectSheet() async {

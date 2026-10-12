@@ -31,13 +31,15 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Every visible change also runs `./scripts/snapshots.sh verify`. When the change is intended, `record` the affected baselines and look at the new images.
 - Reach other states with debug launch arguments after `--`, e.g. `./scripts/run.sh -b -- -DebugSampleProjects YES -DebugSheet newProject`. `DebugSettings` documents each one; open sheets through `-DebugSheet`, since a presentation on the first frame doesn't render.
 - `simctl` cannot tap or drag, so use `axe tap`, `axe drag` and `axe describe-ui` with `--udid`, which reach the simulator without the host's cursor. Never post host mouse events, which take over the user's.
-- `axe touch` can fail with "could not establish simulator input" while `axe tap` and `axe drag` still work, so tap with `axe tap`. If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh` boots it again.
+- `axe touch` can fail with "could not establish simulator input" while `axe tap` and `axe drag` still work, so tap with `axe tap` and long-press with an `axe drag` that moves a point over `--duration 1.5`. If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh` boots it again.
+- The simulator has no camera, so its cells go straight to the photo picker, whose library already holds sample photos; add more with `xcrun simctl addmedia <udid> <files>`.
 - Restore every temporary patch before finishing. Keep a backup copy and confirm with `git diff`.
 
 ## Design rules
 
 - Floating chrome is Liquid Glass: toolbar items, partial-height sheets, and the buttons over slides. Don't put glass on content inside a glass sheet or popover, which reads as glass on glass.
 - Give a horizontal scroll view under the navigation bar the soft top scroll edge effect; the default draws a solid band with a hairline under the bar.
+- Glass over a slide takes its color scheme from the slide's background, not the system's, so it stays legible on a white slide in dark mode.
 - Keep `AccentColor` the icon's violet. Hold the light variant to 4.5:1 against white, and the dark one to 4.5:1 against the dark system background and 3:1 under a prominent button's white label.
 - Hide decorative shapes from accessibility. Every control needs a label, and an icon-only button a hint when its action isn't obvious.
 
@@ -47,7 +49,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Keep each view file to one screen or overlay.
 - Every view has a `#Preview`. Use `@Previewable @State` for bindings.
 - Doc comments explain why a constant has its value, not what the code does.
-- Pad a scroll view's content rather than using `contentMargins` where its targets must center on screen: `scrollPosition`'s anchor centers between the margins, so uneven ones shift it.
+- Pad a horizontal scroll view's content rather than using `contentMargins`, which stop view-aligned scrolling from snapping and center `scrollPosition`'s anchor between the margins. To rest targets in the middle, snap with a `ScrollTargetBehavior` of their offsets, as `SlideStrip` does, since `.viewAligned` rests leading edges on the screen's whatever its anchor.
 - Default isolation is `MainActor`: mark models that cross actors `nonisolated`, and heavy `async` work `@concurrent`, since approachable concurrency runs a `nonisolated async` function on its caller's actor.
 - Unit tests cover the model and snapshots cover screens.
 - Write test files into a `TemporaryDirectory` held by the suite, which removes it after each test, since the simulator doesn't empty a test host's `tmp` between runs. Await any task that outlives the call under test, or it writes the directory back after removal.

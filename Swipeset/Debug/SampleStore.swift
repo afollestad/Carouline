@@ -18,8 +18,13 @@ enum SampleStore {
     static func make() -> ProjectStore {
         try? FileManager.default.removeItem(at: paths.root)
         for project in SampleProjects.all {
-            try? FileManager.default.createDirectory(at: paths.folder(for: project.id), withIntermediateDirectories: true)
+            try? FileManager.default.createDirectory(at: paths.imagesFolder(for: project.id), withIntermediateDirectories: true)
             try? ProjectFile.encode(project).write(to: paths.file(for: project.id), options: .atomic)
+            for image in project.images {
+                if let drawn = SampleImages.image(for: image.id, width: image.pixelWidth, height: image.pixelHeight) {
+                    try? ImageImporter.write(drawn, to: paths.imageFile(image.id, in: project.id))
+                }
+            }
         }
         return ProjectStore(paths: paths)
     }

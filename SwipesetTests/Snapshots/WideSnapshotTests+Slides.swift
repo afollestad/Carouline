@@ -20,6 +20,10 @@ extension WideSnapshotTests {
         await assertScreenSnapshot(of: projectScreen(landscapeProject), on: .wide)
     }
 
+    @Test func photoGrid() async {
+        await assertScreenSnapshot(of: projectScreen(gridFirst), on: .wide)
+    }
+
     @Test func newSlideSheet() async {
         await assertScreenSnapshot(of: LayoutSheet(aspectRatio: .portrait, current: nil) { _ in 0 } onChoose: { _ in }, on: .wide)
     }

@@ -3,6 +3,7 @@
 //  Swipeset
 //
 
+import PhotosUI
 import SwiftUI
 
 /// A project's slides, where they're added, arranged and filled.
@@ -11,6 +12,12 @@ struct ProjectScreen: View {
     let projectID: UUID
     @State private var layoutPurpose: LayoutPurpose?
     @State private var stripPosition: StripItem?
+    @State private var isPickingPhoto = false
+    /// The cell the photo picker fills. Kept apart from `isPickingPhoto`, which the picker clears
+    /// as it closes, possibly before it hands over the pick.
+    @State private var pickTarget: CellAddress?
+    @State private var pickedItem: PhotosPickerItem?
+    @State private var cameraTarget: CellAddress?
     #if DEBUG
     @Environment(DebugSettings.self) private var debug: DebugSettings?
     #endif
@@ -25,9 +32,48 @@ struct ProjectScreen: View {
     }
 
     private func content(_ project: Project) -> some View {
+        strip(project)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle(nameBinding)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationSubtitle(project.summary)
+            .toolbarTitleMenu {
+                RenameButton()
+            }
+            .sheet(item: $layoutPurpose) { purpose in
+                layoutSheet(for: purpose, in: project)
+            }
+            .photosPicker(
+                isPresented: $isPickingPhoto,
+                selection: $pickedItem,
+                matching: .images,
+                preferredItemEncoding: .current,
+                photoLibrary: .shared()
+            )
+            .onChange(of: pickedItem) { _, item in
+                importPicked(item)
+            }
+            .fullScreenCover(item: $cameraTarget) { target in
+                CameraPicker { image in
+                    Task {
+                        await library.importPhoto(into: target, assetIdentifier: nil) { .image(image) }
+                    }
+                }
+                .ignoresSafeArea()
+            }
+            #if DEBUG
+            .task {
+                await openDebugSheet()
+            }
+            #endif
+    }
+
+    private func strip(_ project: Project) -> some View {
         SlideStrip(
             project: project,
             position: $stripPosition,
+            importingCells: library.importingCells,
+            cellActions: cellActions,
             onAddSlide: { layoutPurpose = .newSlide },
             onChangeLayout: { layoutPurpose = .change($0) },
             onMove: { slideID, offset in
@@ -43,21 +89,36 @@ struct ProjectScreen: View {
                 }
             }
         )
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle(nameBinding)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationSubtitle(project.summary)
-        .toolbarTitleMenu {
-            RenameButton()
+    }
+
+    private var cellActions: CellActions {
+        CellActions(
+            choosePhoto: { address in
+                pickTarget = address
+                isPickingPhoto = true
+            },
+            takePhoto: CameraPicker.isAvailable ? { cameraTarget = $0 } : nil,
+            removePhoto: { address in
+                withAnimation {
+                    library.removePhoto(at: address)
+                }
+            }
+        )
+    }
+
+    /// Copies the picker's photo into the cell it was opened for, keeping the photo's library
+    /// identifier so the copy can be restored from it.
+    private func importPicked(_ item: PhotosPickerItem?) {
+        guard let item, let target = pickTarget else {
+            return
         }
-        .sheet(item: $layoutPurpose) { purpose in
-            layoutSheet(for: purpose, in: project)
+        pickedItem = nil
+        pickTarget = nil
+        Task {
+            await library.importPhoto(into: target, assetIdentifier: item.itemIdentifier) {
+                try await item.loadTransferable(type: PickedPhoto.self).map { .file($0.url) }
+            }
         }
-        #if DEBUG
-        .task {
-            await openDebugSheet()
-        }
-        #endif
     }
 
     private var nameBinding: Binding<String> {

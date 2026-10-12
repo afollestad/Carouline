@@ -14,14 +14,19 @@ final class ProjectLibrary {
     private(set) var projects: [Project]
     private(set) var unreadable: [UnreadableProject] = []
     private(set) var isLoaded: Bool
-    /// The last write that failed, until someone shows it.
-    var writeFailure: WriteFailure?
+    /// Cells with a photo on its way in.
+    var importingCells: Set<CellAddress> = []
+    /// The last write or import that failed, until someone shows it.
+    var failure: LibraryFailure?
 
     @ObservationIgnored let store: any ProjectStoring
     /// The newest write. Each one waits for the last, so a slow save can't land after, and
     /// overwrite, a newer one, and a file is only deleted once the JSON that dropped it is saved.
     @ObservationIgnored private var lastWrite: Task<Void, Never>?
     @ObservationIgnored private var loading: Task<Void, Never>?
+    /// The latest import into each cell. An earlier one still running finds itself replaced
+    /// and discards its photo, so the last photo picked wins however long each takes.
+    @ObservationIgnored var importTokens: [CellAddress: UUID] = [:]
 
     /// `projects`, when given, stand in for the store's, with `unreadable`, as previews and
     /// snapshots need.
@@ -107,7 +112,7 @@ final class ProjectLibrary {
         await lastWrite?.value
     }
 
-    private func write(_ operation: @escaping @Sendable (any ProjectStoring) async throws -> Void) {
+    func write(_ operation: @escaping @Sendable (any ProjectStoring) async throws -> Void) {
         let previous = lastWrite
         let store = store
         lastWrite = Task {
@@ -115,7 +120,7 @@ final class ProjectLibrary {
             do {
                 try await operation(store)
             } catch {
-                writeFailure = WriteFailure(error: error)
+                failure = LibraryFailure(kind: .write, error: error)
             }
         }
     }
@@ -134,8 +139,39 @@ final class ProjectLibrary {
     }
 }
 
-/// A write that didn't reach the disk.
-struct WriteFailure: Identifiable {
+/// A change that didn't take.
+struct LibraryFailure: Identifiable {
+    enum Kind {
+        /// A change that didn't reach the disk.
+        case write
+        /// A photo that couldn't be read or copied in.
+        case importPhoto
+    }
+
     let id = UUID()
+    let kind: Kind
     let error: any Error
+
+    var title: String {
+        switch kind {
+        case .write: "Couldn't Save Changes"
+        case .importPhoto: "Couldn't Add Photo"
+        }
+    }
+
+    var message: String {
+        switch kind {
+        case .write: "Swipeset couldn't save your latest changes. \(error.localizedDescription)"
+        case .importPhoto: "Swipeset couldn't read that photo. Try another, or the same one again."
+        }
+    }
+}
+
+/// A cell in a slide of a project.
+nonisolated struct CellAddress: Hashable, Identifiable, Sendable {
+    let projectID: UUID
+    let slideID: UUID
+    let index: Int
+
+    var id: Self { self }
 }

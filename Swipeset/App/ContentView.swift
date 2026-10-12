@@ -30,10 +30,10 @@ struct ContentView: View {
                 createdProjectID = library.createProject(aspectRatio: ratio).id
             }
         }
-        .alert("Couldn't Save Changes", isPresented: showsWriteFailure, presenting: library.writeFailure) { _ in
+        .alert(library.failure?.title ?? "", isPresented: showsFailure, presenting: library.failure) { _ in
             Button("OK", role: .cancel) {}
         } message: { failure in
-            Text("Swipeset couldn't save your latest changes. \(failure.error.localizedDescription)")
+            Text(failure.message)
         }
         .task {
             await library.load()
@@ -43,12 +43,12 @@ struct ContentView: View {
         }
     }
 
-    private var showsWriteFailure: Binding<Bool> {
+    private var showsFailure: Binding<Bool> {
         Binding {
-            library.writeFailure != nil
+            library.failure != nil
         } set: { isShown in
             if !isShown {
-                library.writeFailure = nil
+                library.failure = nil
             }
         }
     }

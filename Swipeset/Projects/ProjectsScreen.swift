@@ -127,8 +127,14 @@ private struct ProjectThumbnail: View {
     var body: some View {
         Group {
             if let slide = project.slides.first {
-                SlideView(slide: slide, style: project.style)
-                    .overlay {
+                SlideView(slide: slide, style: project.style) { index in
+                    if let image = slide.cells[index].image {
+                        CellPhoto(image: image, projectID: project.id)
+                    } else {
+                        PlaceholderCell(background: project.style.background)
+                    }
+                }
+                .overlay {
                         Rectangle()
                             .strokeBorder(.separator, lineWidth: 0.5)
                     }
