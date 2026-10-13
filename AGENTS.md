@@ -36,6 +36,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Long-press with an `axe drag` that moves a point over `--duration 1.5`, since `axe touch` can fail with "could not establish simulator input". Move the zoom slider by dragging its thumb with `axe drag` too, since `axe slider` can't.
 - If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh` boots it again.
 - The simulator has no camera, so its cells go straight to the photo picker, whose library already holds sample photos; add more with `xcrun simctl addmedia <udid> <files>`.
+- Judge launch and loading speed with the app opened from a device's Home Screen, or run with the scheme's "Debug executable" off. Xcode's debugger pauses the app for each of the 2,000-odd libraries it loads, adding seconds at launch and on first use of image decoding, haptics and the camera.
 - Restore every temporary patch before finishing. Keep a backup copy and confirm with `git diff`.
 
 ## Design rules
@@ -60,5 +61,6 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Pad a horizontal scroll view's content rather than using `contentMargins`, which stop view-aligned scrolling from snapping and center `scrollPosition`'s anchor between the margins. To rest targets in the middle, snap with a `ScrollTargetBehavior` of their offsets, as `SlideStrip` does, since `.viewAligned` rests leading edges on the screen's whatever its anchor.
 - Count and number the carousel with `Project.carouselSlideCount` and `slideNumbers`, never `slides.count` or indexes, since a panorama is one slide that posts as several.
 - Default isolation is `MainActor`: mark models that cross actors `nonisolated`, and heavy `async` work `@concurrent`, since approachable concurrency runs a `nonisolated async` function on its caller's actor.
+- Start a repeating animation with an explicit `withAnimation`, as `LoadingPulse` does, which `assertScreenSnapshot()`'s `transaction` holds still. An implicit or scoped `.animation` sets its own and keeps moving there, so the baseline flakes.
 - Unit tests cover the model and snapshots cover screens.
 - Write test files into a `TemporaryDirectory` held by the suite, which removes it after each test, since the simulator doesn't empty a test host's `tmp` between runs. Await any task that outlives the call under test, or it writes the directory back after removal.
