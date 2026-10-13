@@ -10,6 +10,24 @@ extension ProjectLibrary {
         cell(at: address)?.image
     }
 
+    /// How many photos a pick for the cell at `address` can take: one for each empty cell in its
+    /// slide when it's empty, or one to replace its photo. Cells with a photo on its way in count
+    /// as full, so a second pick can't replace the first while it loads.
+    func pickLimit(for address: CellAddress) -> Int {
+        guard let slide = slide(containing: address), cell(at: address)?.image == nil else {
+            return 1
+        }
+        return max(1, slide.emptyCellCount(skipping: importingIndexes(in: address)))
+    }
+
+    /// The cells, by `Slide.cellsToFill`, that `count` photos picked for the cell at `address` go
+    /// in, passing over those with a photo on its way in.
+    func cellsToFill(from address: CellAddress, count: Int) -> [CellAddress] {
+        let slide = slide(containing: address)
+        let indexes = slide?.cellsToFill(from: address.index, count: count, skipping: importingIndexes(in: address)) ?? []
+        return indexes.map { CellAddress(projectID: address.projectID, slideID: address.slideID, index: $0) }
+    }
+
     /// Copies the photo `source` produces into the cell at `address`, replacing any photo there,
     /// framed by `crop`. `source` runs first, so a slow load from the picker shows as importing
     /// too, and a nil from it, as from a picker that hands back nothing, leaves the cell as it was.
@@ -152,11 +170,19 @@ extension ProjectLibrary {
     }
 
     private func cell(at address: CellAddress) -> Cell? {
-        guard let slide = project(address.projectID)?.slides.first(where: { $0.id == address.slideID }),
-              slide.cells.indices.contains(address.index) else {
+        guard let slide = slide(containing: address), slide.cells.indices.contains(address.index) else {
             return nil
         }
         return slide.cells[address.index]
+    }
+
+    private func slide(containing address: CellAddress) -> Slide? {
+        project(address.projectID)?.slides.first { $0.id == address.slideID }
+    }
+
+    /// The cells of `address`'s slide with a photo on its way in.
+    private func importingIndexes(in address: CellAddress) -> Set<Int> {
+        Set(importingCells.filter { $0.projectID == address.projectID && $0.slideID == address.slideID }.map(\.index))
     }
 }
 

@@ -160,6 +160,7 @@ private struct SlideCard: View {
                     address: address,
                     background: style.background,
                     position: "slide \(number), photo \(index + 1) of \(slide.cells.count)",
+                    emptyCellCount: slide.emptyCellCount(skipping: importingIndexes),
                     isImporting: importingCells.contains(address),
                     actions: cellActions,
                     session: session
@@ -209,6 +210,11 @@ private struct SlideCard: View {
         } message: {
             Text(deletionMessage)
         }
+    }
+
+    /// The cells with a photo on its way in, which a pick can't fill.
+    private var importingIndexes: Set<Int> {
+        Set(slide.cells.indices.filter { importingCells.contains(CellAddress(projectID: projectID, slideID: slide.id, index: $0)) })
     }
 
     private var deletionMessage: String {

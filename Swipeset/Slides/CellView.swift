@@ -39,6 +39,8 @@ struct CellView: View {
     let background: RGBColor
     /// Where the cell sits, as in "photo 2 of 3", for VoiceOver.
     let position: String
+    /// The empty cells in the cell's slide, which one pick for an empty cell can fill.
+    let emptyCellCount: Int
     let isImporting: Bool
     let actions: CellActions
     let session: CropSession
@@ -53,7 +55,7 @@ struct CellView: View {
             if let image = cell.image {
                 photo(image)
             } else if !isImporting {
-                AddPhotoButton(position: position, offersSources: actions.takePhoto != nil) {
+                AddPhotoButton(position: position, emptyCellCount: emptyCellCount, offersSources: actions.takePhoto != nil) {
                     sourceButtons
                 } choose: {
                     actions.choosePhoto(address)
@@ -241,6 +243,7 @@ struct CellView: View {
 /// goes straight to the library when there isn't.
 private struct AddPhotoButton<Sources: View>: View {
     let position: String
+    let emptyCellCount: Int
     /// Whether there's more than the library to choose from.
     let offersSources: Bool
     @ViewBuilder let sources: () -> Sources
@@ -261,7 +264,9 @@ private struct AddPhotoButton<Sources: View>: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .accessibilityLabel("Add \(position)")
-        .accessibilityHint("Fills this cell with a photo")
+        .accessibilityHint(emptyCellCount > 1
+            ? "Fills this cell, or up to \(emptyCellCount) empty cells in order, with photos"
+            : "Fills this cell with a photo")
     }
 
     private var label: some View {
@@ -317,6 +322,7 @@ private extension String {
             address: CellAddress(projectID: projectID, slideID: slide.id, index: index),
             background: .white,
             position: "photo \(index + 1) of 4",
+            emptyCellCount: 2,
             isImporting: index == 3,
             actions: .preview,
             session: CropSession(selection: CellAddress(projectID: projectID, slideID: slide.id, index: 0))

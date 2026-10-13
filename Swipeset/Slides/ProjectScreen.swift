@@ -13,10 +13,12 @@ struct ProjectScreen: View {
     @State private var layoutPurpose: LayoutPurpose?
     @State private var stripPosition: StripItem?
     @State private var isPickingPhoto = false
-    /// The cell the photo picker fills. Kept apart from `isPickingPhoto`, which the picker clears
-    /// as it closes, possibly before it hands over the pick.
+    /// The cell the photo picker fills, and the slide's other empty cells when it picks several.
+    /// Kept apart from `isPickingPhoto`, which the picker clears as it closes, possibly before it
+    /// hands over the pick.
     @State private var pickTarget: CellAddress?
-    @State private var pickedItem: PhotosPickerItem?
+    @State private var pickLimit = 1
+    @State private var pickedItems: [PhotosPickerItem] = []
     @State private var cameraTarget: CellAddress?
     @State private var session: CropSession
     @State private var isExporting = false
@@ -97,13 +99,16 @@ struct ProjectScreen: View {
             }
             .photosPicker(
                 isPresented: $isPickingPhoto,
-                selection: $pickedItem,
+                selection: $pickedItems,
+                maxSelectionCount: pickLimit,
+                // Numbered in the order they're picked, which is the order they fill the cells.
+                selectionBehavior: .ordered,
                 matching: .images,
                 preferredItemEncoding: .current,
                 photoLibrary: .shared()
             )
-            .onChange(of: pickedItem) { _, item in
-                importPicked(item)
+            .onChange(of: pickedItems) { _, items in
+                importPicked(items)
             }
             .fullScreenCover(item: $cameraTarget) { target in
                 CameraPicker { image in
@@ -198,10 +203,7 @@ struct ProjectScreen: View {
 
     private var cellActions: CellActions {
         CellActions(
-            choosePhoto: { address in
-                pickTarget = address
-                isPickingPhoto = true
-            },
+            choosePhoto: { choosePhotos(for: $0) },
             takePhoto: CameraPicker.isAvailable ? { cameraTarget = $0 } : nil,
             removePhoto: { address in
                 withAnimation {
@@ -239,8 +241,7 @@ struct ProjectScreen: View {
                 onChoosePhoto: {
                     // Saved first, so the replacement doesn't inherit an unsaved zoom.
                     saveLiveCrop()
-                    pickTarget = selection
-                    isPickingPhoto = true
+                    choosePhotos(for: selection)
                 },
                 onTakePhoto: {
                     saveLiveCrop()
@@ -288,17 +289,28 @@ struct ProjectScreen: View {
         session.liveCrop = nil
     }
 
-    /// Copies the picker's photo into the cell it was opened for, keeping the photo's library
-    /// identifier so the copy can be restored from it.
-    private func importPicked(_ item: PhotosPickerItem?) {
-        guard let item, let target = pickTarget else {
+    /// Opens the picker for the cell at `address`, taking as many photos as its slide has empty
+    /// cells when it's empty, or one to replace its photo.
+    private func choosePhotos(for address: CellAddress) {
+        pickTarget = address
+        pickLimit = library.pickLimit(for: address)
+        isPickingPhoto = true
+    }
+
+    /// Copies the picker's photos into the cell it was opened for and, when there are several, the
+    /// slide's other empty cells, keeping each photo's library identifier so its copy can be
+    /// restored from it.
+    private func importPicked(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty, let target = pickTarget else {
             return
         }
-        pickedItem = nil
+        pickedItems = []
         pickTarget = nil
-        Task {
-            await library.importPhoto(into: target, assetIdentifier: item.itemIdentifier) {
-                try await item.loadTransferable(type: PickedPhoto.self).map { .file($0.url) }
+        for (item, address) in zip(items, library.cellsToFill(from: target, count: items.count)) {
+            Task {
+                await library.importPhoto(into: address, assetIdentifier: item.itemIdentifier) {
+                    try await item.loadTransferable(type: PickedPhoto.self).map { .file($0.url) }
+                }
             }
         }
     }

@@ -90,6 +90,26 @@ struct ProjectLibraryImagesTests {
         #expect(!copyExists(image, in: address.projectID))
     }
 
+    @Test func picksForAnEmptyCellFillTheSlidesEmptyCells() async throws {
+        let library = ProjectLibrary(store: ProjectStore(paths: paths))
+        await library.load()
+        let projectID = library.createProject(aspectRatio: .portrait).id
+        let slideID = try #require(library.addSlide(.threeRows, to: projectID))
+        let cells = (0..<3).map { CellAddress(projectID: projectID, slideID: slideID, index: $0) }
+        let picked = try pickedPhoto()
+        await library.importPhoto(into: cells[1], assetIdentifier: nil) { .file(picked) }
+        await library.flush()
+
+        #expect(library.pickLimit(for: cells[2]) == 2)
+        #expect(library.pickLimit(for: cells[1]) == 1)
+        #expect(library.cellsToFill(from: cells[2], count: 2) == [cells[0], cells[2]])
+        #expect(library.cellsToFill(from: CellAddress(projectID: projectID, slideID: UUID(), index: 0), count: 2).isEmpty)
+        // A photo still on its way into the first cell keeps a second pick out of it.
+        library.importingCells.insert(cells[0])
+        #expect(library.pickLimit(for: cells[2]) == 1)
+        #expect(library.cellsToFill(from: cells[2], count: 2) == [cells[2]])
+    }
+
     @Test func savesANewCropAndIgnoresAnUnchangedOne() async throws {
         let (library, address) = try await makeLibrary()
         let picked = try pickedPhoto()
