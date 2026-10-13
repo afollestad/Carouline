@@ -48,15 +48,20 @@ struct PresentationQueueTests {
         #expect(queue.pending == nil)
     }
 
+    /// An ask while one is closing waits for it too, rather than opening as it goes, which would
+    /// never show and leave the earlier ask to open later.
     @Test func theLatestAskWinsWhileOneIsClosing() {
         var queue = PresentationQueue<Sheet>()
         queue.present(.style)
         queue.present(.export)
 
         queue.present(.layout(1))
+        #expect(queue.current == nil)
+        #expect(queue.pending == .layout(1))
         queue.presentPending()
 
         #expect(queue.current == .layout(1))
+        #expect(queue.pending == nil)
     }
 
     /// The closed presentation's content disappears after the next has opened when nothing was

@@ -136,6 +136,8 @@ struct ProjectScreen: View {
                 layoutSheet(for: purpose, in: project)
                     .onDisappear { presenter.presentPending() }
             }
+            // The only presentation with no content to call `presentPending()` as it goes, which
+            // it needn't, since it covers the screen and nothing can be asked for behind it.
             .photosPicker(
                 isPresented: isPresenting(.photoPicker),
                 selection: $pickedItems,

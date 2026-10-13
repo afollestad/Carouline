@@ -13,13 +13,14 @@ struct PresentationQueue<Item: Hashable> {
     /// What opens once `current`'s content has gone.
     private(set) var pending: Item?
 
-    /// Opens `item`, or, while another is open, closes that one and holds `item` back for
-    /// `presentPending()`. Asking for what's already open changes nothing.
+    /// Opens `item`, or, while another is open, closes it and holds `item` back for
+    /// `presentPending()`; while one is still closing, `item` takes the place of what's held back.
+    /// Asking for what's already open changes nothing.
     mutating func present(_ item: Item) {
         guard current != item else {
             return
         }
-        if current == nil {
+        if current == nil, pending == nil {
             current = item
         } else {
             pending = item
