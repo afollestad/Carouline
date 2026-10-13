@@ -88,6 +88,20 @@ struct ProjectLibraryImagesTests {
         #expect(library.project(address.projectID)?.slides.first?.span == 5)
     }
 
+    /// A wide photo keeps enough to fill a panorama, so its slide can become one and stay sharp.
+    @Test func aWidePhotoInACellKeepsEnoughForAPanorama() async throws {
+        let (library, address) = try await makeLibrary()
+        let picked = try pickedPhoto(width: 6000, height: 1500)
+
+        await library.importPhoto(into: address, assetIdentifier: nil) { .file(picked) }
+        library.changeLayout(of: address.slideID, in: address.projectID, to: .panorama)
+        await library.flush()
+
+        let slide = try #require(library.project(address.projectID)?.slides.first)
+        #expect(slide.span == 5)
+        #expect(slide.cells.first?.image?.pixelSize == CGSize(width: 6000, height: 1500))
+    }
+
     @Test func aPanoramaKeepsItsWidthWhenItsPhotoIsReplacedOrRestored() async throws {
         let (library, address) = try await makeLibrary(layout: .panorama)
         let first = try pickedPhoto(width: 6000, height: 1500)

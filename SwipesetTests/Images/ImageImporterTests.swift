@@ -11,6 +11,9 @@ import UIKit
 
 struct ImageImporterTests {
     private let temporary = TemporaryDirectory("ImageImporterTests")
+    /// A cell's and a panorama's copies, for a portrait project's 1350-pixel-tall slides.
+    private let cell = ImageImporter.CopyLimit(slideHeight: 1350, isPanorama: false)
+    private let panorama = ImageImporter.CopyLimit(slideHeight: 1350, isPanorama: true)
 
     private func file(_ name: String) throws -> URL {
         try FileManager.default.createDirectory(at: temporary.url, withIntermediateDirectories: true)
@@ -22,37 +25,65 @@ struct ImageImporterTests {
         try TestImages.writeJPEG(width: 6000, height: 4000, to: source)
         let copy = try file("copy.jpg")
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy, limit: cell)
 
         #expect(size == CGSize(width: 3072, height: 2048))
         #expect(TestImages.pixelSize(of: copy) == size)
     }
 
     @Test func keepsMoreOfAPanoramasPhoto() async throws {
+        let source = try file("photo.jpg")
+        try TestImages.writeJPEG(width: 4000, height: 3000, to: source)
+
+        let inCell = try await ImageImporter.makeCopy(of: .file(source), at: try file("cell.jpg"), limit: cell)
+        let inPanorama = try await ImageImporter.makeCopy(of: .file(source), at: try file("panorama.jpg"), limit: panorama)
+
+        #expect(inCell == CGSize(width: 3072, height: 2304))
+        #expect(inPanorama == CGSize(width: 4000, height: 3000))
+    }
+
+    /// A photo too wide for a cell's copy to fill a panorama of the project's slides keeps more,
+    /// so its slide can become a panorama.
+    @Test func keepsMoreOfAWidePhotoInACell() async throws {
         let source = try file("wide.jpg")
         try TestImages.writeJPEG(width: 6000, height: 1500, to: source)
 
-        let cell = try await ImageImporter.makeCopy(of: .file(source), at: try file("cell.jpg"))
-        let panorama = try await ImageImporter.makeCopy(of: .file(source), at: try file("panorama.jpg"), limit: .panorama)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell)
 
-        #expect(cell == CGSize(width: 3072, height: 768))
-        #expect(panorama == CGSize(width: 6000, height: 1500))
+        #expect(size == CGSize(width: 6000, height: 1500))
     }
 
-    @Test func limitsAPanoramasCopyByWidthAndByPixels() {
+    /// Stored wide but tagged to turn, the photo stands tall, which a cell's copy needs no more of.
+    @Test func judgesAPhotosWidthUpright() async throws {
+        let source = try file("turned.jpg")
+        try TestImages.writeJPEG(width: 6000, height: 1500, orientation: 6, to: source)
+
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell)
+
+        #expect(size == CGSize(width: 768, height: 3072))
+    }
+
+    @Test func limitsACopyByThePanoramaItCouldFill() {
         // As wide as ten slides, for a photo wider than that.
-        #expect(ImageImporter.CopyLimit.panorama.longestSide(width: 40000, height: 2000) == 10800)
+        #expect(panorama.longestSide(width: 40000, height: 2000) == 10800)
         // About 24 megapixels, 5796 by 4140, for a photo nearer square.
-        #expect(ImageImporter.CopyLimit.panorama.longestSide(width: 7000, height: 5000) == 5796)
-        #expect(ImageImporter.CopyLimit.panorama.longestSide(width: 0, height: 0) == 10800)
-        #expect(ImageImporter.CopyLimit.cell.longestSide(width: 7000, height: 5000) == ImageImporter.maximumPixelSize)
+        #expect(panorama.longestSide(width: 7000, height: 5000) == 5796)
+        #expect(panorama.longestSide(width: 0, height: 0) == 10800)
+        // A cell keeps more only of a photo too wide for its usual copy to fill a panorama.
+        #expect(cell.longestSide(width: 7000, height: 5000) == ImageImporter.maximumPixelSize)
+        #expect(cell.longestSide(width: 2000, height: 8000) == ImageImporter.maximumPixelSize)
+        #expect(cell.longestSide(width: 8000, height: 2000) == 9797)
+        #expect(cell.longestSide(width: 0, height: 0) == ImageImporter.maximumPixelSize)
+        // Landscape slides are short enough for the usual copy to fill a panorama of them.
+        let landscapeCell = ImageImporter.CopyLimit(slideHeight: 566, isPanorama: false)
+        #expect(landscapeCell.longestSide(width: 8000, height: 2000) == ImageImporter.maximumPixelSize)
     }
 
     @Test func keepsASmallPhotoAtItsOwnSize() async throws {
         let source = try file("small.jpg")
         try TestImages.writeJPEG(width: 800, height: 600, to: source)
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"))
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell)
 
         #expect(size == CGSize(width: 800, height: 600))
     }
@@ -63,7 +94,7 @@ struct ImageImporterTests {
         try TestImages.writeJPEG(width: 400, height: 200, orientation: 6, to: source)
         let copy = try file("copy.jpg")
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy, limit: cell)
 
         #expect(size == CGSize(width: 200, height: 400))
         #expect(TestImages.pixelSize(of: copy) == size)
@@ -73,7 +104,7 @@ struct ImageImporterTests {
         let drawn = try #require(SampleImages.image(for: UUID(), width: 400, height: 200))
         let capture = UIImage(cgImage: drawn, scale: 1, orientation: .right)
 
-        let size = try await ImageImporter.makeCopy(of: .image(capture), at: try file("copy.jpg"))
+        let size = try await ImageImporter.makeCopy(of: .image(capture), at: try file("copy.jpg"), limit: cell)
 
         #expect(size == CGSize(width: 200, height: 400))
     }
@@ -83,7 +114,7 @@ struct ImageImporterTests {
         try Data("not an image".utf8).write(to: source)
 
         await #expect(throws: ImageImporter.ImportError.self) {
-            try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"))
+            try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell)
         }
     }
 }

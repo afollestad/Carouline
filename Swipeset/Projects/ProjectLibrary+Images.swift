@@ -121,7 +121,7 @@ extension ProjectLibrary {
                 return .denied
             }
         }
-        // Asked for at the copy's size, so a panorama's original doesn't come back as all of a
+        // Asked for at the copy's size, so a large copy's original doesn't come back as all of a
         // 48-megapixel photo, nor a cell's past what its copy keeps.
         let maxPixelSize = copyLimit(for: address).longestSide(width: image.pixelWidth, height: image.pixelHeight)
         await importPhoto(
@@ -188,9 +188,12 @@ extension ProjectLibrary {
         project(address.projectID)?.slides.first { $0.id == address.slideID }
     }
 
-    /// How large a copy the cell at `address` keeps: a panorama's spreads across several slides.
+    /// How much of a photo the cell at `address` keeps, for its project's slides.
     private func copyLimit(for address: CellAddress) -> ImageImporter.CopyLimit {
-        slide(containing: address)?.layout == .panorama ? .panorama : .cell
+        ImageImporter.CopyLimit(
+            slideHeight: project(address.projectID).map { Int($0.aspectRatio.exportSize.height) } ?? 0,
+            isPanorama: slide(containing: address)?.layout == .panorama
+        )
     }
 
     /// The cells of `address`'s slide with a photo on its way in.

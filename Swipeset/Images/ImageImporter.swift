@@ -15,7 +15,7 @@ nonisolated enum PhotoSource: Sendable {
     case image(UIImage)
 }
 
-/// Makes the app's own copy of a photo: upright, no larger than a cell can use, as a JPEG.
+/// Makes the app's own copy of a photo: upright, no larger than its slides can use, as a JPEG.
 nonisolated enum ImageImporter {
     /// Room for a full zoom into the smallest cells of a 1080-pixel export, while a 48-megapixel
     /// photo's copy stays near a tenth of its size.
@@ -23,23 +23,30 @@ nonisolated enum ImageImporter {
 
     /// The most of a photo a copy keeps.
     struct CopyLimit: Hashable, Sendable {
-        let longestSide: Int
-        /// Nil for no limit past `longestSide`.
-        let maximumPixels: Int?
+        /// The export height of the project's slides, which a panorama of the photo fills.
+        let slideHeight: Int
+        /// Whether the copy fills a panorama rather than a cell.
+        let isPanorama: Bool
 
-        static let cell = CopyLimit(longestSide: maximumPixelSize, maximumPixels: nil)
-        /// As wide as the widest panorama's export, for a photo as wide as it, but no more than
-        /// 24 megapixels, about 96 MB decoded, so a photo nearer square isn't kept whole.
-        static let panorama = CopyLimit(longestSide: 1080 * Slide.panoramaSpans.upperBound, maximumPixels: 24_000_000)
+        /// As wide as the widest panorama's export.
+        private static let panoramaSide = 1080 * Slide.panoramaSpans.upperBound
+        /// About 96 MB decoded, so a photo nearer square isn't kept whole.
+        private static let panoramaPixels = 24_000_000.0
 
-        /// The longer side of a copy of a `width` by `height` photo, or `longestSide` when the
-        /// photo's size isn't known.
+        /// The longer side of the copy of an upright `width` by `height` photo. A panorama's copy
+        /// keeps up to the widest panorama's export, within `panoramaPixels`. So does a cell's
+        /// when the photo is too wide for `maximumPixelSize` to fill a panorama of these slides,
+        /// so it stays sharp if the slide becomes one; any other cell's keeps `maximumPixelSize`.
         func longestSide(width: Int, height: Int) -> Int {
-            guard let maximumPixels, width > 0, height > 0 else {
-                return longestSide
+            let isWide = height > 0 && width * slideHeight > height * maximumPixelSize
+            guard isPanorama || isWide else {
+                return maximumPixelSize
+            }
+            guard width > 0, height > 0 else {
+                return Self.panoramaSide
             }
             let aspect = Double(max(width, height)) / Double(min(width, height))
-            return min(longestSide, Int((Double(maximumPixels) * aspect).squareRoot()))
+            return min(Self.panoramaSide, Int((Self.panoramaPixels * aspect).squareRoot()))
         }
     }
 
@@ -50,7 +57,7 @@ nonisolated enum ImageImporter {
 
     /// Writes `source`'s copy, within `limit`, to `destination` and returns its pixel size.
     @concurrent
-    static func makeCopy(of source: PhotoSource, at destination: URL, limit: CopyLimit = .cell) async throws -> CGSize {
+    static func makeCopy(of source: PhotoSource, at destination: URL, limit: CopyLimit) async throws -> CGSize {
         let imageSource: CGImageSource? = switch source {
         case .file(let url):
             CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary)
@@ -61,10 +68,13 @@ nonisolated enum ImageImporter {
         guard let imageSource else {
             throw ImportError.unreadable
         }
-        // Upright or not, the photo's sides keep the same proportion, which is all the limit needs.
         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
-        let width = properties?[kCGImagePropertyPixelWidth] as? Int ?? 0
-        let height = properties?[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let storedWidth = properties?[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let storedHeight = properties?[kCGImagePropertyPixelHeight] as? Int ?? 0
+        // EXIF orientations 5 to 8 turn the photo a quarter, so it stands the other way up.
+        let isTurned = (5...8).contains(properties?[kCGImagePropertyOrientation] as? Int ?? 1)
+        let width = isTurned ? storedHeight : storedWidth
+        let height = isTurned ? storedWidth : storedHeight
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             // Bakes the EXIF orientation into the pixels, so the copy needs none.
