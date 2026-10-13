@@ -52,28 +52,32 @@ struct CellView: View {
 
     var body: some View {
         ZStack {
-            // In the screen's scheme, rather than the one the cell's glass takes below.
-            PlaceholderCell(background: background)
-                .environment(\.colorScheme, colorScheme)
             if let image = cell.image {
+                // Behind the photo while it loads, and in its place when it's missing, in the
+                // screen's scheme rather than the one the cell's glass takes below.
+                PlaceholderCell(background: background)
+                    .environment(\.colorScheme, colorScheme)
                 photo(image)
-            } else if !isImporting {
-                AddPhotoButton(
-                    position: position,
-                    emptyCellCount: emptyCellCount,
-                    isPanorama: isPanorama,
-                    offersSources: actions.takePhoto != nil
-                ) {
-                    sourceButtons
-                } choose: {
-                    actions.choosePhoto(address)
+            } else {
+                // Glass over what's behind the slide, as the strip's other chrome is, so an empty
+                // cell reads as a space to fill rather than part of the slide.
+                Color.clear
+                    .glassEffect(.regular, in: .rect)
+                if !isImporting {
+                    AddPhotoButton(
+                        position: position,
+                        emptyCellCount: emptyCellCount,
+                        isPanorama: isPanorama,
+                        offersSources: actions.takePhoto != nil
+                    ) {
+                        sourceButtons
+                    } choose: {
+                        actions.choosePhoto(address)
+                    }
                 }
             }
             if isImporting {
-                ProgressView()
-                    .padding(isCompact ? 6 : 12)
-                    .glassEffect(.regular, in: Circle())
-                    .accessibilityLabel("Adding \(position)")
+                importingSpinner
             }
         }
         .controlSize(isCompact ? .small : .regular)
@@ -96,10 +100,31 @@ struct CellView: View {
         .environment(\.colorScheme, isOnLight ? .light : .dark)
     }
 
-    /// Whether the cell's glass sits on something light: the placeholder, while no photo covers
-    /// it, and otherwise the slide's background.
+    /// Whether the cell's glass sits on something light: for an empty cell, the screen behind its
+    /// glass; for a missing photo, the placeholder; and otherwise the slide's background.
     private var isOnLight: Bool {
-        cell.image == nil || isMissing ? PlaceholderCell.isLight(on: background, in: colorScheme) : background.isLight
+        if cell.image == nil {
+            colorScheme == .light
+        } else if isMissing {
+            PlaceholderCell.isLight(on: background, in: colorScheme)
+        } else {
+            background.isLight
+        }
+    }
+
+    /// A spinner on an empty cell's glass, or on a glass circle of its own over a photo it's
+    /// replacing, rather than glass on glass.
+    @ViewBuilder
+    private var importingSpinner: some View {
+        if cell.image == nil {
+            ProgressView()
+                .accessibilityLabel("Adding \(position)")
+        } else {
+            ProgressView()
+                .padding(isCompact ? 6 : 12)
+                .glassEffect(.regular, in: Circle())
+                .accessibilityLabel("Adding \(position)")
+        }
     }
 
     private var isSelected: Bool {
@@ -248,7 +273,7 @@ struct CellView: View {
     }
 }
 
-/// A glass circle with a plus, which offers the library and the camera when there is one, and
+/// A plus filling an empty cell, which offers the library and the camera when there is one, and
 /// goes straight to the library when there isn't.
 private struct AddPhotoButton<Sources: View>: View {
     let position: String
@@ -272,8 +297,10 @@ private struct AddPhotoButton<Sources: View>: View {
                 }
             }
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
+        // Plain, since the cell's own glass is behind it, and the whole cell, an easy target
+        // even in a thin panorama.
+        .buttonStyle(.plain)
+        .hoverEffect(.highlight)
         .accessibilityLabel("Add \(position)")
         .accessibilityHint(hint)
     }
@@ -289,10 +316,11 @@ private struct AddPhotoButton<Sources: View>: View {
     }
 
     private var label: some View {
-        let isSmall = controlSize == .small
-        return Image(systemName: "plus")
-            .font(isSmall ? .footnote.weight(.semibold) : .title3.weight(.semibold))
-            .frame(width: isSmall ? 14 : 28, height: isSmall ? 14 : 28)
+        Image(systemName: "plus")
+            .font(controlSize == .small ? .body.weight(.semibold) : .title2.weight(.semibold))
+            .foregroundStyle(Color.primary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(.rect)
     }
 }
 

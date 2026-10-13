@@ -37,11 +37,11 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 
 ## Design rules
 
-- Floating chrome is Liquid Glass: toolbar items, partial-height sheets, project rows, slide captions, and the buttons over slides. Don't put glass on content inside a glass sheet or popover, which reads as glass on glass.
+- Floating chrome is Liquid Glass: toolbar items, partial-height sheets, project rows, slide captions, the buttons over slides, and the strip's empty cells, whose slide background is left out under them. Don't put glass on content inside a glass sheet or popover, which reads as glass on glass.
 - Screens sit on `GlowBackdrop`, or `SlideBackdrop` on the project screen, never a flat system background, so their glass has color to frost. A plain list draws section headers and footers on an opaque band over it, so put notes in clear rows.
 - Blur a backdrop small inside `drawingGroup()` and scale it up, as `SlideBackdrop` does. A full-screen blur re-renders on every frame the strip scrolls, and a full-screen 8-bit offscreen render bands the dark glow.
 - Give a horizontal scroll view under the navigation bar the soft top scroll edge effect; the default draws a solid band with a hairline under the bar.
-- Glass over a slide takes its color scheme from what it sits on, not the system's, so it stays legible on a white slide in dark mode: the slide's background, or an empty cell's placeholder, which is dark gray in dark mode.
+- Glass over a slide takes its color scheme from what it sits on, not the system's, so it stays legible on a white slide in dark mode: the slide's background, a missing photo's placeholder, or for an empty cell's glass, the screen behind the slide.
 - Cap the slide strip and the selection bar at `accessibility1`, since slides leave fixed room for their captions and buttons. Sheets and the projects list stay uncapped.
 - Give text in glass sheets and popovers `Color.primary`, not gray: on iPad the popovers float over the slides, and a bright photo through the glass washes gray text out.
 - Keep `AccentColor` the icon's violet. Hold the light variant to 4.5:1 against white, and the dark one to 4.5:1 against the dark system background and 3:1 under a prominent button's white label.

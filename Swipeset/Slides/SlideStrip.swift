@@ -215,7 +215,7 @@ private struct SlideCard: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            SlideView(slide: slide, style: style) { index in
+            SlideView(slide: slide, style: style, revealsEmptyCells: true) { index in
                 let address = CellAddress(projectID: projectID, slideID: slide.id, index: index)
                 CellView(
                     cell: slide.cells[index],

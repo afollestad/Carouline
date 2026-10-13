@@ -9,6 +9,9 @@ import SwiftUI
 struct SlideView<CellContent: View>: View {
     let slide: Slide
     let style: SlideStyle
+    /// Whether empty cells show what's behind the slide rather than its background, for the
+    /// strip's glass to frost.
+    var revealsEmptyCells = false
     @ViewBuilder let cell: (Int) -> CellContent
 
     var body: some View {
@@ -17,7 +20,32 @@ struct SlideView<CellContent: View>: View {
                 cell(index)
             }
         }
-        .background(style.background.color)
+        .background {
+            SlideBackground(
+                layout: slide.layout,
+                style: style,
+                span: slide.span,
+                holes: revealsEmptyCells ? slide.cells.indices.filter { slide.cells[$0].image == nil } : []
+            )
+            .fill(style.background.color, style: FillStyle(eoFill: true))
+        }
+    }
+}
+
+/// A slide's background less the cells at `holes`, which show what's behind the slide.
+struct SlideBackground: Shape {
+    let layout: SlideLayout
+    let style: SlideStyle
+    let span: Int
+    let holes: [Int]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect)
+        let frames = SlideGeometry.cellFrames(for: layout, in: rect.size, style: style, span: span)
+        for index in holes where frames.indices.contains(index) {
+            path.addRect(frames[index].offsetBy(dx: rect.minX, dy: rect.minY))
+        }
+        return path
     }
 }
 
@@ -30,8 +58,9 @@ extension SlideView where CellContent == PlaceholderCell {
     }
 }
 
-/// An empty cell's fill: dark gray in dark mode, so an empty slide doesn't glare on the dark
-/// screen, and otherwise dark on a light background and light on a dark one, so it shows on either.
+/// A cell's fill where no photo shows, as in an empty cell's thumbnail or behind a missing photo:
+/// dark gray in dark mode, so it doesn't glare on the dark screen, and otherwise dark on a light
+/// background and light on a dark one, so it shows on either.
 struct PlaceholderCell: View {
     let background: RGBColor
     @Environment(\.colorScheme) private var colorScheme
