@@ -47,8 +47,6 @@ struct CellView: View {
     /// Whether the cell is a panorama's, whose first photo sets how many slides it spans.
     var isPanorama = false
     @State private var size: CGSize = .zero
-    /// The crop when the current drag or pinch began, which the gesture's values build on.
-    @State private var gestureStart: ImageCrop?
     @State private var isMissing = false
 
     var body: some View {
@@ -179,34 +177,21 @@ struct CellView: View {
         actions.select(address)
     }
 
-    /// Drags pan and pinches zoom about where they started, together in one gesture, each
-    /// measured from the crop at the gesture's start so the photo tracks the fingers exactly.
+    /// Drags pan and pinches zoom about where they started, together in one gesture.
     private func cropGesture(for image: PlacedImage) -> some Gesture {
         SimultaneousGesture(DragGesture(minimumDistance: 0), MagnifyGesture())
             .onChanged { value in
-                let start = gestureStart ?? session.liveCrop ?? image.crop
-                gestureStart = start
-                var crop = start
-                if let magnify = value.second {
-                    crop = CropGeometry.zoomed(
-                        crop,
-                        by: magnify.magnification,
-                        about: magnify.startLocation,
-                        imageSize: image.pixelSize,
-                        cellSize: size
-                    )
-                }
-                if let drag = value.first {
-                    crop = CropGeometry.panned(crop, by: drag.translation, imageSize: image.pixelSize, cellSize: size)
-                }
-                session.liveCrop = crop
+                session.frame(
+                    image,
+                    translation: value.first?.translation,
+                    magnification: value.second?.magnification,
+                    anchor: value.second?.startLocation ?? .zero
+                )
             }
             .onEnded { _ in
-                if let crop = session.liveCrop {
+                if let crop = session.endFraming() {
                     actions.setCrop(crop, address)
                 }
-                session.liveCrop = nil
-                gestureStart = nil
             }
     }
 

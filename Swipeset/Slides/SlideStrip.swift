@@ -88,6 +88,7 @@ struct SlideStrip: View {
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
             .onTapGesture(perform: onBackgroundTap)
+            .gesture(framingGesture, isEnabled: session.selection != nil)
         }
         .scrollTargetBehavior(snapping)
         // A drag on the selected photo frames it rather than scrolling past it.
@@ -95,6 +96,40 @@ struct SlideStrip: View {
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
+    }
+
+    /// Drags and pinches anywhere on the strip frame the selected photo, as scrolling is locked
+    /// while one is, so a thin panorama or a small cell needn't be hit exactly. The photo's own
+    /// gesture takes those on it, and a pinch away from it zooms about its middle, as the zoom
+    /// slider does.
+    private var framingGesture: some Gesture {
+        SimultaneousGesture(DragGesture(), MagnifyGesture())
+            .onChanged { value in
+                guard let image = selectedPhoto else {
+                    return
+                }
+                session.frame(
+                    image,
+                    translation: value.first?.translation,
+                    magnification: value.second?.magnification,
+                    anchor: CGPoint(x: session.cellSize.width / 2, y: session.cellSize.height / 2)
+                )
+            }
+            .onEnded { _ in
+                let crop = session.endFraming()
+                if let selection = session.selection, let crop {
+                    cellActions.setCrop(crop, selection)
+                }
+            }
+    }
+
+    private var selectedPhoto: PlacedImage? {
+        guard let selection = session.selection,
+              let slide = project.slides.first(where: { $0.id == selection.slideID }),
+              slide.cells.indices.contains(selection.index) else {
+            return nil
+        }
+        return slide.cells[selection.index].image
     }
 
     /// Rests the strip with a slide, or the add button, in the middle of the screen. View-aligned
