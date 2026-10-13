@@ -133,7 +133,7 @@ private struct LayoutTile: View {
         if layout == .panorama {
             // As wide as a slide's tile, and as tall as a default panorama of these slides.
             RoundedRectangle(cornerRadius: 3)
-                .fill(.tint.opacity(0.4))
+                .fill(.tint)
                 .overlay {
                     SeamLines(span: Slide.defaultPanoramaSpan)
                         .stroke(.white, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
@@ -141,9 +141,10 @@ private struct LayoutTile: View {
                 .frame(height: previewSize.height / CGFloat(Slide.defaultPanoramaSpan))
         } else {
             SlideCells(layout: layout, style: Self.diagramStyle) {
+                // Solid, so the cells keep their contrast on the sheet's glass.
                 ForEach(layout.grid.cells.indices, id: \.self) { _ in
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(.tint.opacity(0.4))
+                        .fill(.tint)
                 }
             }
         }

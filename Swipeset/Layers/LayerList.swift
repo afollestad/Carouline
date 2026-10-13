@@ -60,6 +60,8 @@ struct LayerList: View {
                 Button("Add Layer", systemImage: "plus") {
                     session.sheetPath.append(.add)
                 }
+                // As the close button is, which the accent loses its contrast beside on the glass.
+                .tint(Color.primary)
             }
         }
     }
@@ -157,8 +159,9 @@ struct LayerList: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(.fill.quaternary)
                 .overlay {
+                    // Primary, as the layers' previews above it draw, so it shows on the glass.
                     Image(systemName: "rectangle.split.2x2")
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(Color.primary)
                 }
                 .frame(width: LayerPreview.side, height: LayerPreview.side)
             VStack(alignment: .leading, spacing: 2) {

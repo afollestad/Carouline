@@ -47,9 +47,9 @@ private struct RatioTile: View {
 
     var body: some View {
         VStack(spacing: 6) {
+            // Solid, so the shape keeps its contrast on the sheet's glass.
             RoundedRectangle(cornerRadius: 6)
-                .fill(.tint.opacity(0.18))
-                .strokeBorder(.tint, lineWidth: 2)
+                .fill(.tint)
                 .aspectRatio(ratio.widthOverHeight, contentMode: .fit)
                 .frame(width: 72, height: 72)
                 .padding(.bottom, 4)

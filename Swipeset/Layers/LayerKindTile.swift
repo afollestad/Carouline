@@ -15,15 +15,17 @@ struct LayerKindTile: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
+                // Solid, with white on it, as a prominent button is, which keeps its contrast on
+                // a sheet's glass over whatever photo is under it.
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.tint.opacity(0.18))
-                    .strokeBorder(.tint, lineWidth: 2)
+                    .fill(.tint)
                     .overlay {
                         if isAdding {
                             ProgressView()
+                                .tint(.white)
                         } else {
                             illustration
-                                .foregroundStyle(.tint)
+                                .foregroundStyle(.white)
                         }
                     }
                     .frame(width: 72, height: 72)
