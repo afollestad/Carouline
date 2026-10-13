@@ -67,7 +67,7 @@ extension ProjectLibrary {
                 picked = url
             }
             try FileManager.default.createDirectory(at: store.paths.imports, withIntermediateDirectories: true)
-            let size = try await ImageImporter.makeCopy(of: photo, at: staging)
+            let size = try await ImageImporter.makeCopy(of: photo, at: staging, limit: copyLimit(for: address))
             guard importTokens[address] == token,
                   try await store.adoptImage(at: staging, as: imageID, in: address.projectID) else {
                 return
@@ -121,6 +121,9 @@ extension ProjectLibrary {
                 return .denied
             }
         }
+        // Asked for at the copy's size, so a panorama's original doesn't come back as all of a
+        // 48-megapixel photo, nor a cell's past what its copy keeps.
+        let maxPixelSize = copyLimit(for: address).longestSide(width: image.pixelWidth, height: image.pixelHeight)
         await importPhoto(
             into: address,
             assetIdentifier: assetIdentifier,
@@ -128,7 +131,7 @@ extension ProjectLibrary {
             failingAs: asking ? .restorePhoto : nil,
             replacing: image.id
         ) {
-            guard let original = await photos.image(for: assetIdentifier, maxPixelSize: ImageImporter.maximumPixelSize) else {
+            guard let original = await photos.image(for: assetIdentifier, maxPixelSize: maxPixelSize) else {
                 throw RestoreError.originalGone
             }
             return .image(original)
@@ -154,7 +157,9 @@ extension ProjectLibrary {
     }
 
     /// Puts `image` in the cell at `address`, deleting the copy it replaces once that's saved.
-    /// Returns false, changing nothing, when the cell no longer exists.
+    /// A photo filling an empty panorama spreads it across as many slides as the photo fills;
+    /// one replacing or restoring a photo keeps the width it had. Returns false, changing
+    /// nothing, when the cell no longer exists.
     @discardableResult
     func place(_ image: PlacedImage?, at address: CellAddress) -> Bool {
         guard let cell = cell(at: address) else {
@@ -163,6 +168,9 @@ extension ProjectLibrary {
         update(address.projectID, deletingImages: cell.image.map { [$0.id] } ?? []) { project in
             guard let slideIndex = project.slides.firstIndex(where: { $0.id == address.slideID }) else {
                 return
+            }
+            if let image, cell.image == nil, project.slides[slideIndex].layout == .panorama {
+                project.slides[slideIndex].span = Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio)
             }
             project.slides[slideIndex].cells[address.index].image = image
         }
@@ -178,6 +186,11 @@ extension ProjectLibrary {
 
     private func slide(containing address: CellAddress) -> Slide? {
         project(address.projectID)?.slides.first { $0.id == address.slideID }
+    }
+
+    /// How large a copy the cell at `address` keeps: a panorama's spreads across several slides.
+    private func copyLimit(for address: CellAddress) -> ImageImporter.CopyLimit {
+        slide(containing: address)?.layout == .panorama ? .panorama : .cell
     }
 
     /// The cells of `address`'s slide with a photo on its way in.

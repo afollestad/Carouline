@@ -210,6 +210,13 @@ struct ProjectScreen: View {
                 withAnimation {
                     library.deleteSlide(slideID, in: projectID)
                 }
+            },
+            onSetSpan: { slideID, span in
+                withAnimation {
+                    library.setSpan(span, of: slideID, in: projectID)
+                    // Brought to the front, as a move is, should the menu be a neighbor's.
+                    stripPosition = .slide(slideID)
+                }
             }
         )
         // Slides leave fixed room for their captions and buttons, which larger text overflows.

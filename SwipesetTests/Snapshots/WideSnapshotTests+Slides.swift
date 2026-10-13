@@ -45,4 +45,8 @@ extension WideSnapshotTests {
     @Test func newSlideSheet() async {
         await assertScreenSnapshot(of: LayoutSheet(aspectRatio: .portrait, current: nil) { _ in 0 } onChoose: { _ in }, on: .wide)
     }
+
+    @Test func panoramaSlides() async {
+        await assertScreenSnapshot(of: projectScreen(panoramaProject), on: .wide)
+    }
 }

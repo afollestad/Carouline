@@ -28,6 +28,7 @@ struct LayoutSheet: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(layout.name)
+                        .accessibilityHint(layout == .panorama ? "One photo across several slides that swipe as one image" : "")
                         .accessibilityAddTraits(layout == current ? .isSelected : [])
                     }
                 }
@@ -98,7 +99,7 @@ struct LayoutSheet: View {
 }
 
 /// A layout drawn as tinted cells on the tile, with gaps wide enough to read at this size
-/// whatever the project's own spacing.
+/// whatever the project's own spacing, or a panorama as a band cut into slides.
 private struct LayoutTile: View {
     private static let diagramStyle = SlideStyle(spacing: 0.06, border: 0, background: .white)
 
@@ -108,14 +109,9 @@ private struct LayoutTile: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            SlideCells(layout: layout, style: Self.diagramStyle) {
-                ForEach(layout.grid.cells.indices, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(.tint.opacity(0.4))
-                }
-            }
-            .frame(width: previewSize.width, height: previewSize.height)
-            .accessibilityHidden(true)
+            diagram
+                .frame(width: previewSize.width, height: previewSize.height)
+                .accessibilityHidden(true)
             Text(layout.name)
                 .font(.caption)
                 .multilineTextAlignment(.center)
@@ -133,12 +129,40 @@ private struct LayoutTile: View {
         .contentShape(.rect(cornerRadius: 16))
         .hoverEffect(.highlight)
     }
+
+    @ViewBuilder
+    private var diagram: some View {
+        if layout == .panorama {
+            // As wide as a slide's tile, and as tall as a default panorama of these slides.
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.tint.opacity(0.4))
+                .overlay {
+                    SeamLines(span: Slide.defaultPanoramaSpan)
+                        .stroke(.white, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                }
+                .frame(height: previewSize.height / CGFloat(Slide.defaultPanoramaSpan))
+        } else {
+            SlideCells(layout: layout, style: Self.diagramStyle) {
+                ForEach(layout.grid.cells.indices, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.tint.opacity(0.4))
+                }
+            }
+        }
+    }
 }
 
 #Preview("New") {
     Color.clear
         .sheet(isPresented: .constant(true)) {
             LayoutSheet(aspectRatio: .portrait, current: nil) { _ in 0 } onChoose: { _ in }
+        }
+}
+
+#Preview("Change Panorama") {
+    Color.clear
+        .sheet(isPresented: .constant(true)) {
+            LayoutSheet(aspectRatio: .portrait, current: .panorama) { _ in 0 } onChoose: { _ in }
         }
 }
 

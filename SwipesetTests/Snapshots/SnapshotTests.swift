@@ -72,6 +72,32 @@ extension ScreenSnapshotting {
         )
     }
 
+    /// A wide photo cut across three portrait slides, with a slide after it. Kept out of
+    /// `projects`, so the project list's baselines don't change with it.
+    var panoramaProject: Project {
+        Project(
+            id: fixtureID(6),
+            name: "Ridgeline",
+            aspectRatio: .portrait,
+            slides: [
+                Slide(id: fixtureID(61), layout: .panorama, span: 3, cells: [photo(161, 3072, 1024)]),
+                Slide(id: fixtureID(62), layout: .single, cells: [photo(162, 2048, 2730)])
+            ],
+            createdAt: created
+        )
+    }
+
+    /// An empty panorama across three landscape slides, the thinnest card a default one makes.
+    var landscapePanorama: Project {
+        Project(
+            id: fixtureID(7),
+            name: "Shoreline",
+            aspectRatio: .landscape,
+            slides: [Slide(id: fixtureID(71), layout: .panorama)],
+            createdAt: created
+        )
+    }
+
     /// `project`'s screen in its navigation stack, from a library holding just it, with
     /// `selection` selected to frame.
     func projectScreen(_ project: Project, selection: CellAddress? = nil) -> some View {
@@ -123,7 +149,10 @@ extension ScreenSnapshotting {
     }
 
     var unreadableProject: UnreadableProject {
-        UnreadableProject(folder: URL(filePath: "/Projects/Newer", directoryHint: .isDirectory), reason: .newerVersion(2))
+        UnreadableProject(
+            folder: URL(filePath: "/Projects/Newer", directoryHint: .isDirectory),
+            reason: .newerVersion(ProjectFile.currentFormatVersion + 1)
+        )
     }
 
     /// IDs that stay the same between runs, so slides keep their order and identity.

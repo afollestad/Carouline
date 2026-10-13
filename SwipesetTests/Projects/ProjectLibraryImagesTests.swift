@@ -20,12 +20,12 @@ struct ProjectLibraryImagesTests {
         )
     }
 
-    /// A library with one project of one two-cell slide, and the first cell's address.
-    private func makeLibrary() async throws -> (ProjectLibrary, CellAddress) {
+    /// A library with one portrait project of one slide in `layout`, and the first cell's address.
+    private func makeLibrary(layout: SlideLayout = .twoColumns) async throws -> (ProjectLibrary, CellAddress) {
         let library = ProjectLibrary(store: ProjectStore(paths: paths))
         await library.load()
         let projectID = library.createProject(aspectRatio: .portrait).id
-        let slideID = try #require(library.addSlide(.twoColumns, to: projectID))
+        let slideID = try #require(library.addSlide(layout, to: projectID))
         return (library, CellAddress(projectID: projectID, slideID: slideID, index: 0))
     }
 
@@ -75,6 +75,37 @@ struct ProjectLibraryImagesTests {
         #expect(new != nil && new?.id != old?.id)
         #expect(copyExists(new, in: address.projectID))
         #expect(!copyExists(old, in: address.projectID))
+    }
+
+    @Test func aPhotoFillingAPanoramaSpreadsItAcrossTheSlidesItFills() async throws {
+        let (library, address) = try await makeLibrary(layout: .panorama)
+        let picked = try pickedPhoto(width: 6000, height: 1500)
+
+        await library.importPhoto(into: address, assetIdentifier: nil) { .file(picked) }
+        await library.flush()
+
+        #expect(library.photo(at: address)?.pixelSize == CGSize(width: 6000, height: 1500))
+        #expect(library.project(address.projectID)?.slides.first?.span == 5)
+    }
+
+    @Test func aPanoramaKeepsItsWidthWhenItsPhotoIsReplacedOrRestored() async throws {
+        let (library, address) = try await makeLibrary(layout: .panorama)
+        let first = try pickedPhoto(width: 6000, height: 1500)
+        await library.importPhoto(into: address, assetIdentifier: nil) { .file(first) }
+        library.setSpan(3, of: address.slideID, in: address.projectID)
+        let span = { library.project(address.projectID)?.slides.first?.span }
+
+        let second = try pickedPhoto()
+        await library.importPhoto(into: address, assetIdentifier: "A/L0/001") { .file(second) }
+        #expect(span() == 3)
+        await library.flush()
+        let image = try #require(library.photo(at: address))
+        try FileManager.default.removeItem(at: paths.imageFile(image.id, in: address.projectID))
+        let outcome = await library.restorePhoto(at: address, from: MockPhotoLibrary(assets: ["A/L0/001"]), asking: false)
+        await library.flush()
+
+        #expect(outcome == .restored)
+        #expect(span() == 3)
     }
 
     @Test func removingAPhotoDeletesItsCopy() async throws {

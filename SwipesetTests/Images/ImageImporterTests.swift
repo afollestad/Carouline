@@ -28,6 +28,26 @@ struct ImageImporterTests {
         #expect(TestImages.pixelSize(of: copy) == size)
     }
 
+    @Test func keepsMoreOfAPanoramasPhoto() async throws {
+        let source = try file("wide.jpg")
+        try TestImages.writeJPEG(width: 6000, height: 1500, to: source)
+
+        let cell = try await ImageImporter.makeCopy(of: .file(source), at: try file("cell.jpg"))
+        let panorama = try await ImageImporter.makeCopy(of: .file(source), at: try file("panorama.jpg"), limit: .panorama)
+
+        #expect(cell == CGSize(width: 3072, height: 768))
+        #expect(panorama == CGSize(width: 6000, height: 1500))
+    }
+
+    @Test func limitsAPanoramasCopyByWidthAndByPixels() {
+        // As wide as ten slides, for a photo wider than that.
+        #expect(ImageImporter.CopyLimit.panorama.longestSide(width: 40000, height: 2000) == 10800)
+        // About 24 megapixels, 5796 by 4140, for a photo nearer square.
+        #expect(ImageImporter.CopyLimit.panorama.longestSide(width: 7000, height: 5000) == 5796)
+        #expect(ImageImporter.CopyLimit.panorama.longestSide(width: 0, height: 0) == 10800)
+        #expect(ImageImporter.CopyLimit.cell.longestSide(width: 7000, height: 5000) == ImageImporter.maximumPixelSize)
+    }
+
     @Test func keepsASmallPhotoAtItsOwnSize() async throws {
         let source = try file("small.jpg")
         try TestImages.writeJPEG(width: 800, height: 600, to: source)

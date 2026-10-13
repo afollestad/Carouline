@@ -3,7 +3,7 @@
 //  Swipeset
 //
 
-/// How a slide splits into cells.
+/// How a slide splits into cells, or, as a panorama, one cell cut across several slides.
 nonisolated enum SlideLayout: String, Codable, CaseIterable, Identifiable, Sendable {
     case single
     case twoColumns
@@ -15,6 +15,7 @@ nonisolated enum SlideLayout: String, Codable, CaseIterable, Identifiable, Senda
     case threeColumns
     case threeRows
     case grid
+    case panorama
 
     var id: Self { self }
 
@@ -30,12 +31,13 @@ nonisolated enum SlideLayout: String, Codable, CaseIterable, Identifiable, Senda
         case .threeColumns: "Three Columns"
         case .threeRows: "Three Rows"
         case .grid: "Grid of Four"
+        case .panorama: "Panorama"
         }
     }
 
     var grid: LayoutGrid {
         switch self {
-        case .single:
+        case .single, .panorama:
             LayoutGrid(columns: 1, rows: 1, cells: [.init(0, 0)])
         case .twoColumns:
             LayoutGrid(columns: 2, rows: 1, cells: [.init(0, 0), .init(1, 0)])

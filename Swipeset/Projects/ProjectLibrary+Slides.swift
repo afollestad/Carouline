@@ -40,18 +40,44 @@ extension ProjectLibrary {
     }
 
     /// Gives slide `slideID` a new layout, carrying its photos over in order and deleting any
-    /// the new layout has no cell for.
+    /// the new layout has no cell for. A panorama spans as many slides as its photo fills, which
+    /// shows all of it once its framing is reset, since a zoom set for one slide's shape crops
+    /// a panorama to a strip.
     func changeLayout(of slideID: UUID, in projectID: UUID, to layout: SlideLayout) {
-        guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }), slide.layout != layout else {
+        guard let project = project(projectID),
+              let slide = project.slides.first(where: { $0.id == slideID }),
+              slide.layout != layout else {
             return
         }
-        let (cells, dropped) = Self.cells(of: slide, in: layout)
+        let (packed, dropped) = Self.cells(of: slide, in: layout)
+        var cells = packed
+        var span: Int?
+        if layout == .panorama, let image = cells[0].image {
+            cells[0].image?.crop = ImageCrop()
+            span = Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio)
+        }
+        let changed = Slide(id: slideID, layout: layout, span: span, cells: cells)
         update(projectID, deletingImages: dropped.map(\.id)) { project in
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return
             }
-            project.slides[index].layout = layout
-            project.slides[index].cells = cells
+            project.slides[index] = changed
+        }
+    }
+
+    /// Spreads panorama `slideID` across `span` slides, kept within `Slide.panoramaSpans`.
+    func setSpan(_ span: Int, of slideID: UUID, in projectID: UUID) {
+        let span = Slide.clampedPanoramaSpan(span)
+        guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }),
+              slide.layout == .panorama,
+              slide.span != span else {
+            return
+        }
+        update(projectID) { project in
+            guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
+                return
+            }
+            project.slides[index].span = span
         }
     }
 

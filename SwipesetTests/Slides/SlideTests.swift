@@ -3,6 +3,7 @@
 //  SwipesetTests
 //
 
+import CoreGraphics
 import Testing
 @testable import Swipeset
 
@@ -57,5 +58,41 @@ struct SlideTests {
     @Test func fillsNothingForACellThatIsGone() {
         #expect(grid().cellsToFill(from: 4, count: 1).isEmpty)
         #expect(grid().cellsToFill(from: 0, count: 0).isEmpty)
+    }
+
+    @Test func spansOnlyAPanoramaAcrossSlides() {
+        let panorama = Slide(layout: .panorama)
+        #expect(panorama.span == Slide.defaultPanoramaSpan)
+        #expect(panorama.cells.count == 1)
+        #expect(Slide(layout: .panorama, span: 1).span == 2)
+        #expect(Slide(layout: .panorama, span: 40).span == 10)
+        #expect(Slide(layout: .grid, span: 3).span == 1)
+    }
+
+    /// A photo of `width` by `height` across slides of `aspectRatio`, and the span that fits it.
+    struct Fit: Sendable, CustomTestStringConvertible {
+        let width: Int
+        let height: Int
+        let aspectRatio: AspectRatio
+        let span: Int
+
+        var testDescription: String {
+            "\(width) by \(height) on \(aspectRatio.spokenRatio)"
+        }
+    }
+
+    @Test(arguments: [
+        Fit(width: 4000, height: 1000, aspectRatio: .portrait, span: 5),
+        Fit(width: 3000, height: 1000, aspectRatio: .square, span: 3),
+        Fit(width: 1920, height: 1080, aspectRatio: .portrait, span: 2),
+        // Halfway between two spans rounds up.
+        Fit(width: 2000, height: 1000, aspectRatio: .portrait, span: 3),
+        Fit(width: 4000, height: 1000, aspectRatio: .landscape, span: 2),
+        // Too narrow or too wide for a panorama, clamped to the spans there are.
+        Fit(width: 1000, height: 1000, aspectRatio: .portrait, span: 2),
+        Fit(width: 12000, height: 1000, aspectRatio: .story, span: 10)
+    ])
+    func fitsAPanoramaToItsPhoto(_ fit: Fit) {
+        #expect(Slide.panoramaSpan(fitting: CGSize(width: fit.width, height: fit.height), in: fit.aspectRatio) == fit.span)
     }
 }

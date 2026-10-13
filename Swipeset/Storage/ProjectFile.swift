@@ -9,7 +9,8 @@ import Foundation
 nonisolated enum ProjectFile {
     /// Bump when a field changes meaning or a new one becomes required, and migrate the old
     /// shape in `decode(_:)`. A new optional field needs no bump, since older files decode it as nil.
-    static let currentFormatVersion = 1
+    /// Version 2 added panoramas, which a version 1 build can't read and mustn't save over.
+    static let currentFormatVersion = 2
 
     enum ReadError: Error, Hashable, Sendable {
         /// Not a project this build understands: unparseable, unversioned, or with values out of range.
@@ -23,6 +24,7 @@ nonisolated enum ProjectFile {
         try makeEncoder().encode(Document(formatVersion: currentFormatVersion, project: project))
     }
 
+    /// Version 1 needs no migration: `Slide` reads its missing `span` as 1.
     static func decode(_ data: Data) throws -> Project {
         let decoder = makeDecoder()
         guard let probe = try? decoder.decode(Probe.self, from: data), probe.formatVersion >= 1 else {
@@ -38,12 +40,17 @@ nonisolated enum ProjectFile {
     }
 
     /// Pads a slide missing trailing cells, as an interrupted write of a future layout change
-    /// might leave it, but refuses one with more cells than its layout, which would drop photos.
+    /// might leave it, but refuses one with more cells than its layout, which would drop photos,
+    /// or a span its layout can't have.
     private static func validated(_ project: Project) throws -> Project {
         var project = project
         for index in project.slides.indices {
-            let expected = project.slides[index].layout.grid.cells.count
-            let count = project.slides[index].cells.count
+            let slide = project.slides[index]
+            guard slide.layout == .panorama ? Slide.panoramaSpans.contains(slide.span) : slide.span == 1 else {
+                throw ReadError.damaged
+            }
+            let expected = slide.layout.grid.cells.count
+            let count = slide.cells.count
             guard count <= expected else {
                 throw ReadError.damaged
             }

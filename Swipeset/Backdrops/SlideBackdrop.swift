@@ -52,11 +52,12 @@ struct SlideBackdrop: View {
     }
 
     /// The slide's photos where its cells put them, blurred small and scaled up to fill `size`.
+    /// A panorama renders each of its slides as small as one, so the screen fills from its middle.
     private func photos(of slide: Slide, filling size: CGSize) -> some View {
-        let small = CGSize(width: Self.renderWidth, height: Self.renderWidth / aspectRatio.widthOverHeight)
+        let small = CGSize(width: Self.renderWidth * CGFloat(slide.span), height: Self.renderWidth / aspectRatio.widthOverHeight)
         // Half again past filling, so the blur's fade at the photos' edges falls off the screen.
         let scale = max(size.width / small.width, size.height / small.height) * 1.5
-        return SlideCells(layout: slide.layout, style: style) {
+        return SlideCells(layout: slide.layout, style: style, span: slide.span) {
             ForEach(slide.cells.indices, id: \.self) { index in
                 if let image = slide.cells[index].image {
                     CellPhoto(image: image, projectID: projectID)

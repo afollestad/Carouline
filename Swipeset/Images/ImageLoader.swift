@@ -24,7 +24,8 @@ nonisolated struct ImageRequest: Hashable, Sendable {
     }
 
     /// Rounds a size up to one of a few, so a cell resized or zoomed a little reuses its decode
-    /// rather than making another.
+    /// rather than making another. Capped at a cell's copy size even for a panorama's larger
+    /// copy, since no card on screen shows more, and its whole copy decodes to up to 96 MB.
     static func bucket(for pixels: CGFloat) -> Int {
         [256, 512, 1024, 2048].first { CGFloat($0) >= pixels } ?? ImageImporter.maximumPixelSize
     }

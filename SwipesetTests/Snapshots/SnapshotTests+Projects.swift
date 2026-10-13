@@ -25,6 +25,12 @@ extension SnapshotTests {
         )
     }
 
+    /// A panorama's thumbnail shows just its first slide, and its summary counts all of them.
+    @Test func panoramaProjectList() async {
+        let library = library([panoramaProject])
+        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader))
+    }
+
     @Test func newProjectSheet() async {
         await assertScreenSnapshot(of: AspectRatioSheet { _ in })
     }

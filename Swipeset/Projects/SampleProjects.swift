@@ -26,7 +26,8 @@ nonisolated enum SampleProjects {
                             photo(105, 2048, 1365),
                             Cell()
                         ]
-                    )
+                    ),
+                    Slide(id: sampleID(14), layout: .panorama, span: 5, cells: [photo(106, 4096, 1024)])
                 ],
                 createdAt: date(daysAgo: 3)
             ),
@@ -34,7 +35,11 @@ nonisolated enum SampleProjects {
                 id: sampleID(2),
                 name: "Story Ideas",
                 aspectRatio: .story,
-                slides: [Slide(id: sampleID(21), layout: .threeRows, cells: [photo(201, 2048, 1365), Cell(), photo(202, 2048, 1536)])],
+                slides: [
+                    Slide(id: sampleID(21), layout: .threeRows, cells: [photo(201, 2048, 1365), Cell(), photo(202, 2048, 1536)]),
+                    // Empty, to fill with a wide photo and watch it fit.
+                    Slide(id: sampleID(22), layout: .panorama)
+                ],
                 createdAt: date(daysAgo: 5)
             ),
             Project(id: sampleID(3), name: "Coastline", aspectRatio: .landscape, createdAt: date(daysAgo: 8))

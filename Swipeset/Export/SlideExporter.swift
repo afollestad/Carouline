@@ -32,8 +32,8 @@ nonisolated protocol SlideExporting: Sendable {
     func export(_ project: Project) async throws -> ExportResult
 }
 
-/// Renders each slide at its shape's export size into a JPEG, in a folder of its own under
-/// `ProjectPaths.exports`, named in order after the project.
+/// Renders each slide at its shape's export size into a JPEG, a panorama into one for every slide
+/// it spans, in a folder of its own under `ProjectPaths.exports`, named in order after the project.
 nonisolated struct SlideExporter: SlideExporting {
     enum ExportError: Error {
         case unencodable
@@ -72,24 +72,26 @@ nonisolated struct SlideExporter: SlideExporting {
         let folder = paths.exports.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = Self.fileName(for: project.name)
-        let digits = max(2, String(project.slides.count).count)
+        let digits = max(2, String(project.carouselSlideCount).count)
         var slides: [ExportedSlide] = []
         var missingPhotos = 0
-        for (index, slide) in project.slides.enumerated() {
+        for slide in project.slides {
             try Task.checkCancellation()
-            // One slide's full-size render and decodes at a time, rather than all of them at once.
+            // One slide's decodes at a time, rather than all of them at once.
             try autoreleasepool {
-                let rendered = SlideRenderer.render(slide, style: project.style, size: project.aspectRatio.exportSize) { image, size in
+                missingPhotos += try SlideRenderer.render(slide, style: project.style, size: project.aspectRatio.exportSize) { image, size in
                     decode(image, project.id, size)
+                } piece: { image in
+                    try Task.checkCancellation()
+                    guard let data = image.jpegData(compressionQuality: 0.92) else {
+                        throw ExportError.unencodable
+                    }
+                    // Numbered through the carousel, a panorama's pieces among the other slides.
+                    let number = String(slides.count + 1).leftPadded(to: digits)
+                    let file = folder.appending(path: "\(name) \(number).jpg", directoryHint: .notDirectory)
+                    try data.write(to: file)
+                    slides.append(ExportedSlide(file: file, thumbnail: Self.thumbnail(of: file)))
                 }
-                missingPhotos += rendered.missingPhotos
-                guard let data = rendered.image.jpegData(compressionQuality: 0.92) else {
-                    throw ExportError.unencodable
-                }
-                let number = String(index + 1).leftPadded(to: digits)
-                let file = folder.appending(path: "\(name) \(number).jpg", directoryHint: .notDirectory)
-                try data.write(to: file)
-                slides.append(ExportedSlide(file: file, thumbnail: Self.thumbnail(of: file)))
             }
         }
         let emptyCells = project.slides.reduce(0) { count, slide in

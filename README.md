@@ -1,6 +1,6 @@
 # Swipeset
 
-Swipeset is a native iOS app for photo carousels. Pick a slide shape, lay out each slide with one to four photos from the camera or your library, then save the set to Photos or share it to any app that takes several images at once.
+Swipeset is a native iOS app for photo carousels. Pick a slide shape, lay out each slide with one to four photos from the camera or your library, or cut one wide photo across several slides as a panorama, then save the set to Photos or share it to any app that takes several images at once.
 
 ## Development
 

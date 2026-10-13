@@ -37,7 +37,7 @@ struct ExportSheet: View {
             Group {
                 switch phase {
                 case .preparing:
-                    ProgressView(project.slides.count == 1 ? "Preparing 1 slide…" : "Preparing \(project.slides.count) slides…")
+                    ProgressView(project.carouselSlideCount == 1 ? "Preparing 1 slide…" : "Preparing \(project.carouselSlideCount) slides…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .ready(let result):
                     ready(result)

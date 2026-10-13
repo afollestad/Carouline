@@ -86,6 +86,65 @@ struct ProjectLibrarySlidesTests {
         #expect(!exists(paths.imageFile(dropped.id, in: projectID)))
     }
 
+    @Test func addsAPanoramaAcrossTheDefaultSpan() async throws {
+        let (library, projectID) = await makeLibrary()
+        _ = try #require(library.addSlide(.panorama, to: projectID))
+
+        let panorama = try #require(slides(library, projectID).first)
+        #expect(panorama.span == Slide.defaultPanoramaSpan)
+        #expect(panorama.cells.count == 1)
+    }
+
+    @Test func aSlideTurnedPanoramaFitsItsFirstPhotoAndDropsTheRest() async throws {
+        let (library, projectID) = await makeLibrary()
+        let slideID = try #require(library.addSlide(.grid, to: projectID))
+        let kept = try await placeImage(in: library, projectID: projectID, slideID: slideID, cell: 0, width: 400, height: 100)
+        let dropped = try await placeImage(in: library, projectID: projectID, slideID: slideID, cell: 2)
+        library.setCrop(ImageCrop(scale: 2, centerX: 0.3, centerY: 0.5), at: CellAddress(projectID: projectID, slideID: slideID, index: 0))
+        let slide = try #require(slides(library, projectID).first)
+        #expect(ProjectLibrary.photosLost(changing: slide, to: .panorama) == 1)
+
+        library.changeLayout(of: slideID, in: projectID, to: .panorama)
+        await library.flush()
+
+        let panorama = try #require(slides(library, projectID).first)
+        #expect(panorama.layout == .panorama)
+        #expect(panorama.span == 5)
+        #expect(panorama.cells.map(\.image?.id) == [kept.id])
+        #expect(panorama.cells[0].image?.crop == ImageCrop())
+        #expect(!exists(paths.imageFile(dropped.id, in: projectID)))
+    }
+
+    @Test func aPanoramaTurnedSlideKeepsItsPhotoInTheFirstCell() async throws {
+        let (library, projectID) = await makeLibrary()
+        let slideID = try #require(library.addSlide(.panorama, to: projectID))
+        let image = try await placeImage(in: library, projectID: projectID, slideID: slideID, cell: 0)
+
+        library.changeLayout(of: slideID, in: projectID, to: .twoColumns)
+        await library.flush()
+
+        let slide = try #require(slides(library, projectID).first)
+        #expect(slide.span == 1)
+        #expect(slide.cells.map(\.image?.id) == [image.id, nil])
+    }
+
+    @Test func setsAPanoramasSpanWithinBounds() async throws {
+        let (library, projectID) = await makeLibrary()
+        let panoramaID = try #require(library.addSlide(.panorama, to: projectID))
+        let slideID = try #require(library.addSlide(.single, to: projectID))
+
+        library.setSpan(1, of: panoramaID, in: projectID)
+        #expect(slides(library, projectID)[0].span == 2)
+        library.setSpan(11, of: panoramaID, in: projectID)
+        #expect(slides(library, projectID)[0].span == 10)
+        library.setSpan(4, of: slideID, in: projectID)
+        #expect(slides(library, projectID)[1].span == 1)
+        let modified = library.project(projectID)?.modifiedAt
+        library.setSpan(10, of: panoramaID, in: projectID)
+        #expect(library.project(projectID)?.modifiedAt == modified)
+        await library.flush()
+    }
+
     @Test func savesANewStyleAndIgnoresTheSameOne() async throws {
         let (library, projectID) = await makeLibrary()
         let modified = library.project(projectID)?.modifiedAt
@@ -101,9 +160,17 @@ struct ProjectLibrarySlidesTests {
 
     // MARK: Helpers
 
-    /// Puts a copy on disk and in cell `cell` of the slide, as an import would.
-    private func placeImage(in library: ProjectLibrary, projectID: UUID, slideID: UUID, cell: Int) async throws -> PlacedImage {
-        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10)
+    /// Puts a copy on disk and in cell `cell` of the slide, as an import would, sized as a
+    /// `width` by `height` photo.
+    private func placeImage(
+        in library: ProjectLibrary,
+        projectID: UUID,
+        slideID: UUID,
+        cell: Int,
+        width: Int = 10,
+        height: Int = 10
+    ) async throws -> PlacedImage {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: width, pixelHeight: height)
         try FileManager.default.createDirectory(at: paths.imports, withIntermediateDirectories: true)
         let copy = paths.imports.appending(path: "\(image.id).jpg")
         try Data([0xFF, 0xD8]).write(to: copy)

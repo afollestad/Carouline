@@ -44,6 +44,8 @@ struct CellView: View {
     let isImporting: Bool
     let actions: CellActions
     let session: CropSession
+    /// Whether the cell is a panorama's, whose first photo sets how many slides it spans.
+    var isPanorama = false
     @State private var size: CGSize = .zero
     /// The crop when the current drag or pinch began, which the gesture's values build on.
     @State private var gestureStart: ImageCrop?
@@ -55,7 +57,12 @@ struct CellView: View {
             if let image = cell.image {
                 photo(image)
             } else if !isImporting {
-                AddPhotoButton(position: position, emptyCellCount: emptyCellCount, offersSources: actions.takePhoto != nil) {
+                AddPhotoButton(
+                    position: position,
+                    emptyCellCount: emptyCellCount,
+                    isPanorama: isPanorama,
+                    offersSources: actions.takePhoto != nil
+                ) {
                     sourceButtons
                 } choose: {
                     actions.choosePhoto(address)
@@ -63,11 +70,12 @@ struct CellView: View {
             }
             if isImporting {
                 ProgressView()
-                    .padding(12)
+                    .padding(isCompact ? 6 : 12)
                     .glassEffect(.regular, in: Circle())
                     .accessibilityLabel("Adding \(position)")
             }
         }
+        .controlSize(isCompact ? .small : .regular)
         .onGeometryChange(for: CGSize.self) { proxy in
             proxy.size
         } action: { size in
@@ -89,6 +97,13 @@ struct CellView: View {
 
     private var isSelected: Bool {
         session.selection == address
+    }
+
+    /// Shorter than this, as a wide panorama's cell is, the regular controls overflow the cell.
+    private static let compactHeight: CGFloat = 52
+
+    private var isCompact: Bool {
+        size.height > 0 && size.height < Self.compactHeight
     }
 
     private func photo(_ image: PlacedImage) -> some View {
@@ -244,10 +259,12 @@ struct CellView: View {
 private struct AddPhotoButton<Sources: View>: View {
     let position: String
     let emptyCellCount: Int
+    let isPanorama: Bool
     /// Whether there's more than the library to choose from.
     let offersSources: Bool
     @ViewBuilder let sources: () -> Sources
     let choose: () -> Void
+    @Environment(\.controlSize) private var controlSize
 
     var body: some View {
         Group {
@@ -264,15 +281,24 @@ private struct AddPhotoButton<Sources: View>: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .accessibilityLabel("Add \(position)")
-        .accessibilityHint(emptyCellCount > 1
-            ? "Fills this cell, or up to \(emptyCellCount) empty cells in order, with photos"
-            : "Fills this cell with a photo")
+        .accessibilityHint(hint)
+    }
+
+    private var hint: String {
+        if isPanorama {
+            "Fills the panorama with a photo, which sets how many slides it spans"
+        } else if emptyCellCount > 1 {
+            "Fills this cell, or up to \(emptyCellCount) empty cells in order, with photos"
+        } else {
+            "Fills this cell with a photo"
+        }
     }
 
     private var label: some View {
-        Image(systemName: "plus")
-            .font(.title3.weight(.semibold))
-            .frame(width: 28, height: 28)
+        let isSmall = controlSize == .small
+        return Image(systemName: "plus")
+            .font(isSmall ? .footnote.weight(.semibold) : .title3.weight(.semibold))
+            .frame(width: isSmall ? 14 : 28, height: isSmall ? 14 : 28)
     }
 }
 
@@ -280,13 +306,17 @@ private struct AddPhotoButton<Sources: View>: View {
 /// again. VoiceOver reads the cell's own label and actions instead.
 private struct MissingPhoto<MenuContent: View>: View {
     let menu: MenuContent
+    @Environment(\.controlSize) private var controlSize
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title3)
-                .foregroundStyle(Color.secondary)
-                .accessibilityHidden(true)
+            // Left out of a cell too short for both.
+            if controlSize != .small {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title3)
+                    .foregroundStyle(Color.secondary)
+                    .accessibilityHidden(true)
+            }
             Menu {
                 menu
             } label: {
@@ -297,7 +327,7 @@ private struct MissingPhoto<MenuContent: View>: View {
             }
             .buttonStyle(.glass)
         }
-        .padding(8)
+        .padding(controlSize == .small ? 2 : 8)
         .accessibilityHidden(true)
     }
 }

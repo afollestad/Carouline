@@ -7,18 +7,22 @@ import CoreGraphics
 
 /// Where a slide's cells sit, shared by the screen and the export so both lay out alike.
 nonisolated enum SlideGeometry {
-    /// The frames of `layout`'s cells in a slide of `size`, in reading order. `pixelScale` rounds
-    /// every edge to a whole pixel at that scale, as an export needs, so no cell's antialiased
-    /// edge lets the background bleed in as a seam.
+    /// The frames of `layout`'s cells in a slide of `size`, in reading order. A panorama's `size`
+    /// covers all `span` of its slides, and the style measures from one, so its border frames
+    /// the whole as thick as a single slide's. `pixelScale` rounds every edge to a whole pixel at
+    /// that scale, as an export needs, so no cell's antialiased edge lets the background bleed in
+    /// as a seam.
     static func cellFrames(
         for layout: SlideLayout,
         in size: CGSize,
         style: SlideStyle,
+        span: Int = 1,
         pixelScale: CGFloat? = nil
     ) -> [CGRect] {
         let grid = layout.grid
-        let gap = max(0, style.spacing) * size.width
-        let border = max(0, style.border) * size.width
+        let slideWidth = size.width / CGFloat(max(1, span))
+        let gap = max(0, style.spacing) * slideWidth
+        let border = max(0, style.border) * slideWidth
         let trackWidth = max(0, (size.width - 2 * border - CGFloat(grid.columns - 1) * gap) / CGFloat(grid.columns))
         let trackHeight = max(0, (size.height - 2 * border - CGFloat(grid.rows - 1) * gap) / CGFloat(grid.rows))
         return grid.cells.map { span in

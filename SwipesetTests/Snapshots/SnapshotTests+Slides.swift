@@ -53,4 +53,22 @@ extension SnapshotTests {
     @Test func changeLayoutSheet() async {
         await assertScreenSnapshot(of: LayoutSheet(aspectRatio: .landscape, current: .grid) { _ in 0 } onChoose: { _ in })
     }
+
+    @Test func panoramaSlides() async {
+        await assertScreenSnapshot(of: projectScreen(panoramaProject))
+    }
+
+    @Test func selectedPanorama() async {
+        let project = panoramaProject
+        let selection = CellAddress(projectID: project.id, slideID: project.slides[0].id, index: 0)
+        await assertScreenSnapshot(of: projectScreen(project, selection: selection))
+    }
+
+    @Test func emptyPanorama() async {
+        await assertScreenSnapshot(of: projectScreen(landscapePanorama))
+    }
+
+    @Test func exportPanorama() async {
+        await assertScreenSnapshot(of: exportSheet(panoramaProject))
+    }
 }

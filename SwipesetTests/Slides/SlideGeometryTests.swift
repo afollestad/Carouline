@@ -49,6 +49,23 @@ struct SlideGeometryTests {
         }
     }
 
+    @Test func aPanoramaMeasuresItsBorderFromOneSlide() throws {
+        let style = SlideStyle(spacing: 0.02, border: 0.05, background: .white)
+        let canvas = CGSize(width: 3240, height: 1350)
+        let frame = try #require(SlideGeometry.cellFrames(for: .panorama, in: canvas, style: style, span: 3, pixelScale: 1).first)
+        #expect(frame == CGRect(x: 54, y: 54, width: 3132, height: 1242))
+    }
+
+    @Test func snappingCoversAPanoramasWholeCanvas() {
+        let style = SlideStyle(spacing: 0, border: 0.0333, background: .white)
+        let frames = SlideGeometry.cellFrames(for: .panorama, in: CGSize(width: 5400, height: 1350), style: style, span: 5, pixelScale: 1)
+        for frame in frames {
+            for edge in [frame.minX, frame.minY, frame.maxX, frame.maxY] {
+                #expect(edge == edge.rounded())
+            }
+        }
+    }
+
     @Test func oversizedSpacingCollapsesCellsRatherThanInvertingThem() {
         let style = SlideStyle(spacing: 0.6, border: 0, background: .white)
         let frames = SlideGeometry.cellFrames(for: .threeColumns, in: size, style: style)

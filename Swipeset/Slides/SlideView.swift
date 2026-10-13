@@ -12,7 +12,7 @@ struct SlideView<CellContent: View>: View {
     @ViewBuilder let cell: (Int) -> CellContent
 
     var body: some View {
-        SlideCells(layout: slide.layout, style: style) {
+        SlideCells(layout: slide.layout, style: style, span: slide.span) {
             ForEach(slide.cells.indices, id: \.self) { index in
                 cell(index)
             }
@@ -41,17 +41,18 @@ struct PlaceholderCell: View {
     }
 }
 
-/// Places one subview in each of `layout`'s cells, in reading order.
+/// Places one subview in each of `layout`'s cells, in reading order, across `span` slides.
 struct SlideCells: Layout {
     let layout: SlideLayout
     let style: SlideStyle
+    var span = 1
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         proposal.replacingUnspecifiedDimensions()
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let frames = SlideGeometry.cellFrames(for: layout, in: bounds.size, style: style)
+        let frames = SlideGeometry.cellFrames(for: layout, in: bounds.size, style: style, span: span)
         for (subview, frame) in zip(subviews, frames) {
             subview.place(
                 at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),

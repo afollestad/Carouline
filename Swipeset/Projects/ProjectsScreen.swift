@@ -146,20 +146,25 @@ private struct ProjectRow: View {
     }
 }
 
-/// The project's first slide, or its empty shape before it has one.
+/// The project's first slide, or its empty shape before it has one. A panorama shows its first
+/// slide, as the carousel opens on it.
 private struct ProjectThumbnail: View {
     let project: Project
 
     var body: some View {
         Group {
             if let slide = project.slides.first {
-                SlideView(slide: slide, style: project.style) { index in
-                    if let image = slide.cells[index].image {
-                        CellPhoto(image: image, projectID: project.id)
-                    } else {
-                        PlaceholderCell(background: project.style.background)
+                GeometryReader { proxy in
+                    SlideView(slide: slide, style: project.style) { index in
+                        if let image = slide.cells[index].image {
+                            CellPhoto(image: image, projectID: project.id)
+                        } else {
+                            PlaceholderCell(background: project.style.background)
+                        }
                     }
+                    .frame(width: proxy.size.width * CGFloat(slide.span), height: proxy.size.height)
                 }
+                .clipped()
                 .overlay {
                         Rectangle()
                             .strokeBorder(.separator, lineWidth: 0.5)
