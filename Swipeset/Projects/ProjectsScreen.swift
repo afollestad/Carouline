@@ -67,14 +67,14 @@ struct ProjectsScreen: View {
         List {
             Section {
                 ForEach(library.projects) { project in
-                    projectRow(project, isCard: false)
+                    projectRow(project, isInGrid: false)
                         .glassRow()
                 }
             }
             if !library.unreadable.isEmpty {
                 Section {
                     ForEach(library.unreadable) { project in
-                        unreadableRow(project, isCard: false)
+                        unreadableRow(project, isInGrid: false)
                             .glassRow()
                     }
                     // A row rather than the section's footer, which a plain list draws on an
@@ -98,14 +98,14 @@ struct ProjectsScreen: View {
             VStack(alignment: .leading, spacing: 20) {
                 LazyVGrid(columns: Self.gridColumns, spacing: 10) {
                     ForEach(library.projects) { project in
-                        projectRow(project, isCard: true)
+                        projectRow(project, isInGrid: true)
                     }
                 }
                 if !library.unreadable.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         LazyVGrid(columns: Self.gridColumns, spacing: 10) {
                             ForEach(library.unreadable) { project in
-                                unreadableRow(project, isCard: true)
+                                unreadableRow(project, isInGrid: true)
                             }
                         }
                         Text(Self.unreadableNote)
@@ -122,63 +122,56 @@ struct ProjectsScreen: View {
         .buttonStyle(.plain)
     }
 
-    private func projectRow(_ project: Project, isCard: Bool) -> some View {
-        ProjectRow(project: project, isCard: isCard) { name in
+    private func projectRow(_ project: Project, isInGrid: Bool) -> some View {
+        ProjectRow(project: project, isInGrid: isInGrid) { name in
             library.rename(project.id, to: name)
         } onDelete: {
             library.delete(project.id)
         }
     }
 
-    private func unreadableRow(_ project: UnreadableProject, isCard: Bool) -> some View {
-        UnreadableRow(project: project, isCard: isCard) {
+    private func unreadableRow(_ project: UnreadableProject, isInGrid: Bool) -> some View {
+        UnreadableRow(project: project, isInGrid: isInGrid) {
             library.delete(project)
         }
     }
 }
 
 private extension View {
-    /// A row of the grid as a glass card on the glow, with the padding the list's rows have
-    /// inside their glass. An openable card is all a target, and its glass answers a press and
-    /// the pointer, as a link's should; another stays still.
+    /// A row as a glass card on the glow, in the list or the grid. An openable card is all a
+    /// target, and its glass answers a press and the pointer, as a link's should; another stays
+    /// still.
     @ViewBuilder
-    func glassCard(_ isCard: Bool, isOpenable: Bool) -> some View {
-        if isCard {
-            let card = padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect(cornerRadius: 24))
-                .contentShape([.contextMenuPreview, .hoverEffect], .rect(cornerRadius: 24))
-            if isOpenable {
-                card
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
-                    .hoverEffect(.highlight)
-            } else {
-                card
-                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
-            }
+    func glassCard(isOpenable: Bool) -> some View {
+        let card = padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect(cornerRadius: 24))
+            .contentShape([.contextMenuPreview, .hoverEffect], .rect(cornerRadius: 24))
+        if isOpenable {
+            card
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
+                .hoverEffect(.highlight)
         } else {
-            self
+            card
+                .glassEffect(.regular, in: .rect(cornerRadius: 24))
         }
     }
 
-    /// A row as its own glass card on the glow, apart from the rows around it.
+    /// A list row that leaves its card apart from the rows around it. The card draws its glass in
+    /// the row rather than its background, which drops the list's highlight and sits behind the
+    /// touches, so a press would show nothing.
     func glassRow() -> some View {
-        listRowBackground(
-            Color.clear
-                .glassEffect(.regular, in: .rect(cornerRadius: 24))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 5)
-        )
-        .listRowInsets(EdgeInsets(top: 15, leading: 30, bottom: 15, trailing: 30))
-        .listRowSeparator(.hidden)
+        listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+            .listRowSeparator(.hidden)
     }
 }
 
 private struct ProjectRow: View {
     let project: Project
-    /// Whether it's a card in the grid, which draws its own glass and chevron, and can't swipe.
-    let isCard: Bool
+    /// Whether it's in the grid, which can't swipe.
+    let isInGrid: Bool
     let onRename: (String) -> Void
     let onDelete: () -> Void
     @State private var isRenaming = false
@@ -197,16 +190,16 @@ private struct ProjectRow: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.secondary)
                 }
-                if isCard {
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.forward")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Color.secondary)
-                        .accessibilityHidden(true)
-                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.secondary)
+                    .accessibilityHidden(true)
             }
-            .glassCard(isCard, isOpenable: true)
+            .glassCard(isOpenable: true)
         }
+        // The card draws its own chevron, inside its glass.
+        .navigationLinkIndicatorVisibility(.hidden)
         .accessibilityLabel("\(project.name), \(project.spokenSummary)")
         // Without the destructive role, which would start removing the row before the confirmation.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -224,7 +217,7 @@ private struct ProjectRow: View {
         .accessibilityAction(named: "Rename", startRenaming)
         .accessibilityActions {
             // The list's swipe action is VoiceOver's way to delete there.
-            if isCard {
+            if isInGrid {
                 Button("Delete") {
                     isConfirmingDelete = true
                 }
@@ -298,8 +291,8 @@ private struct ProjectThumbnail: View {
 
 private struct UnreadableRow: View {
     let project: UnreadableProject
-    /// Whether it's a card in the grid, which draws its own glass and can't swipe.
-    let isCard: Bool
+    /// Whether it's in the grid, which can't swipe.
+    let isInGrid: Bool
     let onDelete: () -> Void
     @State private var isConfirmingDelete = false
 
@@ -319,11 +312,11 @@ private struct UnreadableRow: View {
                     .foregroundStyle(Color.secondary)
             }
         }
-        .glassCard(isCard, isOpenable: false)
+        .glassCard(isOpenable: false)
         .accessibilityElement(children: .combine)
         .accessibilityActions {
             // The list's swipe action is VoiceOver's way to delete there.
-            if isCard {
+            if isInGrid {
                 Button("Delete") {
                     isConfirmingDelete = true
                 }
