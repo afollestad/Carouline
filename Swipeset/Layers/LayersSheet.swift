@@ -95,16 +95,16 @@ struct LayersSheet: View {
                 try await item.loadTransferable(type: PickedPhoto.self).map { .file($0.url) }
             }
         }
-        .presentationDetents([typingDetent, .medium, .large], selection: $detent)
-        // A swipe scrolls down to the slide's style, below its layers, rather than growing the sheet
-        // over the slide it changes. Cut down to the text field, the sheet still grows back.
-        .presentationContentInteraction(detent == typingDetent ? .resizes : .scrolls)
+        .presentationDetents(detents, selection: $detent)
+        // A swipe scrolls down to the slide's style, below its layers, or past a field being typed
+        // in to its typefaces, rather than growing the sheet over the slide it changes.
+        .presentationContentInteraction(.scrolls)
         // The slides stay in view and in reach above the sheet, so each change shows on them.
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         .foregroundStyle(Color.primary)
         .tint(.accentColor)
         .dynamicTypeSize(dynamicTypeSize)
-        .onChange(of: session.typingLayerID != nil) { _, isTyping in
+        .onChange(of: isTyping) { _, isTyping in
             withAnimation {
                 detent = isTyping ? typingDetent : .medium
             }
@@ -127,6 +127,17 @@ struct LayersSheet: View {
 
     private var typingDetent: PresentationDetent {
         .height(Self.typingHeight(at: dynamicTypeSize))
+    }
+
+    /// Just the text field's height while it's typed in, since the keyboard grows a sheet to the
+    /// largest it offers as it shows, over the slide, whichever is selected. The slides behind stay
+    /// dimmed then, as a sheet without `.medium` to be undimmed through dims them.
+    private var detents: Set<PresentationDetent> {
+        isTyping ? [typingDetent] : [typingDetent, .medium, .large]
+    }
+
+    private var isTyping: Bool {
+        session.typingLayerID != nil
     }
 
     private func close() {
