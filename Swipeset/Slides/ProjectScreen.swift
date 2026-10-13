@@ -10,19 +10,17 @@ import SwiftUI
 struct ProjectScreen: View {
     let library: ProjectLibrary
     let projectID: UUID
-    @State private var layoutPurpose: LayoutPurpose?
+    /// What's open over the screen. Asks go through it, since one made while another is up
+    /// never shows.
+    @State private var presenter = PresentationQueue<Presentation>()
     @State private var stripPosition: StripItem?
-    @State private var isPickingPhoto = false
     /// The cell the photo picker fills, and the slide's other empty cells when it picks several.
-    /// Kept apart from `isPickingPhoto`, which the picker clears as it closes, possibly before it
+    /// Kept apart from `presenter`, which the picker clears as it closes, possibly before it
     /// hands over the pick.
     @State private var pickTarget: CellAddress?
     @State private var pickLimit = 1
     @State private var pickedItems: [PhotosPickerItem] = []
-    @State private var cameraTarget: CellAddress?
     @State private var session: CropSession
-    @State private var isExporting = false
-    @State private var isStyling = false
     /// The style being edited, which the slides draw while the style sheet is open.
     @State private var styleDraft: SlideStyle?
     /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
@@ -79,16 +77,9 @@ struct ProjectScreen: View {
                 RenameButton()
             }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    styleButton(project)
-                }
-                // Apart, so the two read as separate actions rather than one control.
-                ToolbarSpacer(.fixed, placement: .primaryAction)
-                ToolbarItem(placement: .primaryAction) {
-                    shareButton(project)
-                }
+                toolbar(project)
             }
-            .onChange(of: isStyling) { _, isStyling in
+            .onChange(of: presenter.current == .style) { _, isStyling in
                 if !isStyling {
                     saveStyleDraft()
                     styleDraft = nil
@@ -97,14 +88,38 @@ struct ProjectScreen: View {
         return presentations(over: screen, project: project)
     }
 
+    private func toolbar(_ project: Project) -> ProjectToolbar {
+        ProjectToolbar(
+            project: project,
+            exporter: SlideExporter(paths: library.store.paths),
+            isStyling: isPresenting(.style),
+            isExporting: isPresenting(.export),
+            style: styleDraftBinding(project),
+            onStyle: {
+                // Not again while it's open, which would drop the unsaved draft.
+                if presenter.current != .style {
+                    styleDraft = project.style
+                }
+                presenter.present(.style)
+            },
+            onShare: {
+                select(nil)
+                presenter.present(.export)
+            },
+            onCommitStyle: saveStyleDraft,
+            onPopoverGone: { presenter.presentPending() }
+        )
+    }
+
     /// The layout sheet, the photo picker and the camera, which open over the screen.
     private func presentations(over screen: some View, project: Project) -> some View {
         screen
-            .sheet(item: $layoutPurpose) { purpose in
+            .sheet(item: layoutPurpose) { purpose in
                 layoutSheet(for: purpose, in: project)
+                    .onDisappear { presenter.presentPending() }
             }
             .photosPicker(
-                isPresented: $isPickingPhoto,
+                isPresented: isPresenting(.photoPicker),
                 selection: $pickedItems,
                 maxSelectionCount: pickLimit,
                 // Numbered in the order they're picked, which is the order they fill the cells.
@@ -116,13 +131,14 @@ struct ProjectScreen: View {
             .onChange(of: pickedItems) { _, items in
                 importPicked(items)
             }
-            .fullScreenCover(item: $cameraTarget) { target in
+            .fullScreenCover(item: cameraTarget) { target in
                 CameraPicker { image in
                     Task {
                         await library.importPhoto(into: target, assetIdentifier: nil) { .image(image) }
                     }
                 }
                 .ignoresSafeArea()
+                .onDisappear { presenter.presentPending() }
             }
             #if DEBUG
             .task {
@@ -149,29 +165,41 @@ struct ProjectScreen: View {
         }
     }
 
-    private func styleButton(_ project: Project) -> some View {
-        Button("Style", systemImage: "slider.horizontal.3") {
-            styleDraft = project.style
-            isStyling = true
-        }
-        .accessibilityHint("Sets the spacing, border and background of every slide")
-        // A sheet on iPhone, and on iPad a popover, which leaves the slides in view beside it.
-        .popover(isPresented: $isStyling) {
-            StyleSheet(style: styleDraftBinding(project), onCommit: saveStyleDraft)
-                .frame(idealWidth: 380, idealHeight: 540)
+    /// Whether `shown` is open, as a presentation modifier reads and dismisses it. A dismissal
+    /// closes `shown` only while it's still open, never one opened since.
+    private func isPresenting(_ shown: Presentation) -> Binding<Bool> {
+        Binding {
+            presenter.current == shown
+        } set: { isPresented in
+            if !isPresented {
+                presenter.dismiss(shown)
+            }
         }
     }
 
-    private func shareButton(_ project: Project) -> some View {
-        Button("Share Slides", systemImage: "square.and.arrow.up") {
-            select(nil)
-            isExporting = true
+    private var layoutPurpose: Binding<LayoutPurpose?> {
+        Binding {
+            guard case .layout(let purpose) = presenter.current else {
+                return nil
+            }
+            return purpose
+        } set: { purpose in
+            if purpose == nil {
+                presenter.dismiss { if case .layout = $0 { true } else { false } }
+            }
         }
-        .disabled(project.slides.isEmpty)
-        .accessibilityHint("Saves the slides to Photos or shares them to another app")
-        .popover(isPresented: $isExporting) {
-            ExportSheet(project: project, exporter: SlideExporter(paths: library.store.paths))
-                .frame(idealWidth: 420, idealHeight: 480)
+    }
+
+    private var cameraTarget: Binding<CellAddress?> {
+        Binding {
+            guard case .camera(let target) = presenter.current else {
+                return nil
+            }
+            return target
+        } set: { target in
+            if target == nil {
+                presenter.dismiss { if case .camera = $0 { true } else { false } }
+            }
         }
     }
 
@@ -197,8 +225,8 @@ struct ProjectScreen: View {
             cellActions: cellActions,
             session: session,
             onBackgroundTap: { select(nil) },
-            onAddSlide: { layoutPurpose = .newSlide },
-            onChangeLayout: { layoutPurpose = .change($0) },
+            onAddSlide: { presenter.present(.layout(.newSlide)) },
+            onChangeLayout: { presenter.present(.layout(.change($0))) },
             onMove: { slideID, offset in
                 withAnimation {
                     library.moveSlide(slideID, in: projectID, by: offset)
@@ -226,7 +254,7 @@ struct ProjectScreen: View {
     private var cellActions: CellActions {
         CellActions(
             choosePhoto: { choosePhotos(for: $0) },
-            takePhoto: CameraPicker.isAvailable ? { cameraTarget = $0 } : nil,
+            takePhoto: CameraPicker.isAvailable ? { presenter.present(.camera($0)) } : nil,
             removePhoto: { address in
                 withAnimation {
                     library.removePhoto(at: address)
@@ -267,7 +295,7 @@ struct ProjectScreen: View {
                 },
                 onTakePhoto: {
                     saveLiveCrop()
-                    cameraTarget = selection
+                    presenter.present(.camera(selection))
                 },
                 onReset: {
                     session.liveCrop = nil
@@ -316,7 +344,7 @@ struct ProjectScreen: View {
     private func choosePhotos(for address: CellAddress) {
         pickTarget = address
         pickLimit = library.pickLimit(for: address)
-        isPickingPhoto = true
+        presenter.present(.photoPicker)
     }
 
     /// Copies the picker's photos into the cell it was opened for and, when there are several, the
@@ -387,9 +415,9 @@ struct ProjectScreen: View {
             select(CellAddress(projectID: projectID, slideID: slides[slide].id, index: cell))
         }
         if debug?.sheet == .export {
-            isExporting = true
+            presenter.present(.export)
         } else if debug?.sheet == .layout {
-            layoutPurpose = .newSlide
+            presenter.present(.layout(.newSlide))
         }
     }
     #endif
@@ -401,6 +429,15 @@ private enum LayoutPurpose: Hashable, Identifiable {
     case change(UUID)
 
     var id: Self { self }
+}
+
+/// What the project screen opens over itself.
+private enum Presentation: Hashable {
+    case layout(LayoutPurpose)
+    case photoPicker
+    case camera(CellAddress)
+    case style
+    case export
 }
 
 #Preview {
