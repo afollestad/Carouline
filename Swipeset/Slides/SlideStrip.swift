@@ -45,6 +45,10 @@ struct SlideStrip: View {
     /// arrow and the screen's edge take.
     private static let popoverMinWidth: CGFloat = 320
     private static let popoverMargin: CGFloat = 24
+    /// The least `typingScale` shrinks the slides to. In landscape the keyboard and the sheet's
+    /// typing height can outgrow the strip, which would scale them to nothing or flip them, though
+    /// the sheet there is always full height and covers them.
+    private static let minimumTypingScale: CGFloat = 0.2
 
     var body: some View {
         Group {
@@ -67,17 +71,19 @@ struct SlideStrip: View {
         } action: { size in
             fullSize = size
         }
+        .scaleEffect(typingScale, anchor: .top)
         .animation(.smooth(duration: 0.25), value: bottomRoom)
+        .animation(.smooth(duration: 0.25), value: typingScale)
+        // On a phone, the keyboard a text layer is typed with would lay the slides out smaller,
+        // which `typingScale` does instead. An iPad's slides keep making room for it.
+        .ignoresSafeArea(horizontalSizeClass == .compact ? .keyboard : [])
     }
 
-    /// Room under the slides, so the one being edited shrinks to stay in view: above the keyboard
-    /// and the short sheet over it while a phone types a text layer, and above an iPad's layers
-    /// popover when the slide leaves it no room beside.
+    /// Room under the slides, so the one being edited shrinks to stay in view above an iPad's
+    /// layers popover when the slide leaves it no room beside.
     private var bottomRoom: CGFloat {
-        if horizontalSizeClass == .compact {
-            return layerSession.keyboardRoom
-        }
-        guard let slide = project.slides.first(where: { $0.id == layersSlideID }) else {
+        guard horizontalSizeClass != .compact,
+              let slide = project.slides.first(where: { $0.id == layersSlideID }) else {
             return 0
         }
         // Measured at the full size, so the room taken can't change whether room is taken.
@@ -89,6 +95,19 @@ struct SlideStrip: View {
         // stays for the slide, however short the screen.
         let room = LayersSheet.popoverSize.height + Self.popoverMargin - SelectionBar.reservedHeight
         return min(room, fullSize.height / 2)
+    }
+
+    /// How far a phone shrinks the slides while a text layer is typed, so the one being edited
+    /// stays in view above the keyboard and the short sheet over it: the room above the selection
+    /// bar's, fitted into the room they leave. Scaled rather than laid out smaller, since the lazy
+    /// stack drops the slide while laying out its new size, and the slide's layers sheet with it.
+    private var typingScale: CGFloat {
+        let room = layerSession.keyboardRoom
+        let content = fullSize.height - SelectionBar.reservedHeight
+        guard horizontalSizeClass == .compact, room > 0, content > 0 else {
+            return 1
+        }
+        return min(1, max(Self.minimumTypingScale, (fullSize.height - room) / content))
     }
 
     private var strip: some View {
