@@ -46,6 +46,9 @@ struct CellView: View {
     let session: CropSession
     /// Whether the cell is a panorama's, whose first photo sets how many slides it spans.
     var isPanorama = false
+    /// Whether a photo or a layer is selected anywhere on the strip, while which a long press is
+    /// the start of a drag rather than a menu.
+    var isAnythingSelected = false
     @State private var size: CGSize = .zero
     @State private var isMissing = false
     @Environment(\.colorScheme) private var colorScheme
@@ -195,12 +198,14 @@ struct CellView: View {
                     photoMenu
                 }
             }
-            // No menu while framing, where a long press is the start of a drag, and the bar below
-            // offers the same choices.
+            // No menu while framing a photo or moving a layer, where a long press is the start of
+            // a drag, and the bar below offers the same choices.
             .contextMenu {
-                if isMissing {
+                if isAnythingSelected {
+                    EmptyView()
+                } else if isMissing {
                     missingMenu(image)
-                } else if !isSelected {
+                } else {
                     photoMenu
                 }
             }

@@ -272,6 +272,7 @@ private struct ProjectThumbnail: View {
                         SlideLayers(
                             layers: slide.layers,
                             projectID: project.id,
+                            slideID: slide.id,
                             span: slide.span,
                             background: project.style.background,
                             size: canvas

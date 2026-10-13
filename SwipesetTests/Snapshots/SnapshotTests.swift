@@ -99,10 +99,16 @@ extension ScreenSnapshotting {
     }
 
     /// `project`'s screen in its navigation stack, from a library holding just it, with
-    /// `selection` selected to frame, and `missing` images' copies missing.
-    func projectScreen(_ project: Project, selection: CellAddress? = nil, missing: Set<UUID>? = nil) -> some View {
+    /// `selection` selected to frame, `layerSession`'s layer selected, and `missing` images'
+    /// copies missing.
+    func projectScreen(
+        _ project: Project,
+        selection: CellAddress? = nil,
+        layerSession: LayerSession? = nil,
+        missing: Set<UUID>? = nil
+    ) -> some View {
         NavigationStack {
-            ProjectScreen(library: library([project]), projectID: project.id, selection: selection)
+            ProjectScreen(library: library([project]), projectID: project.id, selection: selection, layerSession: layerSession ?? LayerSession())
         }
         .environment(\.imageLoader, missing.map { MockImageLoader(missing: $0) } ?? imageLoader)
     }
@@ -164,6 +170,11 @@ extension ScreenSnapshotting {
             ],
             createdAt: created
         )
+    }
+
+    /// A session with `layerID` on `project`'s first slide selected, snapped to `snap`.
+    func selecting(_ layerID: UUID, in project: Project, snap: LayerSnap = LayerSnap()) -> LayerSession {
+        LayerSession(selection: LayerAddress(projectID: project.id, slideID: project.slides[0].id, layerID: layerID), snap: snap)
     }
 
     /// `layeredProject` with its grid first.

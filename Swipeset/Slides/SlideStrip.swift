@@ -18,7 +18,9 @@ struct SlideStrip: View {
     let importingCells: Set<CellAddress>
     let cellActions: CellActions
     let session: CropSession
-    /// Taps between the slides, which finish framing a photo.
+    let layerSession: LayerSession
+    let layerActions: LayerActions
+    /// Taps between the slides, which finish framing a photo or moving a layer.
     let onBackgroundTap: () -> Void
     let onAddSlide: () -> Void
     let onChangeLayout: (UUID) -> Void
@@ -67,6 +69,8 @@ struct SlideStrip: View {
                         importingCells: importingCells,
                         cellActions: cellActions,
                         session: session,
+                        layerSession: layerSession,
+                        layerActions: layerActions,
                         onChangeLayout: { onChangeLayout(slide.id) },
                         onMove: { onMove(slide.id, $0) },
                         onDelete: { onDelete(slide.id) },
@@ -88,39 +92,66 @@ struct SlideStrip: View {
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
             .onTapGesture(perform: onBackgroundTap)
-            .gesture(framingGesture, isEnabled: session.selection != nil)
+            .gesture(selectionGesture, isEnabled: isAnythingSelected)
         }
         .scrollTargetBehavior(snapping)
-        // A drag on the selected photo frames it rather than scrolling past it.
-        .scrollDisabled(session.selection != nil)
+        // A drag on the selected photo or layer moves it rather than scrolling past it.
+        .scrollDisabled(isAnythingSelected)
+        .sensoryFeedback(.alignment, trigger: layerSession.snapsTaken)
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
-    /// Drags and pinches anywhere on the strip frame the selected photo, as scrolling is locked
-    /// while one is, so a thin panorama or a small cell needn't be hit exactly. The photo's own
-    /// gesture takes those on it, and a pinch away from it zooms about its middle, as the zoom
-    /// slider does.
-    private var framingGesture: some Gesture {
-        SimultaneousGesture(DragGesture(), MagnifyGesture())
+    private var isAnythingSelected: Bool {
+        session.selection != nil || layerSession.selection != nil
+    }
+
+    /// Drags, pinches and twists anywhere on the strip move the selected photo or layer, as
+    /// scrolling is locked while one is, so a thin panorama, a small cell or a small layer needn't
+    /// be hit exactly. A selected photo's own gesture takes those on it, and a pinch away from it
+    /// zooms about its middle, as the zoom slider does. A photo ignores twists. The drag keeps its
+    /// least distance, so taps still reach the layers and the space between the slides.
+    private var selectionGesture: some Gesture {
+        SimultaneousGesture(SimultaneousGesture(DragGesture(), MagnifyGesture()), RotateGesture())
             .onChanged { value in
-                guard let image = selectedPhoto else {
-                    return
+                let translation = value.first?.first?.translation
+                let magnification = value.first?.second?.magnification
+                if let image = selectedPhoto {
+                    session.frame(
+                        image,
+                        translation: translation,
+                        magnification: magnification,
+                        anchor: CGPoint(x: session.cellSize.width / 2, y: session.cellSize.height / 2)
+                    )
+                } else if let (layer, canvas) = selectedLayer {
+                    let gesture = LayerGesture(translation: translation, magnification: magnification, rotation: value.second?.rotation.radians)
+                    layerSession.move(layer, by: gesture, on: canvas)
                 }
-                session.frame(
-                    image,
-                    translation: value.first?.translation,
-                    magnification: value.second?.magnification,
-                    anchor: CGPoint(x: session.cellSize.width / 2, y: session.cellSize.height / 2)
-                )
             }
             .onEnded { _ in
-                let crop = session.endFraming()
-                if let selection = session.selection, let crop {
-                    cellActions.setCrop(crop, selection)
+                if session.selection != nil {
+                    let crop = session.endFraming()
+                    if let selection = session.selection, let crop {
+                        cellActions.setCrop(crop, selection)
+                    }
+                } else {
+                    let placement = layerSession.endMoving()
+                    if let selection = layerSession.selection, let placement {
+                        layerActions.setPlacement(placement, selection)
+                    }
                 }
             }
+    }
+
+    /// The selected layer, and the slide it moves on at the size the strip draws it.
+    private var selectedLayer: (Layer, LayerCanvas)? {
+        guard let selection = layerSession.selection,
+              let slide = project.slides.first(where: { $0.id == selection.slideID }),
+              let layer = slide.layers.first(where: { $0.id == selection.layerID }) else {
+            return nil
+        }
+        return (layer, LayerCanvas(size: cardSize(span: slide.span), span: slide.span))
     }
 
     private var selectedPhoto: PlacedImage? {
@@ -251,6 +282,8 @@ private struct GhostSlide: View {
         importingCells: [],
         cellActions: .preview,
         session: CropSession(),
+        layerSession: LayerSession(),
+        layerActions: .preview,
         onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },
@@ -269,6 +302,8 @@ private struct GhostSlide: View {
         importingCells: [],
         cellActions: .preview,
         session: CropSession(),
+        layerSession: LayerSession(),
+        layerActions: .preview,
         onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },
@@ -287,6 +322,8 @@ private struct GhostSlide: View {
         importingCells: [],
         cellActions: .preview,
         session: CropSession(),
+        layerSession: LayerSession(),
+        layerActions: .preview,
         onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },

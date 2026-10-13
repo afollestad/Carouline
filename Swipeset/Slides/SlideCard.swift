@@ -19,6 +19,8 @@ struct SlideCard: View {
     let importingCells: Set<CellAddress>
     let cellActions: CellActions
     let session: CropSession
+    let layerSession: LayerSession
+    let layerActions: LayerActions
     let onChangeLayout: () -> Void
     let onMove: (Int) -> Void
     let onDelete: () -> Void
@@ -38,12 +40,27 @@ struct SlideCard: View {
                     isImporting: importingCells.contains(address),
                     actions: cellActions,
                     session: session,
-                    isPanorama: slide.layout == .panorama
+                    isPanorama: slide.layout == .panorama,
+                    isAnythingSelected: isAnythingSelected
                 )
             }
             .frame(width: size.width, height: size.height)
             .overlay {
-                SlideLayers(layers: slide.layers, projectID: projectID, span: slide.span, background: style.background, size: size)
+                SlideLayers(
+                    layers: slide.layers,
+                    projectID: projectID,
+                    slideID: slide.id,
+                    span: slide.span,
+                    background: style.background,
+                    size: size,
+                    interaction: LayerInteraction(
+                        session: layerSession,
+                        actions: layerActions,
+                        selectedLayerID: layerSession.selection?.slideID == slide.id ? layerSession.selection?.layerID : nil,
+                        isAnythingSelected: isAnythingSelected,
+                        isPhotoSelected: session.selection != nil
+                    )
+                )
             }
             // Over the layers, so a cut still shows across one that crosses it.
             .overlay {
@@ -59,7 +76,7 @@ struct SlideCard: View {
             .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
             .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("\(spokenNumbers) of \(count), \(slide.layout.name)")
+            .accessibilityLabel("\(spokenNumbers) of \(count), \(slide.layout.name)\(spokenLayers)")
             Menu {
                 options
             } label: {
@@ -106,6 +123,21 @@ struct SlideCard: View {
         Divider()
         Button(deleteTitle, systemImage: "trash", role: .destructive) {
             isConfirmingDelete = true
+        }
+    }
+
+    /// A photo or a layer selected anywhere on the strip, while which a long press is the start
+    /// of a drag rather than a menu.
+    private var isAnythingSelected: Bool {
+        session.selection != nil || layerSession.selection != nil
+    }
+
+    /// The slide's layers, as VoiceOver adds them to its label.
+    private var spokenLayers: String {
+        switch slide.layers.count {
+        case 0: ""
+        case 1: ", 1 layer"
+        case let count: ", \(count) layers"
         }
     }
 
@@ -171,6 +203,8 @@ struct SlideCard: View {
         importingCells: [],
         cellActions: .preview,
         session: CropSession(),
+        layerSession: LayerSession(),
+        layerActions: .preview,
         onChangeLayout: {},
         onMove: { _ in },
         onDelete: {},

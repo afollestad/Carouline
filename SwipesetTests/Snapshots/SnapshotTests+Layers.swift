@@ -41,4 +41,21 @@ extension SnapshotTests {
         let library = library([layeredProject])
         await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader))
     }
+
+    @Test func selectedTextLayer() async {
+        let project = layeredProject
+        await assertScreenSnapshot(of: projectScreen(project, layerSession: selecting(fixtureID(183), in: project)))
+    }
+
+    @Test func selectedImageLayer() async {
+        let project = layeredGridFirst
+        await assertScreenSnapshot(of: projectScreen(project, layerSession: selecting(fixtureID(188), in: project)))
+    }
+
+    /// A layer centered across its slide shows the guide it snapped to.
+    @Test func snapGuides() async {
+        let project = layeredGridFirst
+        let session = selecting(fixtureID(188), in: project, snap: LayerSnap(guideX: 0.5))
+        await assertScreenSnapshot(of: projectScreen(project, layerSession: session))
+    }
 }

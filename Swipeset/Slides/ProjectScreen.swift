@@ -21,6 +21,7 @@ struct ProjectScreen: View {
     @State private var pickLimit = 1
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var session: CropSession
+    @State private var layerSession: LayerSession
     /// The style being edited, which the slides draw while the style sheet is open.
     @State private var styleDraft: SlideStyle?
     /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
@@ -30,11 +31,13 @@ struct ProjectScreen: View {
     @Environment(DebugSettings.self) private var debug: DebugSettings?
     #endif
 
-    /// `selection`, when given, opens with that photo selected to frame, as snapshots need.
-    init(library: ProjectLibrary, projectID: UUID, selection: CellAddress? = nil) {
+    /// `selection`, when given, opens with that photo selected to frame, and `layerSession`
+    /// with its layer selected, as snapshots need.
+    init(library: ProjectLibrary, projectID: UUID, selection: CellAddress? = nil, layerSession: LayerSession = LayerSession()) {
         self.library = library
         self.projectID = projectID
         _session = State(initialValue: CropSession(selection: selection))
+        _layerSession = State(initialValue: layerSession)
     }
 
     var body: some View {
@@ -52,21 +55,34 @@ struct ProjectScreen: View {
     private func content(_ project: Project) -> some View {
         let shown = shown(project)
         let screen = strip(shown)
-            .overlay(alignment: .bottom) {
-                selectionBar
-            }
-            .animation(.smooth(duration: 0.25), value: session.selection)
-            .sensoryFeedback(.selection, trigger: session.selection) { _, selection in
-                selection != nil
-            }
-            // A selected photo deleted with its slide, or dropped by a new layout, leaves nothing
-            // to frame, and nothing to bring the strip's scrolling back.
-            .onChange(of: selectedPhotoID) { _, photoID in
-                if photoID == nil, session.selection != nil {
-                    session.liveCrop = nil
-                    session.selection = nil
-                }
-            }
+            .modifier(SelectionBarOverlay(
+                library: library,
+                session: session,
+                onChoosePhoto: { selection in
+                    // Saved first, so the replacement doesn't inherit an unsaved zoom.
+                    saveLiveCrop()
+                    choosePhotos(for: selection)
+                },
+                onTakePhoto: { selection in
+                    saveLiveCrop()
+                    presenter.present(.camera(selection))
+                },
+                onRemove: { selection in
+                    select(nil)
+                    withAnimation {
+                        library.removePhoto(at: selection)
+                    }
+                },
+                onCommitZoom: saveLiveCrop,
+                onDone: { select(nil) }
+            ))
+            .modifier(LayerBarOverlay(
+                project: shown,
+                session: layerSession,
+                actions: layerActions,
+                onCommitSize: saveLivePlacement,
+                onDone: { selectLayer(nil) }
+            ))
             .background {
                 SlideBackdrop(slide: frontSlide(of: shown), projectID: projectID, style: shown.style, aspectRatio: shown.aspectRatio)
             }
@@ -224,6 +240,8 @@ struct ProjectScreen: View {
             importingCells: library.importingCells,
             cellActions: cellActions,
             session: session,
+            layerSession: layerSession,
+            layerActions: layerActions,
             onBackgroundTap: { select(nil) },
             onAddSlide: { presenter.present(.layout(.newSlide)) },
             onChangeLayout: { presenter.present(.layout(.change($0))) },
@@ -281,53 +299,60 @@ struct ProjectScreen: View {
         )
     }
 
-    @ViewBuilder
-    private var selectionBar: some View {
-        if let selection = session.selection, let photo = library.photo(at: selection) {
-            SelectionBar(
-                photo: photo,
-                session: session,
-                hasCamera: CameraPicker.isAvailable,
-                onChoosePhoto: {
-                    // Saved first, so the replacement doesn't inherit an unsaved zoom.
-                    saveLiveCrop()
-                    choosePhotos(for: selection)
-                },
-                onTakePhoto: {
-                    saveLiveCrop()
-                    presenter.present(.camera(selection))
-                },
-                onReset: {
-                    session.liveCrop = nil
-                    library.setCrop(ImageCrop(), at: selection)
-                },
-                onRemove: {
-                    select(nil)
-                    withAnimation {
-                        library.removePhoto(at: selection)
-                    }
-                },
-                onCommitZoom: saveLiveCrop,
-                onDone: { select(nil) }
-            )
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
-
-    private var selectedPhotoID: UUID? {
-        session.selection.flatMap { library.photo(at: $0)?.id }
-    }
-
-    /// Selects the photo at `address` to frame, or none, saving whatever the last one was left
-    /// at, and brings the photo's slide to the middle.
+    /// Selects the photo at `address` to frame, or nothing, saving whatever the last photo or
+    /// layer was left at, and brings the photo's slide to the middle.
     private func select(_ address: CellAddress?) {
         saveLiveCrop()
+        saveLivePlacement()
+        layerSession.selection = nil
         session.selection = address
         if let address {
             withAnimation {
                 stripPosition = .slide(address.slideID)
             }
         }
+    }
+
+    /// Selects the layer at `address` to move, size and turn, or none, saving whatever the last
+    /// photo or layer was left at, and brings the layer's slide to the middle.
+    private func selectLayer(_ address: LayerAddress?) {
+        saveLiveCrop()
+        saveLivePlacement()
+        session.selection = nil
+        layerSession.selection = address
+        if let address {
+            withAnimation {
+                stripPosition = .slide(address.slideID)
+            }
+        }
+    }
+
+    /// Saves a placement the size slider left unsaved, as VoiceOver's adjustments do, since they
+    /// never end an edit.
+    private func saveLivePlacement() {
+        if let selection = layerSession.selection, let livePlacement = layerSession.livePlacement {
+            library.setPlacement(livePlacement, at: selection)
+        }
+        layerSession.livePlacement = nil
+    }
+
+    private var layerActions: LayerActions {
+        LayerActions(
+            select: { selectLayer($0) },
+            setPlacement: { placement, address in
+                library.setPlacement(placement, at: address)
+            },
+            move: { address, offset in
+                withAnimation {
+                    library.moveLayer(at: address, by: offset)
+                }
+            },
+            delete: { address in
+                withAnimation {
+                    library.deleteLayer(at: address)
+                }
+            }
+        )
     }
 
     /// Saves a crop the zoom slider left unsaved, as VoiceOver's adjustments and `axe slider` do,
@@ -402,17 +427,20 @@ struct ProjectScreen: View {
     }
 
     #if DEBUG
-    /// Selects `-DebugSelectCell`'s photo and opens `-DebugSheet`'s sheet after a moment, since a
-    /// presentation on the first frame doesn't render, and the strip can't scroll to a photo's
-    /// slide before it has measured the slides.
+    /// Selects `-DebugSelectCell`'s photo or `-DebugSelectLayer`'s layer, and opens
+    /// `-DebugSheet`'s sheet, after a moment, since a presentation on the first frame doesn't
+    /// render, and the strip can't scroll to a slide before it has measured the slides.
     private func openDebugSheet() async {
-        guard debug?.selectedCell != nil || debug?.sheet == .layout || debug?.sheet == .export else {
+        guard debug?.selectedCell != nil || debug?.selectedLayer != nil || debug?.sheet == .layout || debug?.sheet == .export else {
             return
         }
         try? await Task.sleep(for: .milliseconds(500))
         let slides = library.project(projectID)?.slides ?? []
         if let (slide, cell) = debug?.selectedCell, slides.indices.contains(slide) {
             select(CellAddress(projectID: projectID, slideID: slides[slide].id, index: cell))
+        }
+        if let (slide, layer) = debug?.selectedLayer, slides.indices.contains(slide), slides[slide].layers.indices.contains(layer) {
+            selectLayer(LayerAddress(projectID: projectID, slideID: slides[slide].id, layerID: slides[slide].layers[layer].id))
         }
         if debug?.sheet == .export {
             presenter.present(.export)
