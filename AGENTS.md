@@ -16,7 +16,8 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 ## Build and test
 
 - Xcode 27 project with an iOS 26 deployment target, so gate iOS 27 APIs with `#available`. Use iOS 26 APIs such as Liquid Glass, scroll edge effects, and `navigationSubtitle` freely.
-- Source folders are synchronized groups, so new files under `Swipeset/` or `SwipesetTests/` join their targets without touching `project.pbxproj`. Info.plist keys, usage descriptions included, are `INFOPLIST_KEY_*` build settings; there is no Info.plist file.
+- Don't register new files under `Swipeset/` or `SwipesetTests/` in `project.pbxproj`, since source folders are synchronized groups that add them to their targets.
+- Set Info.plist keys, usage descriptions included, as `INFOPLIST_KEY_*` build settings; there is no Info.plist file.
 - First-time setup: `./scripts/setup.sh` installs `swiftlint`, `xcsift` and `axe` and a pre-commit hook that lints.
 - Build, run, test, lint and snapshot through `scripts/`, not raw `xcodebuild`, `simctl launch` or `swiftlint`. They pin the simulator, test locale and DerivedData path (`.build/xcode`) that results and baselines depend on.
 - Build: `./scripts/build.sh`. Run in the simulator: `./scripts/run.sh -b` builds first, while bare `run.sh` relaunches the last build (set `SIMULATOR` to pick another device).
@@ -31,7 +32,9 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Every visible change also runs `./scripts/snapshots.sh verify`. When the change is intended, `record` the affected baselines and look at the new images.
 - Reach other states with debug launch arguments after `--`, e.g. `./scripts/run.sh -b -- -DebugSampleProjects YES -DebugSheet newProject`. `DebugSettings` documents each one; open sheets through `-DebugSheet`, since a presentation on the first frame doesn't render.
 - `simctl` cannot tap or drag, so use `axe tap`, `axe drag` and `axe describe-ui` with `--udid`, which reach the simulator without the host's cursor. Never post host mouse events, which take over the user's.
-- `axe touch` can fail with "could not establish simulator input" while `axe tap` and `axe drag` still work, so tap with `axe tap --tap-style physical`, since the default style can miss buttons in sheets, and long-press with an `axe drag` that moves a point over `--duration 1.5`. `axe slider` can't move the zoom slider either; drag its thumb with `axe drag`. If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh` boots it again.
+- Tap with `axe tap --tap-style physical`, since the default style can miss buttons in sheets.
+- Long-press with an `axe drag` that moves a point over `--duration 1.5`, since `axe touch` can fail with "could not establish simulator input". Move the zoom slider by dragging its thumb with `axe drag` too, since `axe slider` can't.
+- If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh` boots it again.
 - The simulator has no camera, so its cells go straight to the photo picker, whose library already holds sample photos; add more with `xcrun simctl addmedia <udid> <files>`.
 - Restore every temporary patch before finishing. Keep a backup copy and confirm with `git diff`.
 
@@ -40,12 +43,12 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Floating chrome is Liquid Glass: toolbar items, partial-height sheets, project rows, slide captions, the buttons over slides, and the strip's empty cells, whose slide background is left out under them. Don't put glass on content inside a glass sheet or popover, which reads as glass on glass.
 - Screens sit on `GlowBackdrop`, or `SlideBackdrop` on the project screen, never a flat system background, so their glass has color to frost. A plain list draws section headers and footers on an opaque band over it, so put notes in clear rows.
 - Blur a backdrop small inside `drawingGroup()` and scale it up, as `SlideBackdrop` does. A full-screen blur re-renders on every frame the strip scrolls, and a full-screen 8-bit offscreen render bands the dark glow.
-- Give a horizontal scroll view under the navigation bar the soft top scroll edge effect; the default draws a solid band with a hairline under the bar.
 - Glass over a slide takes its color scheme from what it sits on, not the system's, so it stays legible on a white slide in dark mode: the slide's background, a missing photo's placeholder, or for an empty cell's glass, the screen behind the slide.
-- Cap the slide strip and the selection bars at `accessibility1`, since slides leave fixed room for their captions and buttons. Sheets and the projects list stay uncapped.
 - Give text in glass sheets and popovers `Color.primary`, not gray: on iPad the popovers float over the slides, and a bright photo through the glass washes gray text out.
 - Draw the accent solid in glass sheets and popovers, with white on it, and give their icon-only toolbar buttons `Color.primary`, as `SheetCloseItem` does. A faint tint of the accent, or an accent glyph, washes out on the glass.
 - Keep `AccentColor` the icon's violet. Hold the light variant to 4.5:1 against white, and the dark one to 4.5:1 against the dark system background and 3:1 under a prominent button's white label.
+- Give a horizontal scroll view under the navigation bar the soft top scroll edge effect; the default draws a solid band with a hairline under the bar.
+- Cap the slide strip and the selection bars at `accessibility1`, since slides leave fixed room for their captions and buttons. Sheets and the projects list stay uncapped.
 - Hide decorative shapes from accessibility. Every control needs a label, and an icon-only button a hint when its action isn't obvious.
 
 ## Code conventions
@@ -56,7 +59,6 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Doc comments explain why a constant has its value, not what the code does.
 - Pad a horizontal scroll view's content rather than using `contentMargins`, which stop view-aligned scrolling from snapping and center `scrollPosition`'s anchor between the margins. To rest targets in the middle, snap with a `ScrollTargetBehavior` of their offsets, as `SlideStrip` does, since `.viewAligned` rests leading edges on the screen's whatever its anchor.
 - Count and number the carousel with `Project.carouselSlideCount` and `slideNumbers`, never `slides.count` or indexes, since a panorama is one slide that posts as several.
-- A custom `ScrollTargetBehavior` also receives `scrollPosition` scrolls, whose target is the item's own rect with an anchor rather than the visible region, so snap only targets without an anchor.
 - Default isolation is `MainActor`: mark models that cross actors `nonisolated`, and heavy `async` work `@concurrent`, since approachable concurrency runs a `nonisolated async` function on its caller's actor.
 - Unit tests cover the model and snapshots cover screens.
 - Write test files into a `TemporaryDirectory` held by the suite, which removes it after each test, since the simulator doesn't empty a test host's `tmp` between runs. Await any task that outlives the call under test, or it writes the directory back after removal.
