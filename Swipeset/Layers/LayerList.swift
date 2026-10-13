@@ -235,12 +235,10 @@ struct LayerList: View {
         switch layer.content {
         case .text(let text): text.font.name
         case .image(let picture):
-            switch (picture.borderWidth > 0, picture.blur > 0) {
-            case (true, true): "Border, blurred"
-            case (true, false): "Border"
-            case (false, true): "No border, blurred"
-            case (false, false): "No border"
-            }
+            ([picture.borderWidth > 0 ? "Border" : "No border"]
+                + (picture.blur > 0 ? ["blurred"] : [])
+                + (picture.hasShadow ? ["shadowed"] : []))
+                .joined(separator: ", ")
         }
     }
 

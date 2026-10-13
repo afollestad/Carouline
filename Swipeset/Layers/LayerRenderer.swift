@@ -9,11 +9,16 @@ import UIKit
 /// Draws layers with Core Graphics: text for the screen and the export alike, and whole layers
 /// for the export, laid out by `LayerGeometry`.
 nonisolated enum LayerRenderer {
-    /// A shadow's offset down and its blur, as fractions of the type size: soft and close, so it
-    /// lifts the letters off a busy photo without reading as a second copy of them.
+    /// A text shadow's offset down and its blur, as fractions of the type size: soft and close,
+    /// so it lifts the letters off a busy photo without reading as a second copy of them.
     static let shadowOffset: CGFloat = 0.05
     static let shadowBlur: CGFloat = 0.16
+    /// Text's shadow and a picture's alike.
     static let shadowOpacity: CGFloat = 0.55
+    /// Core Graphics' shadow blur for a Gaussian of sigma 1, as a picture's shadow is measured
+    /// and SwiftUI's `shadow(radius:)` takes it: Core Graphics blurs a straight edge's 10–90%
+    /// rise across 1.2 times its blur, and a Gaussian across 2.563 sigmas.
+    static let shadowBlurPerSigma: CGFloat = 2.136
 
     /// A picture layer's picture decoded at the size it's drawn, blurred when it is, with the
     /// outline its border traces when it's transparent, made once however many of a panorama's
@@ -82,7 +87,7 @@ nonisolated enum LayerRenderer {
         context.translateBy(x: box.minX, y: box.minY)
         context.scaleBy(x: box.width / reference.width, y: box.height / reference.height)
         if text.hasShadow {
-            setShadow(in: context, fontSize: layout.fontSize)
+            setShadow(in: context, offset: shadowOffset * layout.fontSize, blur: shadowBlur * layout.fontSize)
             // One shadow for the highlight and letters together, rather than one each.
             context.beginTransparencyLayer(auxiliaryInfo: nil)
         }
@@ -121,19 +126,18 @@ nonisolated enum LayerRenderer {
         }
     }
 
-    /// Sets the text shadow for type `fontSize` in the context's current space, so it scales and
-    /// turns with the layer. A shadow's offset is given outside that space, and positive runs down
-    /// the screen, so it's carried out through the current transform, then flipped back where the
-    /// transform flips the context over a base that runs up, as UIKit's does and a SwiftUI
-    /// canvas's doesn't.
-    private static func setShadow(in context: CGContext, fontSize: CGFloat) {
+    /// Sets a shadow falling `offset` down with a Core Graphics `blur`, both in the context's
+    /// current space, so it scales and turns with the layer. A shadow's offset is given outside
+    /// that space, and positive runs down the screen, so it's carried out through the current
+    /// transform, then flipped back where the transform flips the context over a base that runs
+    /// up, as UIKit's does and a SwiftUI canvas's doesn't.
+    private static func setShadow(in context: CGContext, offset down: CGFloat, blur: CGFloat) {
         let transform = context.ctm
-        let down = shadowOffset * fontSize
         let scale = hypot(transform.a, transform.b)
         let isFlipped = transform.a * transform.d - transform.b * transform.c < 0
         context.setShadow(
             offset: CGSize(width: transform.c * down, height: (isFlipped ? -1 : 1) * transform.d * down),
-            blur: shadowBlur * fontSize * scale,
+            blur: blur * scale,
             color: UIColor.black.withAlphaComponent(shadowOpacity).cgColor
         )
     }
@@ -142,6 +146,18 @@ nonisolated enum LayerRenderer {
     /// picture, and over an outline tracing its shape for a transparent one.
     private static func drawPicture(_ picture: ImageLayer, decoded: Picture, in context: CGContext, box: CGRect) {
         let border = LayerGeometry.borderWidth(of: picture, inFrame: box.size)
+        let frame = box.insetBy(dx: border, dy: border)
+        let shadow = LayerGeometry.shadow(of: picture, pictureSize: frame.size)
+        if let shadow {
+            setShadow(in: context, offset: shadow.offset, blur: shadow.radius * shadowBlurPerSigma)
+            // One shadow for the picture and its border together, rather than one each.
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+        }
+        defer {
+            if shadow != nil {
+                context.endTransparencyLayer()
+            }
+        }
         if border > 0 {
             if picture.image.fileFormat == .jpeg {
                 context.setFillColor(picture.borderColor.uiColor.cgColor)
@@ -150,7 +166,6 @@ nonisolated enum LayerRenderer {
                 UIImage(cgImage: outline).draw(in: box)
             }
         }
-        let frame = box.insetBy(dx: border, dy: border)
         UIImage(cgImage: decoded.image).draw(in: frame.insetBy(dx: -decoded.spread.width * frame.width, dy: -decoded.spread.height * frame.height))
     }
 }

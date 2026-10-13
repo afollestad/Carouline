@@ -117,8 +117,8 @@ extension ScreenSnapshotting {
     }
 
     /// A photo under a shadowed title and highlighted, turned text, and a grid under a framed,
-    /// turned photo and a sticker. Kept out of `projects`, so the project list's baselines don't
-    /// change with it.
+    /// turned photo and a sticker, both shadowed. Kept out of `projects`, so the project list's
+    /// baselines don't change with it.
     var layeredProject: Project {
         Project(
             id: fixtureID(8),
@@ -157,7 +157,8 @@ extension ScreenSnapshotting {
                             id: fixtureID(188),
                             content: .image(ImageLayer(
                                 image: PlacedImage(id: fixtureID(189), assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536),
-                                borderWidth: 0.04
+                                borderWidth: 0.04,
+                                hasShadow: true
                             )),
                             placement: LayerPlacement(centerY: 0.42, scale: 1.2, rotation: 0.08)
                         ),
@@ -165,7 +166,8 @@ extension ScreenSnapshotting {
                             id: fixtureID(190),
                             content: .image(ImageLayer(
                                 image: PlacedImage(id: layeredStickerID, assetIdentifier: nil, pixelWidth: 600, pixelHeight: 600, fileFormat: .png),
-                                borderWidth: 0.05
+                                borderWidth: 0.05,
+                                hasShadow: true
                             )),
                             placement: LayerPlacement(centerX: 0.75, centerY: 0.76, scale: 0.6)
                         )

@@ -35,8 +35,8 @@ nonisolated enum ProjectFile {
     }
 
     /// Versions 1 to 3 kept one style on the project, which each slide takes. Otherwise `Slide`
-    /// reads a missing `span` as 1, and missing layers and blur as none, and `PlacedImage` a
-    /// missing `fileFormat` as JPEG.
+    /// reads a missing `span` as 1, and missing layers and blur as none, `PlacedImage` a missing
+    /// `fileFormat` as JPEG, and `ImageLayer` a missing `hasShadow` as none.
     static func decode(_ data: Data) throws -> Project {
         let decoder = makeDecoder()
         guard let probe = try? decoder.decode(Probe.self, from: data), probe.formatVersion >= 1 else {

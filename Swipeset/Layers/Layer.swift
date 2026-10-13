@@ -91,9 +91,9 @@ nonisolated enum LayerContent: Hashable, Sendable {
     case text(TextLayer)
     case image(ImageLayer)
 
-    /// This content as an editor leaves it with `edited`: text whole, and a picture's border and
-    /// blur but not which picture it is, which only an import or a restore changes. Nil when
-    /// `edited` is another kind's.
+    /// This content as an editor leaves it with `edited`: text whole, and a picture's border, blur
+    /// and shadow but not which picture it is, which only an import or a restore changes. Nil
+    /// when `edited` is another kind's.
     func editing(_ edited: LayerContent) -> LayerContent? {
         switch (edited, self) {
         case (.text, .text):
@@ -195,17 +195,51 @@ nonisolated struct ImageLayer: Codable, Hashable, Sendable {
     var borderColor: RGBColor
     /// The blur's radius, as a fraction of the image's longer side.
     var blur: Double
+    /// Whether the picture and its border cast a shadow, as text's does.
+    var hasShadow: Bool
 
     /// A frame a twelfth of a picture's side reads as a thick mat without crowding the picture.
     static let maximumBorderWidth = 0.08
     /// A tenth of a picture's side blurs it past recognition.
     static let maximumBlur = 0.1
 
-    init(image: PlacedImage, borderWidth: Double = 0, borderColor: RGBColor = .white, blur: Double = 0) {
+    init(image: PlacedImage, borderWidth: Double = 0, borderColor: RGBColor = .white, blur: Double = 0, hasShadow: Bool = false) {
         self.image = image
         self.borderWidth = borderWidth
         self.borderColor = borderColor
         self.blur = blur
+        self.hasShadow = hasShadow
+    }
+
+    /// Reads a missing `hasShadow` as none, since pictures had no shadow before it.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        image = try container.decode(PlacedImage.self, forKey: .image)
+        borderWidth = try container.decode(Double.self, forKey: .borderWidth)
+        borderColor = try container.decode(RGBColor.self, forKey: .borderColor)
+        blur = try container.decode(Double.self, forKey: .blur)
+        hasShadow = try container.decodeIfPresent(Bool.self, forKey: .hasShadow) ?? false
+    }
+
+    /// Leaves out a shadow the picture doesn't have, so a picture without one saves as it did
+    /// before shadows.
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(image, forKey: .image)
+        try container.encode(borderWidth, forKey: .borderWidth)
+        try container.encode(borderColor, forKey: .borderColor)
+        try container.encode(blur, forKey: .blur)
+        if hasShadow {
+            try container.encode(hasShadow, forKey: .hasShadow)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case image
+        case borderWidth
+        case borderColor
+        case blur
+        case hasShadow
     }
 
     func clamped() -> ImageLayer {

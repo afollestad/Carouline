@@ -75,10 +75,14 @@ struct LayerRendererTests {
         _ format: ImageFileFormat = .jpeg,
         border: Double = 0,
         blur: Double = 0,
+        shadow: Bool = false,
         placement: LayerPlacement = LayerPlacement()
     ) -> Layer {
         let image = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400, fileFormat: format)
-        return Layer(content: .image(ImageLayer(image: image, borderWidth: border, borderColor: .black, blur: blur)), placement: placement)
+        return Layer(
+            content: .image(ImageLayer(image: image, borderWidth: border, borderColor: .black, blur: blur, hasShadow: shadow)),
+            placement: placement
+        )
     }
 
     /// The slides exported from a project of `slides`, decoded, on square 1080-pixel slides.
@@ -205,6 +209,32 @@ struct LayerRendererTests {
         #expect(isWhite(try pixel(image, 1000, 540)))
     }
 
+    /// A picture's shadow falls below it: darker under its bottom edge than over its top.
+    @Test func castsAPicturesShadowBelowIt() async throws {
+        let image = try await export([Slide(layout: .single, layers: [picture(shadow: true)])]).images[0]
+
+        // A 540-pixel picture from 270 to 810, its shadow 11 pixels down.
+        #expect(try pixel(image, 540, 815).green < 200)
+        #expect(try pixel(image, 540, 265).green > 220)
+        #expect(isRed(try pixel(image, 540, 805)))
+        let plain = try await export([Slide(layout: .single, layers: [picture()])]).images[0]
+        #expect(isWhite(try pixel(plain, 540, 815)))
+    }
+
+    /// A shadowed picture across a panorama's cut casts its shadow whole on either side, so the
+    /// slides meet without a seam in it.
+    @Test func castsAShadowAcrossAPanoramasCut() async throws {
+        let crossing = picture(shadow: true, placement: LayerPlacement(centerX: 1))
+        let images = try await export([Slide(layout: .panorama, span: 2, layers: [crossing])]).images
+
+        // Under the picture's bottom edge, at the cut and well inside its corners, where a piece
+        // left without what lies past the cut would cast it lighter on either side alike.
+        let inside = try pixel(images[0], 900, 815)
+        #expect(inside.green < 200)
+        #expect(abs(try pixel(images[0], 1079, 815).green - inside.green) < 4)
+        #expect(abs(try pixel(images[1], 0, 815).green - inside.green) < 4)
+    }
+
     /// A layer across a panorama's cut is split between the slides either side of it, each half
     /// where it sat on the whole.
     @Test func splitsALayerAcrossAPanoramasCut() async throws {
@@ -274,6 +304,42 @@ struct LayerRendererTests {
         #expect(abs(drop - offset) < 1.5, "drop \(drop), offset \(offset)")
     }
 
+    /// The screen casts a picture's shadow with SwiftUI and the export with Core Graphics, which
+    /// measure a blur differently, so the two must still fall and soften alike, below the picture
+    /// and beside it.
+    @MainActor
+    @Test func castsAPicturesShadowOnScreenAsTheExportDoes() throws {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 300)
+        let layer = Layer(content: .image(ImageLayer(image: image, hasShadow: true)))
+        // 300 by 225 points at twice the scale, in the middle of a 400-point square.
+        let view = LayerContentView(layer: layer, projectID: UUID(), background: .white, size: CGSize(width: 300, height: 225))
+            .frame(width: 400, height: 400)
+            .background(Color.white)
+            .environment(\.imageLoader, SolidImageLoader(image: try #require(Self.red)))
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        let screen = try #require(renderer.cgImage)
+        // The same 600 by 450 pixels, on a slide 1,200 wide, moved onto an 800-pixel square.
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let decoded = LayerRenderer.Picture(try #require(Self.red), for: ImageLayer(image: image, hasShadow: true))
+        let exported = try #require(UIGraphicsImageRenderer(size: CGSize(width: 800, height: 800), format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 800, height: 800))
+            context.cgContext.translateBy(x: -200, y: 0)
+            LayerRenderer.draw(layer, picture: decoded, in: context.cgContext, canvas: CGSize(width: 1200, height: 800), span: 1)
+        }.cgImage)
+
+        // From the picture's bottom edge at 625 and its right edge at 700.
+        for offset in stride(from: 0, to: 60, by: 4) {
+            let below = try pixel(screen, 400, 625 + CGFloat(offset)).green - pixel(exported, 400, 625 + CGFloat(offset)).green
+            let beside = try pixel(screen, 700 + CGFloat(offset), 400).green - pixel(exported, 700 + CGFloat(offset), 400).green
+            #expect(abs(below) < 8, "below by \(offset): \(below)")
+            #expect(abs(beside) < 8, "beside by \(offset): \(beside)")
+        }
+    }
+
     @Test func leavesOutAMissingPicture() async throws {
         let missing = picture()
         let (images, result) = try await export([Slide(layout: .single, layers: [missing])], missing: [try #require(missing.image?.id)])
@@ -337,5 +403,18 @@ struct LayerRendererTests {
         let renderer = ImageRenderer(content: view)
         renderer.scale = 1
         return try #require(renderer.cgImage)
+    }
+}
+
+/// Hands every view asking for a picture the one image, decoded already.
+private struct SolidImageLoader: ImageLoading {
+    let image: CGImage
+
+    func cachedImage(_ request: ImageRequest) -> CGImage? {
+        image
+    }
+
+    func image(_ request: ImageRequest) async -> CGImage? {
+        image
     }
 }

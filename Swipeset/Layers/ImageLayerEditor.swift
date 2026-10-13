@@ -6,9 +6,9 @@
 import SwiftUI
 
 /// The layers sheet's page for a picture layer: its border's width and color, which frame an
-/// opaque picture and outline a transparent one, and its blur. It edits the session's draft,
-/// which the slide draws as it changes, and saves the draft as a slider is let go and once it
-/// closes.
+/// opaque picture and outline a transparent one, its blur and its shadow. It edits the session's
+/// draft, which the slide draws as it changes, and saves the draft as a slider is let go and once
+/// it closes.
 struct ImageLayerEditor: View {
     let layerID: UUID
     let library: ProjectLibrary
@@ -34,6 +34,9 @@ struct ImageLayerEditor: View {
                 PercentSlider(title: "Blur", value: blur, maximum: 1, fractionLength: 0) {
                     session.saveDraft(to: library, projectID: projectID, endingEdit: false)
                 }
+            }
+            Section {
+                Toggle("Shadow", isOn: hasShadow)
             }
         }
         .layerPage(LayerKind.image.name, close: close)
@@ -75,6 +78,18 @@ struct ImageLayerEditor: View {
         }
     }
 
+    private var hasShadow: Binding<Bool> {
+        Binding {
+            picture?.hasShadow ?? false
+        } set: { hasShadow in
+            guard var picture else {
+                return
+            }
+            picture.hasShadow = hasShadow
+            session.draft?.content = .image(picture)
+        }
+    }
+
     /// The border's color, which also gives a border with no width one, so picking a color shows it.
     private var borderColor: Binding<RGBColor> {
         Binding {
@@ -93,7 +108,11 @@ struct ImageLayerEditor: View {
 }
 
 #Preview {
-    let layer = Layer(content: .image(ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536), borderWidth: 0.04)))
+    let layer = Layer(content: .image(ImageLayer(
+        image: PlacedImage(assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536),
+        borderWidth: 0.04,
+        hasShadow: true
+    )))
     let session = LayerSession()
     let slideID = UUID()
     NavigationStack {

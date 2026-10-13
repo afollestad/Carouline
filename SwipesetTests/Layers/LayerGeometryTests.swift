@@ -103,4 +103,15 @@ struct LayerGeometryTests {
         let picture = ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 200), blur: 0.05)
         #expect(LayerGeometry.blurRadius(of: picture, pictureSize: CGSize(width: 200, height: 100)) == 10)
     }
+
+    /// A picture's shadow is a share of the picture's longer side, its border left out, so it
+    /// stays put as the border changes.
+    @Test func scalesAShadowWithItsPicture() {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 200)
+        let size = CGSize(width: 200, height: 100)
+        let shadow = LayerGeometry.Shadow(radius: 200 * LayerGeometry.pictureShadowRadius, offset: 200 * LayerGeometry.pictureShadowOffset)
+        #expect(LayerGeometry.shadow(of: ImageLayer(image: image, hasShadow: true), pictureSize: size) == shadow)
+        #expect(LayerGeometry.shadow(of: ImageLayer(image: image, borderWidth: 0.08, hasShadow: true), pictureSize: size) == shadow)
+        #expect(LayerGeometry.shadow(of: ImageLayer(image: image), pictureSize: size) == nil)
+    }
 }

@@ -7,7 +7,8 @@ import SwiftUI
 
 /// A picture in its frame, inside its border: a ring of its border color around an opaque
 /// picture, and an outline tracing a transparent one's shape. An opaque picture's blur stays in
-/// its frame, and a transparent one's spreads past its edges, as it does in the export.
+/// its frame, and a transparent one's spreads past its edges, and its shadow falls past them, as
+/// they do in the export.
 struct PictureLayerView: View {
     let picture: ImageLayer
     let projectID: UUID
@@ -43,6 +44,7 @@ struct PictureLayerView: View {
                 PictureOutline(picture: picture, projectID: projectID, size: size)
             }
         }
+        .modifier(PictureShadow(shadow: LayerGeometry.shadow(of: picture, pictureSize: pictureSize), isShown: !isMissing))
         .accessibilityElement()
         .accessibilityLabel(isMissing ? "Image layer, unavailable" : "Image layer")
         .accessibilityAddTraits(isMissing ? [] : .isImage)
@@ -155,6 +157,29 @@ private struct SpreadingBlur: ViewModifier {
                 .padding(-reach)
                 .scaleEffect(shrink)
                 .frame(width: size.width, height: size.height)
+        } else {
+            content
+        }
+    }
+}
+
+/// A picture's shadow, cast by the picture and its border as one, rather than by the picture onto
+/// its border too. Hidden rather than left out for a missing copy, which the export draws nothing
+/// for, so the picture keeps its place in the view tree, and with it the state that found its copy
+/// missing.
+private struct PictureShadow: ViewModifier {
+    let shadow: LayerGeometry.Shadow?
+    let isShown: Bool
+
+    func body(content: Content) -> some View {
+        if let shadow {
+            content
+                .compositingGroup()
+                .shadow(
+                    color: .black.opacity(isShown ? LayerRenderer.shadowOpacity : 0),
+                    radius: shadow.radius,
+                    y: shadow.offset
+                )
         } else {
             content
         }

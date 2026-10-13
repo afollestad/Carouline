@@ -28,6 +28,18 @@ struct LayerTests {
         #expect(try json(image).contains(#""content":{"image":{"#))
     }
 
+    /// A picture without a shadow saves as it did before shadows, and one saved then reads as
+    /// having none.
+    @Test func savesAShadowOnlyWhenAPictureHasOne() throws {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10)
+        let plain = Layer(content: .image(ImageLayer(image: image)))
+        let shadowed = Layer(content: .image(ImageLayer(image: image, hasShadow: true)))
+
+        #expect(try !json(plain).contains("hasShadow"))
+        #expect(try json(shadowed).contains(#""hasShadow":true"#))
+        #expect(try JSONDecoder().decode(Layer.self, from: Data(json(shadowed).utf8)) == shadowed)
+    }
+
     /// A newer build's typeface draws in the default one here, but saves back as it was.
     @Test func keepsATypefaceItDoesntOffer() throws {
         let layer = Layer(content: .text(TextLayer(text: "Hi", font: LayerFont(rawValue: "comicNeue"))))
@@ -108,8 +120,8 @@ struct LayerTests {
         let restored = PlacedImage(assetIdentifier: "A", pixelWidth: 10, pixelHeight: 10)
         let shown = LayerContent.image(ImageLayer(image: restored))
         let missing = PlacedImage(assetIdentifier: "A", pixelWidth: 10, pixelHeight: 10)
-        let draft = LayerContent.image(ImageLayer(image: missing, borderWidth: 0.04, blur: 0.02))
-        #expect(shown.editing(draft) == .image(ImageLayer(image: restored, borderWidth: 0.04, blur: 0.02)))
+        let draft = LayerContent.image(ImageLayer(image: missing, borderWidth: 0.04, blur: 0.02, hasShadow: true))
+        #expect(shown.editing(draft) == .image(ImageLayer(image: restored, borderWidth: 0.04, blur: 0.02, hasShadow: true)))
         #expect(shown.editing(edited) == nil)
     }
 }

@@ -53,6 +53,7 @@ struct ProjectFileTests {
         #expect(picture.image.fileFormat == .png)
         #expect(picture.image.fileName == "6A1F2B3C-0000-4000-8000-000000000006.png")
         #expect(picture.borderWidth == 0.05)
+        #expect(!picture.hasShadow)
         #expect(project.images.map(\.fileFormat) == [.jpeg, .png])
         #expect(slide.style == .standard)
     }
@@ -145,7 +146,7 @@ struct ProjectFileTests {
                     span: 6,
                     layers: [
                         Layer(content: .text(TextLayer(text: "Across", font: .script, isHighlighted: true)), placement: LayerPlacement(centerX: 3)),
-                        Layer(content: .image(ImageLayer(image: sticker, borderWidth: 0.04, blur: 0.01)))
+                        Layer(content: .image(ImageLayer(image: sticker, borderWidth: 0.04, blur: 0.01, hasShadow: true)))
                     ],
                     blur: 0.01,
                     style: flush

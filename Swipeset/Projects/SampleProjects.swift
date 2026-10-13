@@ -58,12 +58,14 @@ nonisolated enum SampleProjects {
         placement: LayerPlacement(centerY: 0.14, scale: 1.4)
     )
 
-    /// A framed photo turned a little over the grid, as a print laid on the others.
+    /// A framed photo turned a little over the grid, as a print laid on the others, lifted off
+    /// them by a shadow.
     private static let framedPhoto = Layer(
         id: sampleID(202),
         content: .image(ImageLayer(
             image: PlacedImage(id: sampleID(107), assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536),
-            borderWidth: 0.04
+            borderWidth: 0.04,
+            hasShadow: true
         )),
         placement: LayerPlacement(centerY: 0.45, scale: 1.2, rotation: -0.08)
     )

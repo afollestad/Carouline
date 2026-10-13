@@ -20,6 +20,18 @@ nonisolated enum LayerGeometry {
     /// A picture's longer side at a layer's natural size, as a fraction of a slide's width: half,
     /// so it sits over the slide without hiding it.
     static let pictureSide: CGFloat = 0.5
+    /// A picture's shadow, as shares of its longer side: its blur, as a Gaussian's sigma like a
+    /// picture's blur, and how far down it falls. Soft and close, as text's is, so it lifts the
+    /// picture off a busy slide without reading as a dark band along its edge.
+    static let pictureShadowRadius: CGFloat = 0.03
+    static let pictureShadowOffset: CGFloat = 0.02
+
+    /// A shadow's blur, as a Gaussian's sigma, and how far down it falls, in the layer's own
+    /// space, so it turns with the layer.
+    struct Shadow: Equatable {
+        let radius: CGFloat
+        let offset: CGFloat
+    }
 
     /// One slide's width on a canvas spanning `span` slides, which every layer measure scales by.
     static func slideWidth(canvas: CGSize, span: Int) -> CGFloat {
@@ -79,6 +91,16 @@ nonisolated enum LayerGeometry {
     /// a share of its longer side, so it blurs alike at any size.
     static func blurRadius(of picture: ImageLayer, pictureSize: CGSize) -> CGFloat {
         picture.blur * max(pictureSize.width, pictureSize.height)
+    }
+
+    /// A picture's shadow when it's drawn at `pictureSize`, or nil when it has none. Measured
+    /// from the picture alone, so it stays put as the border changes.
+    static func shadow(of picture: ImageLayer, pictureSize: CGSize) -> Shadow? {
+        guard picture.hasShadow else {
+            return nil
+        }
+        let side = max(pictureSize.width, pictureSize.height)
+        return Shadow(radius: pictureShadowRadius * side, offset: pictureShadowOffset * side)
     }
 
     /// A picture's border width when its frame, border included, is `frame`: the picture and a
