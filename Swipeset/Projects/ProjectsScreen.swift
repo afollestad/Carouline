@@ -12,6 +12,9 @@ struct ProjectsScreen: View {
 
     var body: some View {
         content
+            .background {
+                GlowBackdrop()
+            }
             .navigationTitle("Projects")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -44,6 +47,7 @@ struct ProjectsScreen: View {
                         } onDelete: {
                             library.delete(project.id)
                         }
+                        .glassRow()
                     }
                 }
                 if !library.unreadable.isEmpty {
@@ -52,14 +56,36 @@ struct ProjectsScreen: View {
                             UnreadableRow(project: project) {
                                 library.delete(project)
                             }
+                            .glassRow()
                         }
-                    } footer: {
+                        // A row rather than the section's footer, which a plain list draws on an
+                        // opaque band across the glow.
                         Text("Swipeset leaves these as they are until you delete them.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.secondary)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 32, bottom: 4, trailing: 32))
+                            .listRowSeparator(.hidden)
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
+    }
+}
+
+private extension View {
+    /// A row as its own glass card on the glow, apart from the rows around it.
+    func glassRow() -> some View {
+        listRowBackground(
+            Color.clear
+                .glassEffect(.regular, in: .rect(cornerRadius: 24))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 5)
+        )
+        .listRowInsets(EdgeInsets(top: 15, leading: 30, bottom: 15, trailing: 30))
+        .listRowSeparator(.hidden)
     }
 }
 

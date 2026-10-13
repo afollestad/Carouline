@@ -16,6 +16,10 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(projects[0]))
     }
 
+    @Test func darkPhotoGrid() async {
+        await assertScreenSnapshot(of: projectScreen(gridFirst), appearance: .dark)
+    }
+
     @Test func storySlides() async {
         await assertScreenSnapshot(of: projectScreen(projects[1]))
     }

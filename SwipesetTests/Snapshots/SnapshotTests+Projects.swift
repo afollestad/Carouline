@@ -17,6 +17,14 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader))
     }
 
+    @Test func darkProjectList() async {
+        let library = library(projects)
+        await assertScreenSnapshot(
+            of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader),
+            appearance: .dark
+        )
+    }
+
     @Test func newProjectSheet() async {
         await assertScreenSnapshot(of: AspectRatioSheet { _ in })
     }

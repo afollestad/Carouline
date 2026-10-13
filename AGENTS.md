@@ -37,7 +37,9 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 
 ## Design rules
 
-- Floating chrome is Liquid Glass: toolbar items, partial-height sheets, and the buttons over slides. Don't put glass on content inside a glass sheet or popover, which reads as glass on glass.
+- Floating chrome is Liquid Glass: toolbar items, partial-height sheets, project rows, slide captions, and the buttons over slides. Don't put glass on content inside a glass sheet or popover, which reads as glass on glass.
+- Screens sit on `GlowBackdrop`, or `SlideBackdrop` on the project screen, never a flat system background, so their glass has color to frost. A plain list draws section headers and footers on an opaque band over it, so put notes in clear rows.
+- Blur a backdrop small inside `drawingGroup()` and scale it up, as `SlideBackdrop` does. A full-screen blur re-renders on every frame the strip scrolls, and a full-screen 8-bit offscreen render bands the dark glow.
 - Give a horizontal scroll view under the navigation bar the soft top scroll edge effect; the default draws a solid band with a hairline under the bar.
 - Glass over a slide takes its color scheme from the slide's background, not the system's, so it stays legible on a white slide in dark mode.
 - Cap the slide strip and the selection bar at `accessibility1`, since slides leave fixed room for their captions and buttons. Sheets and the projects list stay uncapped.

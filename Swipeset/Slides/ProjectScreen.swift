@@ -45,11 +45,15 @@ struct ProjectScreen: View {
         } else {
             // Another window deleted it.
             ContentUnavailableView("Project Deleted", systemImage: "trash")
+                .background {
+                    GlowBackdrop()
+                }
         }
     }
 
     private func content(_ project: Project) -> some View {
-        let screen = strip(shown(project))
+        let shown = shown(project)
+        let screen = strip(shown)
             .overlay(alignment: .bottom) {
                 selectionBar
             }
@@ -65,7 +69,9 @@ struct ProjectScreen: View {
                     session.selection = nil
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background {
+                SlideBackdrop(slide: frontSlide(of: shown), projectID: projectID, style: shown.style, aspectRatio: shown.aspectRatio)
+            }
             .navigationTitle(nameBinding)
             .navigationBarTitleDisplayMode(.inline)
             .navigationSubtitle(project.summary)
@@ -132,6 +138,15 @@ struct ProjectScreen: View {
             project.style = styleDraft
         }
         return project
+    }
+
+    /// The slide in the middle of the strip, which lights the backdrop.
+    private func frontSlide(of project: Project) -> Slide? {
+        switch stripPosition {
+        case .slide(let slideID): project.slides.first { $0.id == slideID } ?? project.slides.first
+        case .add: project.slides.last
+        case nil: project.slides.first
+        }
     }
 
     private func styleButton(_ project: Project) -> some View {

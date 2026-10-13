@@ -176,33 +176,30 @@ private struct SlideCard: View {
             .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Slide \(number) of \(count), \(slide.layout.name)")
-            HStack(spacing: 8) {
-                Text("Slide \(number)")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color.secondary)
-                    .accessibilityHidden(true)
-                Menu {
-                    Button("Change Layout…", systemImage: "rectangle.split.2x2", action: onChangeLayout)
-                    Button("Move Left", systemImage: "arrow.left") {
-                        onMove(-1)
-                    }
-                    .disabled(number == 1)
-                    Button("Move Right", systemImage: "arrow.right") {
-                        onMove(1)
-                    }
-                    .disabled(number == count)
-                    Divider()
-                    Button("Delete Slide", systemImage: "trash", role: .destructive) {
-                        isConfirmingDelete = true
-                    }
-                } label: {
-                    Label("Slide \(number) Options", systemImage: "ellipsis")
-                        .labelStyle(.iconOnly)
-                        .frame(width: 20, height: 20)
+            Menu {
+                Button("Change Layout…", systemImage: "rectangle.split.2x2", action: onChangeLayout)
+                Button("Move Left", systemImage: "arrow.left") {
+                    onMove(-1)
                 }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
+                .disabled(number == 1)
+                Button("Move Right", systemImage: "arrow.right") {
+                    onMove(1)
+                }
+                .disabled(number == count)
+                Divider()
+                Button("Delete Slide", systemImage: "trash", role: .destructive) {
+                    isConfirmingDelete = true
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Slide \(number)")
+                    Image(systemName: "ellipsis")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color.primary)
             }
+            .buttonStyle(.glass)
+            .accessibilityLabel("Slide \(number) Options")
             .frame(height: 44)
         }
         .confirmationDialog("Delete Slide \(number)?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
@@ -289,7 +286,7 @@ private struct GhostSlide: View {
         onMove: { _, _ in },
         onDelete: { _ in }
     )
-    .background(Color(.systemGroupedBackground))
+    .background { GlowBackdrop() }
 }
 
 #Preview("Empty") {
@@ -306,5 +303,5 @@ private struct GhostSlide: View {
         onMove: { _, _ in },
         onDelete: { _ in }
     )
-    .background(Color(.systemGroupedBackground))
+    .background { GlowBackdrop() }
 }

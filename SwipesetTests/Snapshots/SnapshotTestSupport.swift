@@ -48,8 +48,8 @@ private let snapshotScale: CGFloat = 2
 private let settleTimeout: Duration = .seconds(3)
 private let settleInterval: Duration = .milliseconds(100)
 
-/// Renders `view` full screen in its own window on the host app's scene, waits for it
-/// to settle, and compares it against the stored baseline.
+/// Renders `view` full screen in its own window on the host app's scene, in `appearance`,
+/// waits for it to settle, and compares it against the stored baseline.
 ///
 /// The window matters. `drawHierarchy` is what captures Liquid Glass and other backdrop
 /// effects, which `layer.render(in:)` leaves blank, and a full-screen window on the scene
@@ -59,6 +59,7 @@ private let settleInterval: Duration = .milliseconds(100)
 func assertScreenSnapshot<V: View>(
     of view: V,
     on device: SnapshotDevice = .phone,
+    appearance: UIUserInterfaceStyle = .light,
     named name: String? = nil,
     precision: Float = defaultPixelPrecision,
     perceptualPrecision: Float = defaultPerceptualPrecision,
@@ -80,7 +81,7 @@ func assertScreenSnapshot<V: View>(
         return
     }
 
-    let image = await render(view, on: scene)
+    let image = await render(view, on: scene, appearance: appearance)
     assertSnapshot(
         of: image,
         as: .image(precision: precision, perceptualPrecision: perceptualPrecision),
@@ -95,14 +96,14 @@ func assertScreenSnapshot<V: View>(
 
 /// Shows `view` full screen in its own window on `scene` until it settles, and captures it.
 @MainActor
-private func render<V: View>(_ view: V, on scene: UIWindowScene) async -> UIImage {
+private func render<V: View>(_ view: V, on scene: UIWindowScene, appearance: UIUserInterfaceStyle) async -> UIImage {
     let window = UIWindow(windowScene: scene)
     window.frame = scene.effectiveGeometry.coordinateSpace.bounds
     // Above the host app's own window, which keeps running underneath.
     window.windowLevel = .alert + 1
-    // Light, as a new simulator starts, rather than whatever this one was left in. Screens that
-    // follow the system scheme, like glass, otherwise differ between Macs.
-    window.overrideUserInterfaceStyle = .light
+    // Set rather than whatever the simulator was left in. Screens that follow the system
+    // scheme, like glass, otherwise differ between Macs.
+    window.overrideUserInterfaceStyle = appearance
     window.rootViewController = UIHostingController(
         rootView: view
             .transaction { $0.animation = nil }

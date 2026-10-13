@@ -101,5 +101,5 @@ struct SelectionBar: View {
             onDone: {}
         )
     }
-    .background(Color(.systemGroupedBackground))
+    .background { GlowBackdrop() }
 }
