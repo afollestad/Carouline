@@ -33,6 +33,8 @@
 				Debug/CLAUDE.md,
 				Layers/AGENTS.md,
 				Layers/CLAUDE.md,
+				Slides/AGENTS.md,
+				Slides/CLAUDE.md,
 				Storage/AGENTS.md,
 				Storage/CLAUDE.md,
 			);
