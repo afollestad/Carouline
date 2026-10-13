@@ -17,8 +17,14 @@ struct CellPhoto<Missing: View>: View {
     @ViewBuilder let missing: () -> Missing
     @Environment(\.imageLoader) private var loader
     @Environment(\.displayScale) private var displayScale
-    /// The last decode, kept on screen while a sharper one loads for a bigger size.
-    @State private var loaded: CGImage?
+    /// The last decode, kept on screen while a sharper one loads for a bigger size. Kept with
+    /// its photo's ID, as `unreadableID` is, so a photo put in its place, as a thumbnail's or a
+    /// layer's can be, never shows the one before or inherits its state.
+    @State private var loaded: (imageID: UUID, image: CGImage)?
+    /// The photo whose copy turned out unreadable, which `isMissing` reports. Kept here by ID
+    /// rather than read back from `isMissing`, which a thumbnail doesn't keep, and a cell may
+    /// still hold for the photo before.
+    @State private var unreadableID: UUID?
 
     var body: some View {
         GeometryReader { proxy in
@@ -28,19 +34,35 @@ struct CellPhoto<Missing: View>: View {
                 image: image,
                 displayedPixels: max(frame.width, frame.height) * displayScale
             )
+            // None until the cell is measured, as the strip's aren't on its first pass, since the
+            // decode for no size would only be thrown away for the real one.
+            let decode = proxy.size.width > 0 && proxy.size.height > 0 ? request : nil
             ZStack {
-                if let shown = loaded ?? loader.cachedImage(request) {
+                if let shown = loadedImage ?? loader.cachedImage(request) {
                     photo(shown, frame: frame, cell: proxy.size)
-                } else if isMissing {
+                } else if isUnreadable {
                     missing()
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .task(id: request) {
-                let decoded = await loader.image(request)
-                loaded = decoded ?? loaded
-                isMissing = decoded == nil
+            .task(id: decode) {
+                guard let decode else {
+                    return
+                }
+                let decoded = await loader.image(decode)
+                // A decode for a newer size or photo took over, which this one mustn't land on.
+                guard !Task.isCancelled else {
+                    return
+                }
+                if let decoded {
+                    loaded = (decode.imageID, decoded)
+                }
+                unreadableID = decoded == nil ? decode.imageID : nil
             }
+        }
+        // Reported for this photo alone, so one put in place of a missing one starts out loading.
+        .onChange(of: isUnreadable, initial: true) { _, isUnreadable in
+            isMissing = isUnreadable
         }
         .clipped()
         // Clipping hides the photo past the cell but leaves it there to touch, so a wide photo in
@@ -50,6 +72,15 @@ struct CellPhoto<Missing: View>: View {
 }
 
 extension CellPhoto {
+    /// The last decode of the photo shown now.
+    private var loadedImage: CGImage? {
+        loaded?.imageID == image.id ? loaded?.image : nil
+    }
+
+    private var isUnreadable: Bool {
+        unreadableID == image.id
+    }
+
     /// `image` drawn across `frame` in a cell of `cell`, blurred when the photo is: kept sharp at
     /// its edges, as the export's blur is, and rendered once, smaller, into its own layer, rather
     /// than on every frame the strip scrolls. Only the photo within the blur's reach of the cell

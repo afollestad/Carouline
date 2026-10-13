@@ -13,10 +13,10 @@ struct CameraPicker: UIViewControllerRepresentable {
     let onCapture: (UIImage) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    /// False in the simulator and on iPads without a rear camera.
-    static var isAvailable: Bool {
-        UIImagePickerController.isSourceTypeAvailable(.camera)
-    }
+    /// False in the simulator and on iPads without a rear camera. Asked once rather than on every
+    /// redraw of the screens that read it, since each ask goes to the system, and a device's
+    /// cameras don't change.
+    static let isAvailable = UIImagePickerController.isSourceTypeAvailable(.camera)
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
