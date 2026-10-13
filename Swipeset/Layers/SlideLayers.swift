@@ -20,6 +20,11 @@ struct LayerActions {
     /// Copies a picture onto a slide as a layer, with its library identifier, from what the
     /// picker hands over.
     let importImage: (UUID, String?, @escaping @Sendable () async throws -> PhotoSource?) -> Void
+    /// Copies a layer's missing picture in again from the photo library, as the user asked, if
+    /// the layer still shows that copy, by its ID.
+    let restoreImage: (LayerAddress, UUID) -> Void
+    /// Tries that once for each missing copy, as it's shown, without asking for access.
+    let restoreImageQuietly: (LayerAddress, UUID) -> Void
     /// Whether a slide's layers sheet is open, which the slide presents it by.
     let isShowingSheet: (UUID) -> Binding<Bool>
     /// A slide's layers sheet.
@@ -33,6 +38,8 @@ struct LayerActions {
         edit: { _ in },
         openSheet: { _, _ in },
         importImage: { _, _, _ in },
+        restoreImage: { _, _ in },
+        restoreImageQuietly: { _, _ in },
         isShowingSheet: { _ in .constant(false) },
         sheet: { _ in nil }
     )
@@ -110,7 +117,8 @@ private struct LayerPosition {
 
 /// The slide's layers with the session's draft in place of its layer, or on top as a new one.
 /// Only this view reads the draft, which changes with each keystroke, so typing redraws just the
-/// edited slide.
+/// edited slide. A picture keeps the library's copy, as its draft saves, so a restore made while
+/// its editor is open shows.
 private struct DraftedLayers: View {
     let slide: SlideLayers
     let interaction: LayerInteraction
@@ -119,7 +127,7 @@ private struct DraftedLayers: View {
         var layers = slide.layers
         if let draft = interaction.session.draft {
             if let index = layers.firstIndex(where: { $0.id == draft.id }) {
-                layers[index].content = draft.content
+                layers[index].content = layers[index].content.editing(draft.content) ?? layers[index].content
             } else if interaction.session.isDraftNew {
                 layers.append(draft)
             }
@@ -164,6 +172,7 @@ private struct PlacedLayer: View {
         let frame = LayerGeometry.frame(of: placed, canvas: slide.size, span: slide.span)
         let isSelected = interaction?.selectedLayerID == layer.id
         let content = LayerContentView(layer: layer, projectID: slide.projectID, background: slide.background, size: frame.size)
+            .environment(\.missingPictureActions, missingPictureActions)
             .overlay {
                 // Not around new text with nothing typed yet, which takes no room.
                 if isSelected, !frame.isEmpty {
@@ -195,6 +204,20 @@ private struct PlacedLayer: View {
                     menu(interaction.actions)
                 }
             }
+    }
+
+    /// What the picture's placeholder offers, should its copy be missing.
+    private var missingPictureActions: MissingPictureActions? {
+        guard let actions = interaction?.actions, let image = layer.image else {
+            return nil
+        }
+        let address = slide.address(of: layer)
+        return MissingPictureActions(
+            canRestore: image.assetIdentifier != nil,
+            restore: { actions.restoreImage(address, image.id) },
+            restoreQuietly: { actions.restoreImageQuietly(address, image.id) },
+            delete: { actions.delete(address) }
+        )
     }
 
     @ViewBuilder

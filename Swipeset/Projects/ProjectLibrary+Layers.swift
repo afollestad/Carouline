@@ -82,22 +82,61 @@ extension ProjectLibrary {
         return address
     }
 
+    /// Copies the picture of the layer at `address` in again from its library original, when its
+    /// copy `missingID` went missing, keeping its transparency, its border and blur, and where it
+    /// sits. Asks for access to the library only when `asking`, so a restore on sight never
+    /// prompts; one that asks reports what went wrong. A layer no longer showing that copy, deleted
+    /// or restored already, is left as it is.
+    @discardableResult
+    func restoreLayerImage(
+        at address: LayerAddress,
+        missing missingID: UUID,
+        from photos: any PhotoLibrarySource,
+        asking: Bool
+    ) async -> RestoreOutcome {
+        guard let missing = layer(at: address)?.image, missing.id == missingID, let assetIdentifier = missing.assetIdentifier else {
+            return .unavailable
+        }
+        if let refused = await readAccess(to: photos, asking: asking) {
+            return refused
+        }
+        let request = CopyRequest(projectID: address.projectID, assetIdentifier: assetIdentifier, crop: missing.crop) { photo, destination in
+            try await ImageImporter.makeLayerCopy(of: photo, at: destination)
+        }
+        var isRestored = false
+        do {
+            try await adoptCopy(request) {
+                guard let data = await photos.imageData(for: assetIdentifier) else {
+                    throw RestoreError.originalGone
+                }
+                return .data(data)
+            } isCurrent: {
+                true
+            } place: { image in
+                guard var layer = layer(at: address), case .image(var picture) = layer.content, picture.image.id == missing.id else {
+                    return false
+                }
+                picture.image = image
+                layer.content = .image(picture)
+                isRestored = saveLayer(layer, in: address.slideID, of: address.projectID)
+                return isRestored
+            }
+        } catch {
+            if asking {
+                failure = LibraryFailure(kind: .restorePhoto, error: error)
+            }
+        }
+        return isRestored ? .restored : .unavailable
+    }
+
     /// Gives the layer at `address` `content`, as its editor leaves it, keeping the rest of the
     /// layer as it is now, so an edit never undoes a move made meanwhile. A picture keeps the
     /// copy it shows, since an editor changes its border and blur, never which picture it is.
     func setContent(_ content: LayerContent, at address: LayerAddress) {
-        guard var layer = layer(at: address) else {
+        guard var layer = layer(at: address), let edited = layer.content.editing(content) else {
             return
         }
-        switch (content, layer.content) {
-        case (.text, .text):
-            layer.content = content
-        case (.image(var edited), .image(let shown)):
-            edited.image = shown.image
-            layer.content = .image(edited)
-        default:
-            return
-        }
+        layer.content = edited
         saveLayer(layer, in: address.slideID, of: address.projectID)
     }
 

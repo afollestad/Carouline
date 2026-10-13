@@ -140,14 +140,8 @@ extension ProjectLibrary {
         guard let image = photo(at: address), let assetIdentifier = image.assetIdentifier else {
             return .unavailable
         }
-        if !photos.canReadWithoutAsking {
-            guard asking else {
-                return .needsAccess
-            }
-            guard await photos.requestReadAccess() else {
-                failure = LibraryFailure(kind: .restorePhoto, error: RestoreError.denied)
-                return .denied
-            }
+        if let refused = await readAccess(to: photos, asking: asking) {
+            return refused
         }
         // Asked for at the copy's size, so a large copy's original doesn't come back as all of a
         // 48-megapixel photo, nor a cell's past what its copy keeps.
@@ -165,6 +159,22 @@ extension ProjectLibrary {
             return .image(original)
         }
         return photo(at: address)?.id == image.id ? .unavailable : .restored
+    }
+
+    /// Why `photos` can't be read for a restore, or nil when it can: asking for access only when
+    /// `asking`, and reporting a refusal then.
+    func readAccess(to photos: any PhotoLibrarySource, asking: Bool) async -> RestoreOutcome? {
+        guard !photos.canReadWithoutAsking else {
+            return nil
+        }
+        guard asking else {
+            return .needsAccess
+        }
+        guard await photos.requestReadAccess() else {
+            failure = LibraryFailure(kind: .restorePhoto, error: RestoreError.denied)
+            return .denied
+        }
+        return nil
     }
 
     func removePhoto(at address: CellAddress) {

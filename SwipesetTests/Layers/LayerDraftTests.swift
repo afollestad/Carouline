@@ -43,7 +43,9 @@ struct LayerDraftTests {
             presenter: presenter ?? .constant(PresentationQueue()),
             dynamicTypeSize: .large,
             select: { session.selection = $0 },
-            photoSelection: { nil }
+            photoSelection: { nil },
+            photoLibrary: MockPhotoLibrary(),
+            restoresQuietly: { _ in true }
         )
         .actions
     }

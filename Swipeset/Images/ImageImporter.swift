@@ -13,6 +13,8 @@ nonisolated enum PhotoSource: Sendable {
     case file(URL)
     /// A camera capture, which never reaches a file.
     case image(UIImage)
+    /// A library original's data, as stored.
+    case data(Data)
 }
 
 /// Makes the app's own copy of a photo: upright, no larger than its slides can use, as a JPEG,
@@ -74,8 +76,9 @@ nonisolated enum ImageImporter {
     }
 
     /// Writes `source`'s copy for a layer to `destination`, no larger than a layer draws: a PNG
-    /// when a file has transparency to keep, as a sticker or a logo cut out of its background
-    /// does, and otherwise a JPEG, which is far smaller. A camera capture has none to keep.
+    /// when a file or a library original has transparency to keep, as a sticker or a logo cut
+    /// out of its background does, and otherwise a JPEG, which is far smaller. A camera capture
+    /// has none to keep.
     @concurrent
     static func makeLayerCopy(of source: PhotoSource, at destination: URL) async throws -> Copy {
         let image = try upright(source) { _, _ in maximumLayerPixelSize }
@@ -123,6 +126,8 @@ nonisolated enum ImageImporter {
         case .image(let image):
             // JPEG data keeps the capture's orientation as EXIF, which the thumbnail below applies.
             image.jpegData(compressionQuality: 1).flatMap { CGImageSourceCreateWithData($0 as CFData, nil) }
+        case .data(let data):
+            CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
         }
         guard let imageSource else {
             throw ImportError.unreadable

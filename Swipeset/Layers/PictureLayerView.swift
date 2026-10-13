@@ -14,6 +14,7 @@ struct PictureLayerView: View {
     let background: RGBColor
     let size: CGSize
     @State private var isMissing = false
+    @Environment(\.missingPictureActions) private var missingActions
 
     var body: some View {
         let border = LayerGeometry.borderWidth(of: picture, inFrame: size)
@@ -36,7 +37,28 @@ struct PictureLayerView: View {
         .accessibilityElement()
         .accessibilityLabel(isMissing ? "Image layer, unavailable" : "Image layer")
         .accessibilityAddTraits(isMissing ? [] : .isImage)
+        // The placeholder's menu, which VoiceOver passes over within the one element.
+        .accessibilityActions {
+            if isMissing, let missingActions, missingActions.canRestore {
+                Button("Restore from Photos", action: missingActions.restore)
+            }
+        }
     }
+}
+
+/// What a missing picture's placeholder offers on the strip: restoring its copy from the photo
+/// library, which it also tries once as it's shown, and deleting its layer. Thumbnails and
+/// previews, which have none, show just the placeholder.
+struct MissingPictureActions {
+    /// Whether the picture came from the photo library, which it can come back from.
+    let canRestore: Bool
+    let restore: () -> Void
+    let restoreQuietly: () -> Void
+    let delete: () -> Void
+}
+
+extension EnvironmentValues {
+    @Entry var missingPictureActions: MissingPictureActions?
 }
 
 /// A transparent picture's outline, filling the layer's frame of `size`. It renders from the
@@ -127,17 +149,38 @@ private struct SpreadingBlur: ViewModifier {
 }
 
 /// What a picture layer shows when its copy can't be read: the fill a missing photo shows, with
-/// a warning.
+/// a warning, which on the strip is a menu of what can be done about it.
 private struct MissingLayerPicture: View {
     let background: RGBColor
+    @Environment(\.missingPictureActions) private var actions
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
             PlaceholderCell(background: background)
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title3)
-                .foregroundStyle(Color.secondary)
-                .accessibilityHidden(true)
+            if let actions {
+                Menu {
+                    if actions.canRestore {
+                        Button("Restore from Photos", systemImage: "arrow.clockwise", action: actions.restore)
+                    }
+                    Button("Delete Layer", systemImage: "trash", role: .destructive, action: actions.delete)
+                } label: {
+                    Label("Image Unavailable", systemImage: "exclamationmark.triangle")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                // From the placeholder under it, as glass over a slide takes its scheme.
+                .environment(\.colorScheme, PlaceholderCell.isLight(on: background, in: colorScheme) ? .light : .dark)
+                .task {
+                    actions.restoreQuietly()
+                }
+            } else {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title3)
+                    .foregroundStyle(Color.secondary)
+                    .accessibilityHidden(true)
+            }
         }
     }
 }

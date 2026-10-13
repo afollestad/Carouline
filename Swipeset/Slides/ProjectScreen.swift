@@ -373,7 +373,9 @@ struct ProjectScreen: View {
             presenter: $presenter,
             dynamicTypeSize: dynamicTypeSize,
             select: selectLayer,
-            photoSelection: { session.selection }
+            photoSelection: { session.selection },
+            photoLibrary: photoLibrary,
+            restoresQuietly: { quietRestores.insert($0).inserted }
         )
         .actions
     }

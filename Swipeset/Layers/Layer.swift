@@ -90,6 +90,21 @@ nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
 nonisolated enum LayerContent: Hashable, Sendable {
     case text(TextLayer)
     case image(ImageLayer)
+
+    /// This content as an editor leaves it with `edited`: text whole, and a picture's border and
+    /// blur but not which picture it is, which only an import or a restore changes. Nil when
+    /// `edited` is another kind's.
+    func editing(_ edited: LayerContent) -> LayerContent? {
+        switch (edited, self) {
+        case (.text, .text):
+            return edited
+        case (.image(var picture), .image(let shown)):
+            picture.image = shown.image
+            return .image(picture)
+        default:
+            return nil
+        }
+    }
 }
 
 /// Keyed by the kind of layer, as `{"text": {…}}` or `{"image": {…}}`, rather than the

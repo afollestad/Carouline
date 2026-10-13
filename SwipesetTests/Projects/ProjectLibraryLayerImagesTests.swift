@@ -6,6 +6,7 @@
 import Foundation
 import SwiftUI
 import Testing
+import UIKit
 @testable import Swipeset
 
 /// Pictures copied onto slides as layers.
@@ -170,6 +171,146 @@ struct ProjectLibraryLayerImagesTests {
         #expect(fixture.library.project(fixture.projectID)?.slides.first?.layers.isEmpty == true)
     }
 
+    // MARK: Restoring
+
+    /// A picture layer from asset "A/L0/001", bordered, blurred and moved, whose copy was deleted.
+    private struct MissingCopy {
+        let fixture: Fixture
+        let address: LayerAddress
+        let missing: Layer
+
+        var missingID: UUID {
+            missing.image?.id ?? UUID()
+        }
+    }
+
+    private func makeFixtureMissingACopy() async throws -> MissingCopy {
+        let fixture = try await makeFixture()
+        let file = try picked()
+        let address = try #require(await fixture.library.importImageLayer(into: fixture.slideID, of: fixture.projectID, assetIdentifier: "A/L0/001") {
+            .file(file)
+        })
+        var layer = try #require(fixture.library.layer(at: address))
+        if case .image(var picture) = layer.content {
+            picture.borderWidth = 0.04
+            picture.blur = 0.02
+            layer.content = .image(picture)
+        }
+        layer.placement = LayerPlacement(centerX: 0.3, centerY: 0.7, scale: 1.5, rotation: 0.2)
+        fixture.library.saveLayer(layer, in: fixture.slideID, of: fixture.projectID)
+        await fixture.library.flush()
+        let image = try #require(layer.image)
+        try FileManager.default.removeItem(at: paths.imageFile(named: image.fileName, in: fixture.projectID))
+        return MissingCopy(fixture: fixture, address: address, missing: layer)
+    }
+
+    @Test func restoresAMissingCopyKeepingTheLayersLook() async throws {
+        let copy = try await makeFixtureMissingACopy()
+        let library = copy.fixture.library
+
+        let photos = MockPhotoLibrary(assets: ["A/L0/001"])
+        let outcome = await library.restoreLayerImage(at: copy.address, missing: copy.missingID, from: photos, asking: false)
+        await library.flush()
+
+        let restored = try #require(library.layer(at: copy.address))
+        let picture = try #require(picture(at: copy.address, in: library))
+        #expect(outcome == .restored)
+        #expect(restored.image?.id != copy.missing.image?.id)
+        #expect(picture.image.assetIdentifier == "A/L0/001")
+        #expect(picture.image.fileFormat == .jpeg)
+        #expect(picture.borderWidth == 0.04 && picture.blur == 0.02)
+        #expect(restored.placement == copy.missing.placement)
+        #expect(copies(in: copy.fixture.projectID) == [picture.image.fileName])
+    }
+
+    /// A restore asked for by a view still showing the copy as missing, once it's been restored,
+    /// leaves the good copy be.
+    @Test func leavesACopyRestoredSince() async throws {
+        let copy = try await makeFixtureMissingACopy()
+        let library = copy.fixture.library
+        let photos = MockPhotoLibrary(assets: ["A/L0/001"])
+        #expect(await library.restoreLayerImage(at: copy.address, missing: copy.missingID, from: photos, asking: false) == .restored)
+        let restored = library.layer(at: copy.address)
+
+        #expect(await library.restoreLayerImage(at: copy.address, missing: copy.missingID, from: photos, asking: true) == .unavailable)
+        await library.flush()
+
+        #expect(library.layer(at: copy.address) == restored)
+        #expect(copies(in: copy.fixture.projectID).count == 1)
+    }
+
+    /// A cutout comes back from its original's own data, transparency and all.
+    @Test func restoresACutoutAsAPNG() async throws {
+        let copy = try await makeFixtureMissingACopy()
+        let library = copy.fixture.library
+        let photos = MockPhotoLibrary(assets: ["A/L0/001"], cutouts: ["A/L0/001"])
+
+        #expect(await library.restoreLayerImage(at: copy.address, missing: copy.missingID, from: photos, asking: false) == .restored)
+
+        #expect(picture(at: copy.address, in: library)?.image.fileFormat == .png)
+    }
+
+    /// A library whose original arrives only after `fetching` runs, as a slow download from
+    /// iCloud gives the user time to do something else.
+    private struct SlowLibrary: PhotoLibrarySource {
+        let fetching: @Sendable () async -> Void
+        var canReadWithoutAsking: Bool { true }
+
+        func requestReadAccess() async -> Bool {
+            true
+        }
+
+        func image(for assetIdentifier: String, maxPixelSize: Int) async -> UIImage? {
+            nil
+        }
+
+        func imageData(for assetIdentifier: String) async -> Data? {
+            await fetching()
+            return await MockPhotoLibrary(assets: [assetIdentifier]).imageData(for: assetIdentifier)
+        }
+    }
+
+    /// A layer deleted while its restore was out stays deleted, leaving no copy.
+    @Test func aRestoreLeavesADeletedLayerDeleted() async throws {
+        let copy = try await makeFixtureMissingACopy()
+        let library = copy.fixture.library
+        let address = copy.address
+        let photos = SlowLibrary {
+            await MainActor.run {
+                library.deleteLayer(at: address)
+            }
+        }
+
+        let outcome = await library.restoreLayerImage(at: address, missing: copy.missingID, from: photos, asking: true)
+        await library.flush()
+
+        #expect(outcome == .unavailable)
+        #expect(library.layer(at: address) == nil)
+        #expect(copies(in: copy.fixture.projectID).isEmpty)
+        #expect(library.failure == nil)
+    }
+
+    @Test func restoringALayerOnSightNeverAsksForAccess() async throws {
+        let copy = try await makeFixtureMissingACopy()
+        let library = copy.fixture.library
+        let photos = MockPhotoLibrary(canReadWithoutAsking: false, assets: ["A/L0/001"])
+
+        #expect(await library.restoreLayerImage(at: copy.address, missing: copy.missingID, from: photos, asking: false) == .needsAccess)
+        #expect(library.layer(at: copy.address) == copy.missing)
+        #expect(library.failure == nil)
+    }
+
+    @Test func reportsALayersGoneOriginalOnlyWhenAsked() async throws {
+        let copy = try await makeFixtureMissingACopy()
+        let library = copy.fixture.library
+
+        #expect(await library.restoreLayerImage(at: copy.address, missing: copy.missingID, from: MockPhotoLibrary(), asking: false) == .unavailable)
+        #expect(library.failure == nil)
+        #expect(await library.restoreLayerImage(at: copy.address, missing: copy.missingID, from: MockPhotoLibrary(), asking: true) == .unavailable)
+        #expect(library.failure?.kind == .restorePhoto)
+        #expect(library.layer(at: copy.address) == copy.missing)
+    }
+
     // MARK: The screen's import
 
     private func actions(
@@ -184,7 +325,9 @@ struct ProjectLibraryLayerImagesTests {
             presenter: presenter,
             dynamicTypeSize: .large,
             select: { session.selection = $0 },
-            photoSelection: { nil }
+            photoSelection: { nil },
+            photoLibrary: MockPhotoLibrary(),
+            restoresQuietly: { _ in true }
         )
     }
 

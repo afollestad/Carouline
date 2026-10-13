@@ -17,6 +17,11 @@ struct ProjectLayerActions {
     let select: (LayerAddress?) -> Void
     /// The photo selected to frame, which a picture's import mustn't take the selection from.
     let photoSelection: () -> CellAddress?
+    /// Where missing pictures are restored from.
+    let photoLibrary: any PhotoLibrarySource
+    /// Whether a missing picture, by its copy's ID, is yet to be restored quietly, noting that it
+    /// now has been, so one whose original is gone isn't tried on every redraw.
+    let restoresQuietly: (UUID) -> Bool
 
     var actions: LayerActions {
         LayerActions(
@@ -44,6 +49,19 @@ struct ProjectLayerActions {
             importImage: { slideID, assetIdentifier, source in
                 Task {
                     await importImage(into: slideID, assetIdentifier: assetIdentifier, from: source)
+                }
+            },
+            restoreImage: { address, imageID in
+                Task {
+                    await library.restoreLayerImage(at: address, missing: imageID, from: photoLibrary, asking: true)
+                }
+            },
+            restoreImageQuietly: { address, imageID in
+                guard restoresQuietly(imageID) else {
+                    return
+                }
+                Task {
+                    await library.restoreLayerImage(at: address, missing: imageID, from: photoLibrary, asking: false)
                 }
             },
             isShowingSheet: { slideID in

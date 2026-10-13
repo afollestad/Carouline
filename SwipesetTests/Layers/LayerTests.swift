@@ -97,4 +97,19 @@ struct LayerTests {
         #expect(TextLayer(text: " \n ").isBlank)
         #expect(!TextLayer(text: " a ").isBlank)
     }
+
+    /// An editor changes text whole, and a picture's look but never which picture it is, which a
+    /// restore made meanwhile may have changed.
+    @Test func editsContentKeepingThePicture() {
+        let text = LayerContent.text(TextLayer(text: "Lisbon"))
+        let edited = LayerContent.text(TextLayer(text: "Porto"))
+        #expect(text.editing(edited) == edited)
+
+        let restored = PlacedImage(assetIdentifier: "A", pixelWidth: 10, pixelHeight: 10)
+        let shown = LayerContent.image(ImageLayer(image: restored))
+        let missing = PlacedImage(assetIdentifier: "A", pixelWidth: 10, pixelHeight: 10)
+        let draft = LayerContent.image(ImageLayer(image: missing, borderWidth: 0.04, blur: 0.02))
+        #expect(shown.editing(draft) == .image(ImageLayer(image: restored, borderWidth: 0.04, blur: 0.02)))
+        #expect(shown.editing(edited) == nil)
+    }
 }
