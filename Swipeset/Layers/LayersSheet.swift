@@ -110,12 +110,14 @@ struct LayersSheet: View {
             session.typingLayerID = nil
             session.keyboardRoom = 0
             session.saveDraft(to: library, projectID: projectID)
+            session.endSlideBlur(to: library, projectID: projectID)
             onGone()
         }
-        // Typing survives the app being closed from the background.
+        // Typing and a slide's blur survive the app being closed from the background.
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 session.saveDraft(to: library, projectID: projectID, endingEdit: false)
+                session.endSlideBlur(to: library, projectID: projectID)
             }
         }
     }

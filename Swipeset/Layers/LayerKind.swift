@@ -34,7 +34,7 @@ enum LayerKind: CaseIterable, Hashable {
     var editHint: String {
         switch self {
         case .text: "Edits the layer's words, typeface and style"
-        case .image: "Edits the picture's border"
+        case .image: "Edits the picture's border and blur"
         }
     }
 

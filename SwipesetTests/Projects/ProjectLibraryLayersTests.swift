@@ -257,4 +257,28 @@ struct ProjectLibraryLayersTests {
 
         #expect(!copyExists(layer.image, in: projectID))
     }
+
+    /// A slide's blur is kept in range, and its slider's drag saves once, as it's let go, and
+    /// not at all when it's left where it was.
+    @Test func blursASlideOncePerDrag() async throws {
+        let store = CountingStore()
+        let library = ProjectLibrary(store: store, projects: [])
+        let projectID = library.createProject(aspectRatio: .portrait).id
+        let slideID = try #require(library.addSlide(.single, to: projectID))
+        await library.flush()
+        let saves = await store.saves
+        let session = LayerSession()
+
+        session.beginSlideBlur(0, on: slideID)
+        for step in 1...20 {
+            session.slideBlur = Double(step) / 100
+        }
+        session.endSlideBlur(to: library, projectID: projectID)
+        library.setBlur(Slide.maximumBlur, of: slideID, in: projectID)
+        await library.flush()
+
+        #expect(library.project(projectID)?.slides.first?.blur == Slide.maximumBlur)
+        #expect(await store.saves == saves + 1)
+        #expect(session.blurringSlideID == nil)
+    }
 }

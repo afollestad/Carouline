@@ -19,14 +19,32 @@ struct LayerRendererTests {
     }
 
     /// An exporter that draws every opaque picture solid red, and every transparent one red on
-    /// its right half and clear on its left, and that finds no copy for `missing`.
-    private func exporter(missing: Set<UUID> = []) -> SlideExporter {
+    /// its right half and clear on its left, but those in `drawn` as given, and that finds no
+    /// copy for `missing`.
+    private func exporter(missing: Set<UUID> = [], drawn: [UUID: CGImage] = [:]) -> SlideExporter {
         SlideExporter(paths: paths) { image, _, _ in
             guard !missing.contains(image.id) else {
                 return nil
             }
+            if let given = drawn[image.id] {
+                return given
+            }
             return image.fileFormat == .png ? Self.halfClear : Self.red
         }
+    }
+
+    /// Red on one side and blue on the other: its left and right halves, or its top and bottom.
+    private static func redAndBlue(width: Int = 400, height: Int = 400, stacked: Bool = false) throws -> CGImage {
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                             bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        // Core Graphics counts up from the bottom, so the top half is the upper one here.
+        let red = stacked ? CGRect(x: 0, y: height / 2, width: width, height: height / 2) : CGRect(x: 0, y: 0, width: width / 2, height: height)
+        context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(red)
+        return try #require(context.makeImage())
     }
 
     private static let red = solid(red: 1, green: 0, blue: 0)
@@ -53,14 +71,26 @@ struct LayerRendererTests {
         return context.makeImage()
     }()
 
-    private func picture(_ format: ImageFileFormat = .jpeg, border: Double = 0, placement: LayerPlacement = LayerPlacement()) -> Layer {
+    private func picture(
+        _ format: ImageFileFormat = .jpeg,
+        border: Double = 0,
+        blur: Double = 0,
+        placement: LayerPlacement = LayerPlacement()
+    ) -> Layer {
         let image = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400, fileFormat: format)
-        return Layer(content: .image(ImageLayer(image: image, borderWidth: border, borderColor: .black)), placement: placement)
+        return Layer(content: .image(ImageLayer(image: image, borderWidth: border, borderColor: .black, blur: blur)), placement: placement)
     }
 
-    /// The slides exported from a project of `slides`, decoded, on square 1080-pixel slides.
-    private func export(_ slides: [Slide], missing: Set<UUID> = []) async throws -> (images: [CGImage], result: ExportResult) {
-        let result = try await exporter(missing: missing).export(Project(name: "Layers", aspectRatio: .square, slides: slides))
+    /// The slides exported from a project of `slides` in `style`, decoded, on square 1080-pixel
+    /// slides.
+    private func export(
+        _ slides: [Slide],
+        style: SlideStyle = .standard,
+        missing: Set<UUID> = [],
+        drawn: [UUID: CGImage] = [:]
+    ) async throws -> (images: [CGImage], result: ExportResult) {
+        let project = Project(name: "Layers", aspectRatio: .square, style: style, slides: slides)
+        let result = try await exporter(missing: missing, drawn: drawn).export(project)
         return (try result.files.map { try #require(TestImages.decode($0)) }, result)
     }
 
@@ -74,6 +104,10 @@ struct LayerRendererTests {
 
     private func isWhite(_ pixel: TestImages.Pixel) -> Bool {
         pixel.red > 240 && pixel.green > 240 && pixel.blue > 240
+    }
+
+    private func isBlue(_ pixel: TestImages.Pixel) -> Bool {
+        pixel.red < 30 && pixel.green < 30 && pixel.blue > 230
     }
 
     private func isBlack(_ pixel: TestImages.Pixel) -> Bool {
@@ -110,6 +144,67 @@ struct LayerRendererTests {
         #expect(isBlack(try pixel(image, 680, 243)))
         #expect(isWhite(try pixel(image, 400, 540)))
         #expect(isWhite(try pixel(image, 240, 540)))
+    }
+
+    /// A blurred slide softens its photos inside their cells, while their edges against the
+    /// slide's border stay sharp, as on screen.
+    @Test func blursACellInsideItsEdges() async throws {
+        let photo = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400)
+        let slide = Slide(layout: .single, cells: [Cell(image: photo)], blur: 0.02)
+        let style = SlideStyle(spacing: 0, border: 0.05, background: .white)
+        let image = try await export([slide], style: style, drawn: [photo.id: Self.redAndBlue()]).images[0]
+
+        // Red then blue, split at 540, inside a 54-pixel border.
+        let middle = try pixel(image, 540, 540)
+        #expect((60...200).contains(middle.red) && (60...200).contains(middle.blue))
+        #expect(isRed(try pixel(image, 56, 540)))
+        #expect(isWhite(try pixel(image, 51, 540)))
+    }
+
+    /// A blurred photo framed off its middle keeps its way up and its place.
+    @Test func blursAPhotoWhereItsFramed() async throws {
+        // A tall photo, red over blue, framed a little above its middle.
+        let photo = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 800, crop: ImageCrop(centerY: 0.4))
+        let slide = Slide(layout: .single, cells: [Cell(image: photo)], blur: 0.02)
+        let style = SlideStyle(spacing: 0, border: 0.05, background: .white)
+        let image = try await export([slide], style: style, drawn: [photo.id: Self.redAndBlue(height: 800, stacked: true)]).images[0]
+
+        // Drawn 972 by 1944 across a 972-pixel cell, so its middle falls 194 below the cell's, at 734.
+        #expect(isRed(try pixel(image, 540, 600)))
+        #expect(isBlue(try pixel(image, 540, 900)))
+    }
+
+    /// A blurred panorama's photo blurs as one, so its pieces meet without a seam.
+    @Test func blursAPanoramaAcrossItsCuts() async throws {
+        let photo = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400)
+        let slide = Slide(layout: .panorama, span: 2, cells: [Cell(image: photo)], blur: 0.02)
+        let style = SlideStyle(spacing: 0, border: 0, background: .white)
+        let images = try await export([slide], style: style, drawn: [photo.id: Self.redAndBlue()]).images
+
+        // Red then blue, split at the cut, which a sharp photo would meet at in full red and blue.
+        let left = try pixel(images[0], 1079, 540)
+        let right = try pixel(images[1], 0, 540)
+        #expect((60...200).contains(left.red) && (60...200).contains(right.blue))
+        #expect(abs(left.red - right.red) < 16 && abs(left.blue - right.blue) < 16)
+    }
+
+    /// An opaque picture's blur stays sharp at its edges and in its frame, as on screen.
+    @Test func blursAnOpaquePictureInItsFrame() async throws {
+        let image = try await export([Slide(layout: .single, layers: [picture(blur: 0.05)])]).images[0]
+
+        // A 540-pixel picture from 270 to 810.
+        #expect(isRed(try pixel(image, 273, 540)))
+        #expect(isWhite(try pixel(image, 266, 540)))
+    }
+
+    /// A transparent picture's blur spreads past its edges, as a soft-edged cutout's would.
+    @Test func spreadsATransparentPicturesBlur() async throws {
+        let image = try await export([Slide(layout: .single, layers: [picture(.png, blur: 0.05)])]).images[0]
+
+        // Red from 540 to the picture's edge at 810, and a 27-pixel blur past it.
+        let past = try pixel(image, 816, 540)
+        #expect(past.red > 240 && past.green < 200)
+        #expect(isWhite(try pixel(image, 1000, 540)))
     }
 
     /// A layer across a panorama's cut is split between the slides either side of it, each half

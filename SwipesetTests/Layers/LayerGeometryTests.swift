@@ -95,4 +95,12 @@ struct LayerGeometryTests {
     @Test func blankTextTakesNoRoom() {
         #expect(TextLayerLayout.make(for: TextLayer(text: "")).textSize == .zero)
     }
+
+    /// A blur is a share of the slide or picture, so it blurs alike on any screen and in the export.
+    @Test func scalesABlurWithWhatItBlurs() {
+        #expect(LayerGeometry.blurRadius(0.02, slideWidth: 1080) == 21.6)
+        #expect(LayerGeometry.blurRadius(0.02, slideWidth: 540) == 10.8)
+        let picture = ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 200), blur: 0.05)
+        #expect(LayerGeometry.blurRadius(of: picture, pictureSize: CGSize(width: 200, height: 100)) == 10)
+    }
 }

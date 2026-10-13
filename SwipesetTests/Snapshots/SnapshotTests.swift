@@ -236,6 +236,31 @@ extension ScreenSnapshotting {
         )
     }
 
+    /// A photo blurred into a backdrop under sharp text, kept out of `projects`.
+    var blurredProject: Project {
+        Project(
+            id: fixtureID(10),
+            name: "Backdrop",
+            aspectRatio: .portrait,
+            slides: [
+                Slide(
+                    id: fixtureID(96),
+                    layout: .single,
+                    cells: [photo(196, 2048, 2560)],
+                    layers: [
+                        Layer(
+                            id: fixtureID(197),
+                            content: .text(TextLayer(text: "Day one,\nby the river", font: .serif, color: .white, hasShadow: true)),
+                            placement: LayerPlacement(scale: 1.6)
+                        )
+                    ],
+                    blur: 0.03
+                )
+            ],
+            createdAt: created
+        )
+    }
+
     private var violet: RGBColor {
         RGBColor(red: 0.47, green: 0.34, blue: 0.91)
     }

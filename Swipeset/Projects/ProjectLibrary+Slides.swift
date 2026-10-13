@@ -82,6 +82,20 @@ extension ProjectLibrary {
         }
     }
 
+    /// Blurs slide `slideID`'s photos by `blur`, kept within `Slide.maximumBlur`, if it changed.
+    func setBlur(_ blur: Double, of slideID: UUID, in projectID: UUID) {
+        let blur = min(max(blur, 0), Slide.maximumBlur)
+        guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }), slide.blur != blur else {
+            return
+        }
+        update(projectID) { project in
+            guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
+                return
+            }
+            project.slides[index].blur = blur
+        }
+    }
+
     func setStyle(_ style: SlideStyle, of projectID: UUID) {
         guard let project = project(projectID), project.style != style else {
             return

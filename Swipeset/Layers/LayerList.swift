@@ -44,9 +44,17 @@ struct LayerList: View {
             // Its own section, so no drag can drop a layer beneath it.
             Section {
                 layoutRow
+                // A share of the most, which reads plainer than a share of the slide's width.
+                PercentSlider(title: "Blur", value: blur, maximum: 1, fractionLength: 0, showsTitle: true) {
+                    session.endSlideBlur(to: library, projectID: projectID)
+                }
             }
         }
         .layerPage("Layers", close: close)
+        // VoiceOver's adjustments never end a drag, so what they leave is saved as the list goes.
+        .onDisappear {
+            session.endSlideBlur(to: library, projectID: projectID)
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Layer", systemImage: "plus") {
@@ -58,6 +66,18 @@ struct LayerList: View {
 
     private var slide: Slide? {
         library.project(projectID)?.slides.first { $0.id == slideID }
+    }
+
+    /// The slide's blur, as a share of the most, dragged live on the slide and saved once let go.
+    private var blur: Binding<Double> {
+        Binding {
+            (session.blurringSlideID == slideID ? session.slideBlur : slide?.blur ?? 0) / Slide.maximumBlur
+        } set: { share in
+            if session.blurringSlideID != slideID {
+                session.beginSlideBlur(slide?.blur ?? 0, on: slideID)
+            }
+            session.slideBlur = share * Slide.maximumBlur
+        }
     }
 
     private func address(of layerID: UUID) -> LayerAddress {
@@ -121,7 +141,13 @@ struct LayerList: View {
     private func detail(of layer: Layer) -> String {
         switch layer.content {
         case .text(let text): text.font.name
-        case .image(let picture): picture.borderWidth > 0 ? "Border" : "No border"
+        case .image(let picture):
+            switch (picture.borderWidth > 0, picture.blur > 0) {
+            case (true, true): "Border, blurred"
+            case (true, false): "Border"
+            case (false, true): "No border, blurred"
+            case (false, false): "No border"
+            }
         }
     }
 

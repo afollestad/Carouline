@@ -79,4 +79,9 @@ extension SnapshotTests {
     @Test func imageLayerEditor() async {
         await assertScreenSnapshot(of: layersSheet(layeredGridFirst, path: [.image(fixtureID(188))]))
     }
+
+    /// A blurred photo with sharp text over it.
+    @Test func blurredSlideUnderText() async {
+        await assertScreenSnapshot(of: projectScreen(blurredProject))
+    }
 }

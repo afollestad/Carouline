@@ -7,7 +7,7 @@ import SwiftUI
 
 /// A layer drawn small, as the layer list's rows show it: text as "Aa" in its typeface, in the
 /// primary color, which stays legible on the sheet's glass whatever the text's, or the picture
-/// with its border.
+/// with its border but not its blur, which would leave too little at this size to tell it by.
 struct LayerPreview: View {
     let layer: Layer
     let projectID: UUID
@@ -37,10 +37,20 @@ struct LayerPreview: View {
         case .image(let picture):
             let size = LayerGeometry.size(of: Layer(content: layer.content), slideWidth: 1)
             let fitted = Self.fitted(size, in: Self.side - 10)
-            LayerContentView(layer: layer, projectID: projectID, background: .white, size: fitted)
+            LayerContentView(layer: Self.unblurred(layer), projectID: projectID, background: .white, size: fitted)
                 .frame(width: fitted.width, height: fitted.height)
                 .id(picture.image.id)
         }
+    }
+
+    /// `layer` without its blur.
+    private static func unblurred(_ layer: Layer) -> Layer {
+        var layer = layer
+        if case .image(var picture) = layer.content {
+            picture.blur = 0
+            layer.content = .image(picture)
+        }
+        return layer
     }
 
     /// `size` scaled to fit a square of `side`.

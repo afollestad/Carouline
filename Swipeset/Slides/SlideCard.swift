@@ -31,21 +31,18 @@ struct SlideCard: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            SlideView(slide: slide, style: style, revealsEmptyCells: true) { index in
-                let address = CellAddress(projectID: projectID, slideID: slide.id, index: index)
-                CellView(
-                    cell: slide.cells[index],
-                    address: address,
-                    background: style.background,
-                    position: position(of: index),
-                    emptyCellCount: slide.emptyCellCount(skipping: importingIndexes),
-                    isImporting: importingCells.contains(address),
-                    actions: cellActions,
-                    session: session,
-                    isPanorama: slide.layout == .panorama,
-                    isAnythingSelected: isAnythingSelected
-                )
-            }
+            CardPhotos(
+                slide: slide,
+                projectID: projectID,
+                numbers: numbers,
+                style: style,
+                size: size,
+                importingCells: importingCells,
+                cellActions: cellActions,
+                session: session,
+                layerSession: layerSession,
+                isAnythingSelected: isAnythingSelected
+            )
             .frame(width: size.width, height: size.height)
             .overlay {
                 SlideLayers(
@@ -186,19 +183,6 @@ struct SlideCard: View {
     }
 
     /// Where cell `index` sits, for VoiceOver.
-    private func position(of index: Int) -> String {
-        if slide.layout == .panorama {
-            "panorama photo on slides \(numbers.lowerBound) to \(numbers.upperBound)"
-        } else {
-            "slide \(numbers.lowerBound), photo \(index + 1) of \(slide.cells.count)"
-        }
-    }
-
-    /// The cells with a photo on its way in, which a pick can't fill.
-    private var importingIndexes: Set<Int> {
-        Set(slide.cells.indices.filter { importingCells.contains(CellAddress(projectID: projectID, slideID: slide.id, index: $0)) })
-    }
-
     private var deletionMessage: String {
         let layers = slide.layers.count
         switch (slide.cells.compactMap(\.image).count, layers) {
@@ -215,6 +199,55 @@ struct SlideCard: View {
             default: "\(photoNote) Its \(layers) layers are deleted too."
             }
         }
+    }
+}
+
+/// A slide's cells, each with its photo or the way to add one. The only part of the card that
+/// reads a blur the layers sheet's slider is dragging, so each step redraws the photos alone.
+private struct CardPhotos: View {
+    let slide: Slide
+    let projectID: UUID
+    let numbers: ClosedRange<Int>
+    let style: SlideStyle
+    let size: CGSize
+    let importingCells: Set<CellAddress>
+    let cellActions: CellActions
+    let session: CropSession
+    let layerSession: LayerSession
+    let isAnythingSelected: Bool
+
+    var body: some View {
+        let shownBlur = layerSession.blurringSlideID == slide.id ? layerSession.slideBlur : slide.blur
+        let blur = LayerGeometry.blurRadius(shownBlur, slideWidth: size.width / CGFloat(max(1, slide.span)))
+        SlideView(slide: slide, style: style, revealsEmptyCells: true) { index in
+            let address = CellAddress(projectID: projectID, slideID: slide.id, index: index)
+            CellView(
+                cell: slide.cells[index],
+                address: address,
+                background: style.background,
+                position: position(of: index),
+                emptyCellCount: slide.emptyCellCount(skipping: importingIndexes),
+                isImporting: importingCells.contains(address),
+                actions: cellActions,
+                session: session,
+                isPanorama: slide.layout == .panorama,
+                isAnythingSelected: isAnythingSelected,
+                blur: blur
+            )
+        }
+    }
+
+    private func position(of index: Int) -> String {
+        if slide.layout == .panorama {
+            "panorama photo on slides \(numbers.lowerBound) to \(numbers.upperBound)"
+        } else {
+            "slide \(numbers.lowerBound), photo \(index + 1) of \(slide.cells.count)"
+        }
+    }
+
+    /// The cells with a photo on its way in, which a pick can't fill.
+    private var importingIndexes: Set<Int> {
+        Set(slide.cells.indices.filter { importingCells.contains(CellAddress(projectID: projectID, slideID: slide.id, index: $0)) })
     }
 }
 

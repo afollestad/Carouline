@@ -3,6 +3,7 @@
 //  Swipeset
 //
 
+import CoreImage
 import UIKit
 
 /// Draws a slide as images for export, laid out by the same geometry as the screen.
@@ -48,11 +49,9 @@ nonisolated enum SlideRenderer {
                     style.background.uiColor.setFill()
                     context.fill(CGRect(origin: .zero, size: size))
                     context.cgContext.translateBy(x: -CGFloat(index) * size.width, y: 0)
+                    let shown = CGRect(origin: CGPoint(x: CGFloat(index) * size.width, y: 0), size: size)
                     for photo in photos {
-                        context.cgContext.saveGState()
-                        context.cgContext.clip(to: photo.cell)
-                        UIImage(cgImage: photo.image).draw(in: photo.frame)
-                        context.cgContext.restoreGState()
+                        draw(photo, on: shown, canvas: canvas, in: context.cgContext)
                     }
                     for layer in slide.layers {
                         LayerRenderer.draw(layer, picture: pictures[layer.id], in: context.cgContext, canvas: canvas, span: slide.span)
@@ -64,6 +63,37 @@ nonisolated enum SlideRenderer {
         return missing
     }
 
+    /// Draws `photo` clipped to its cell, blurred when its slide is. A blurred one is scaled to
+    /// the canvas by Core Image and only its pixels on `shown`, the canvas's piece being drawn,
+    /// are rendered, so a panorama's photo never renders whole, and each piece takes its pixels
+    /// from the one blurred photo, so the pieces meet without a seam.
+    ///
+    /// A few pixels past the piece are rendered too, and fall outside it, since Core Image
+    /// scaling a part of an image holds its last few pixels at the part's edge.
+    private static func draw(_ photo: DrawnPhoto, on shown: CGRect, canvas: CGSize, in context: CGContext) {
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.clip(to: photo.cell)
+        guard let blurred = photo.blurred else {
+            UIImage(cgImage: photo.image).draw(in: photo.frame)
+            return
+        }
+        let visible = photo.frame.intersection(photo.cell).intersection(shown).integral
+        guard !visible.isEmpty else {
+            return
+        }
+        // Core Image measures up from the bottom, so the canvas is flipped for it.
+        let placed = blurred.transformed(by: CGAffineTransform(
+            translationX: photo.frame.minX,
+            y: canvas.height - photo.frame.maxY
+        ).scaledBy(x: photo.frame.width / CGFloat(photo.image.width), y: photo.frame.height / CGFloat(photo.image.height)))
+        let drawn = visible.insetBy(dx: -Self.renderMargin, dy: -Self.renderMargin)
+        let flipped = CGRect(x: drawn.minX, y: canvas.height - drawn.maxY, width: drawn.width, height: drawn.height)
+        if let rendered = LayerImageEffects.render(placed, from: flipped) {
+            UIImage(cgImage: rendered).draw(in: drawn)
+        }
+    }
+
     /// Each cell's photo decoded at the size its crop draws it, counting those missing.
     private static func decodedPhotos(
         of slide: Slide,
@@ -73,6 +103,7 @@ nonisolated enum SlideRenderer {
         image: (PlacedImage, CGSize) -> CGImage?
     ) -> [DrawnPhoto] {
         let cells = SlideGeometry.cellFrames(for: slide.layout, in: canvas, style: style, span: slide.span, pixelScale: 1)
+        let sigma = LayerGeometry.blurRadius(slide.blur, slideWidth: LayerGeometry.slideWidth(canvas: canvas, span: slide.span))
         return zip(slide.cells, cells).compactMap { cell, rect in
             guard let placed = cell.image else {
                 return nil
@@ -82,7 +113,9 @@ nonisolated enum SlideRenderer {
                 missing += 1
                 return nil
             }
-            return DrawnPhoto(image: decoded, frame: frame.offsetBy(dx: rect.minX, dy: rect.minY), cell: rect)
+            // In the decode's own pixels, which can be fewer than it's drawn across.
+            let blurred = sigma > 0 ? LayerImageEffects.blurredInPlace(decoded, sigma: sigma * CGFloat(decoded.width) / frame.width) : nil
+            return DrawnPhoto(image: decoded, blurred: blurred, frame: frame.offsetBy(dx: rect.minX, dy: rect.minY), cell: rect)
         }
     }
 
@@ -110,9 +143,16 @@ nonisolated enum SlideRenderer {
         return pictures
     }
 
-    /// A decoded photo, where it draws on the canvas, and the cell it's clipped to.
+    /// Past the three pixels Core Image holds at the edge of a part of an image it scales,
+    /// counted in the pixels it renders, as measured at a photo drawn 5.4 times its decode.
+    private static let renderMargin: CGFloat = 8
+
+    /// A decoded photo, blurred when its slide is, where it draws on the canvas, and the cell
+    /// it's clipped to.
     private struct DrawnPhoto {
         let image: CGImage
+        /// The photo blurred, as a recipe each piece renders only its own part of.
+        let blurred: CIImage?
         let frame: CGRect
         let cell: CGRect
     }

@@ -7,8 +7,13 @@ import CoreImage
 import UIKit
 
 /// The outline a transparent picture's border traces, rendered by Core Image for the screen and
-/// the export alike, so the two match. The picture draws over it.
+/// the export alike, so the two match, with the picture drawn over it; and the export's blur,
+/// which blurs as SwiftUI's does on screen.
 nonisolated enum LayerImageEffects {
+    /// How far past its edges a transparent picture's blur reaches, in sigmas, beyond which the
+    /// Gaussian adds less than a level of an 8-bit color.
+    static let blurReach: CGFloat = 3
+
     /// The longest side the screen renders an outline from, sharp enough for a layer filling a
     /// phone's slide, while a render stays quick enough to follow the border's slider.
     static let screenSide = 1024
@@ -88,6 +93,28 @@ nonisolated enum LayerImageEffects {
             "inputBiasVector": CIVector(x: color.red, y: color.green, z: color.blue, w: 0)
         ])
         return context.createCGImage(outline, from: canvas, format: .RGBA8, colorSpace: sRGB)
+    }
+
+    /// `image` blurred by a Gaussian of `sigma` pixels as an opaque photo is: its edges carried
+    /// on past it for the blur, then cut back, so it stays sharp at its frame's edges, as
+    /// SwiftUI's opaque blur keeps it.
+    static func blurredInPlace(_ image: CGImage, sigma: CGFloat) -> CIImage {
+        let input = CIImage(cgImage: image)
+        return input.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: input.extent)
+    }
+
+    /// `image` blurred by a Gaussian of `sigma` pixels as a transparent picture is, spreading
+    /// past its edges by `blurReach` sigmas, which the result's canvas grows by on each side.
+    static func blurredOut(_ image: CGImage, sigma: CGFloat) -> CGImage? {
+        let input = CIImage(cgImage: image)
+        let canvas = input.extent.insetBy(dx: -blurReach * sigma, dy: -blurReach * sigma).integral
+        return render(input.applyingGaussianBlur(sigma: sigma), from: canvas)
+    }
+
+    /// `image`'s pixels in `rect`, measured up from its bottom, as Core Image measures, in 8-bit
+    /// sRGB.
+    static func render(_ image: CIImage, from rect: CGRect) -> CGImage? {
+        context.createCGImage(image, from: rect, format: .RGBA8, colorSpace: sRGB)
     }
 
     /// `image`'s outline for `picture`'s border, which is a share of the picture's longer side.

@@ -262,7 +262,7 @@ private struct ProjectThumbnail: View {
                     let canvas = CGSize(width: proxy.size.width * CGFloat(slide.span), height: proxy.size.height)
                     SlideView(slide: slide, style: project.style) { index in
                         if let image = slide.cells[index].image {
-                            CellPhoto(image: image, projectID: project.id)
+                            CellPhoto(image: image, projectID: project.id, blur: LayerGeometry.blurRadius(slide.blur, slideWidth: proxy.size.width))
                         } else {
                             PlaceholderCell(background: project.style.background)
                         }

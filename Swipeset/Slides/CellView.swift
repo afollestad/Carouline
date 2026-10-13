@@ -49,6 +49,8 @@ struct CellView: View {
     /// Whether a photo or a layer is selected anywhere on the strip, while which a long press is
     /// the start of a drag rather than a menu.
     var isAnythingSelected = false
+    /// The photo's blur, as a Gaussian's sigma in points.
+    var blur: CGFloat = 0
     @State private var size: CGSize = .zero
     @State private var isMissing = false
     @Environment(\.colorScheme) private var colorScheme
@@ -148,7 +150,7 @@ struct CellView: View {
         if isSelected, let liveCrop = session.liveCrop {
             shown.crop = liveCrop
         }
-        let photo = CellPhoto(image: shown, projectID: address.projectID, isMissing: $isMissing) {
+        let photo = CellPhoto(image: shown, projectID: address.projectID, blur: blur, isMissing: $isMissing) {
             MissingPhoto(menu: missingMenu(image))
                 .task {
                     actions.restorePhotoQuietly(address)

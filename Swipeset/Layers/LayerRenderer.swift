@@ -15,15 +15,37 @@ nonisolated enum LayerRenderer {
     static let shadowBlur: CGFloat = 0.16
     static let shadowOpacity: CGFloat = 0.55
 
-    /// A picture layer's picture decoded at the size it's drawn, with the outline its border
-    /// traces when it's transparent, made once however many of a panorama's pieces it crosses.
+    /// A picture layer's picture decoded at the size it's drawn, blurred when it is, with the
+    /// outline its border traces when it's transparent, made once however many of a panorama's
+    /// pieces it crosses.
     struct Picture {
         let image: CGImage
         let outline: CGImage?
+        /// How far a transparent picture's blur spreads past its edges, as a share of its size.
+        let spread: CGSize
 
-        init(_ image: CGImage, for picture: ImageLayer) {
-            self.image = image
-            outline = picture.image.fileFormat == .png ? LayerImageEffects.outline(of: image, for: picture) : nil
+        init(_ decoded: CGImage, for picture: ImageLayer) {
+            let isTransparent = picture.image.fileFormat == .png
+            // From the picture before its blur, so the outline stays crisp.
+            outline = isTransparent ? LayerImageEffects.outline(of: decoded, for: picture) : nil
+            let size = CGSize(width: decoded.width, height: decoded.height)
+            let sigma = LayerGeometry.blurRadius(of: picture, pictureSize: size)
+            if sigma > 0, isTransparent, let blurred = LayerImageEffects.blurredOut(decoded, sigma: sigma) {
+                image = blurred
+                spread = CGSize(
+                    width: CGFloat(blurred.width - decoded.width) / 2 / size.width,
+                    height: CGFloat(blurred.height - decoded.height) / 2 / size.height
+                )
+            } else if sigma > 0, let blurred = LayerImageEffects.render(
+                LayerImageEffects.blurredInPlace(decoded, sigma: sigma),
+                from: CGRect(origin: .zero, size: size)
+            ) {
+                image = blurred
+                spread = .zero
+            } else {
+                image = decoded
+                spread = .zero
+            }
         }
     }
 
@@ -128,6 +150,7 @@ nonisolated enum LayerRenderer {
                 UIImage(cgImage: outline).draw(in: box)
             }
         }
-        UIImage(cgImage: decoded.image).draw(in: box.insetBy(dx: border, dy: border))
+        let frame = box.insetBy(dx: border, dy: border)
+        UIImage(cgImage: decoded.image).draw(in: frame.insetBy(dx: -decoded.spread.width * frame.width, dy: -decoded.spread.height * frame.height))
     }
 }

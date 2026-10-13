@@ -6,7 +6,8 @@
 import SwiftUI
 
 /// A picture in its frame, inside its border: a ring of its border color around an opaque
-/// picture, and an outline tracing a transparent one's shape.
+/// picture, and an outline tracing a transparent one's shape. An opaque picture's blur stays in
+/// its frame, and a transparent one's spreads past its edges, as it does in the export.
 struct PictureLayerView: View {
     let picture: ImageLayer
     let projectID: UUID
@@ -16,10 +17,14 @@ struct PictureLayerView: View {
 
     var body: some View {
         let border = LayerGeometry.borderWidth(of: picture, inFrame: size)
-        CellPhoto(image: picture.image, projectID: projectID, isMissing: $isMissing) {
+        let pictureSize = CGSize(width: max(0, size.width - 2 * border), height: max(0, size.height - 2 * border))
+        let blur = LayerGeometry.blurRadius(of: picture, pictureSize: pictureSize)
+        let isTransparent = picture.image.fileFormat == .png
+        CellPhoto(image: picture.image, projectID: projectID, blur: isTransparent ? 0 : blur, isMissing: $isMissing) {
             MissingLayerPicture(background: background)
         }
-        .frame(width: max(0, size.width - 2 * border), height: max(0, size.height - 2 * border))
+        .frame(width: pictureSize.width, height: pictureSize.height)
+        .modifier(SpreadingBlur(radius: isTransparent && !isMissing ? blur : 0, size: pictureSize))
         .padding(border)
         .background {
             if picture.image.fileFormat == .jpeg {
@@ -93,6 +98,31 @@ private struct PictureOutline: View {
             outline = rendered
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// A transparent picture of `size`'s blur, spreading past its edges, rendered once, smaller,
+/// into a layer with room for the spread, rather than on every frame the strip scrolls.
+private struct SpreadingBlur: ViewModifier {
+    let radius: CGFloat
+    let size: CGSize
+
+    func body(content: Content) -> some View {
+        if radius > 0 {
+            let shrink = ScreenBlur.shrink(for: radius)
+            let reach = LayerImageEffects.blurReach * radius / shrink
+            content
+                .scaleEffect(1 / shrink)
+                .frame(width: size.width / shrink, height: size.height / shrink)
+                .blur(radius: radius / shrink)
+                .padding(reach)
+                .drawingGroup()
+                .padding(-reach)
+                .scaleEffect(shrink)
+                .frame(width: size.width, height: size.height)
+        } else {
+            content
+        }
     }
 }
 

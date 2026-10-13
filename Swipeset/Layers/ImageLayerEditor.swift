@@ -6,8 +6,9 @@
 import SwiftUI
 
 /// The layers sheet's page for a picture layer: its border's width and color, which frame an
-/// opaque picture and outline a transparent one. It edits the session's draft, which the slide
-/// draws as it changes, and saves the draft as the width's slider is let go and once it closes.
+/// opaque picture and outline a transparent one, and its blur. It edits the session's draft,
+/// which the slide draws as it changes, and saves the draft as a slider is let go and once it
+/// closes.
 struct ImageLayerEditor: View {
     let layerID: UUID
     let library: ProjectLibrary
@@ -27,6 +28,12 @@ struct ImageLayerEditor: View {
                     session.saveDraft(to: library, projectID: projectID, endingEdit: false)
                 }
                 ColorSwatches(title: "Color", color: borderColor)
+            }
+            Section("Blur") {
+                // A share of the most, which reads plainer than a share of the picture's side.
+                PercentSlider(title: "Blur", value: blur, maximum: 1, fractionLength: 0) {
+                    session.saveDraft(to: library, projectID: projectID, endingEdit: false)
+                }
             }
         }
         .layerPage(LayerKind.image.name, close: close)
@@ -55,6 +62,16 @@ struct ImageLayerEditor: View {
             }
             picture[keyPath: keyPath] = value
             session.draft?.content = .image(picture)
+        }
+    }
+
+    /// The blur, as a share of the most.
+    private var blur: Binding<Double> {
+        let blur = binding(\.blur)
+        return Binding {
+            blur.wrappedValue / ImageLayer.maximumBlur
+        } set: { share in
+            blur.wrappedValue = share * ImageLayer.maximumBlur
         }
     }
 
