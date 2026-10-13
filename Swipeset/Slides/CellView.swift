@@ -48,10 +48,13 @@ struct CellView: View {
     var isPanorama = false
     @State private var size: CGSize = .zero
     @State private var isMissing = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
+            // In the screen's scheme, rather than the one the cell's glass takes below.
             PlaceholderCell(background: background)
+                .environment(\.colorScheme, colorScheme)
             if let image = cell.image {
                 photo(image)
             } else if !isImporting {
@@ -88,9 +91,15 @@ struct CellView: View {
                 session.cellSize = size
             }
         }
-        // Glass over the slide takes its scheme from the slide's background rather than the
-        // system's, or a dark-mode button on a white slide turns pale gray under a white symbol.
-        .environment(\.colorScheme, background.isLight ? .light : .dark)
+        // Glass takes its scheme from what it sits on rather than the system's, or a dark-mode
+        // button on a white slide turns pale gray under a white symbol.
+        .environment(\.colorScheme, isOnLight ? .light : .dark)
+    }
+
+    /// Whether the cell's glass sits on something light: the placeholder, while no photo covers
+    /// it, and otherwise the slide's background.
+    private var isOnLight: Bool {
+        cell.image == nil || isMissing ? PlaceholderCell.isLight(on: background, in: colorScheme) : background.isLight
     }
 
     private var isSelected: Bool {

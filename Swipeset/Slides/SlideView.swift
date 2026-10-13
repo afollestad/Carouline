@@ -30,14 +30,31 @@ extension SlideView where CellContent == PlaceholderCell {
     }
 }
 
-/// An empty cell's fill, dark on a light background and light on a dark one, so it shows on either.
+/// An empty cell's fill: dark gray in dark mode, so an empty slide doesn't glare on the dark
+/// screen, and otherwise dark on a light background and light on a dark one, so it shows on either.
 struct PlaceholderCell: View {
     let background: RGBColor
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Rectangle()
-            .fill(background.isLight ? Color.black.opacity(0.08) : Color.white.opacity(0.16))
+            .fill(fill)
             .accessibilityHidden(true)
+    }
+
+    private var fill: Color {
+        if colorScheme == .dark {
+            Color(.systemGray5)
+        } else if background.isLight {
+            Color.black.opacity(0.08)
+        } else {
+            Color.white.opacity(0.16)
+        }
+    }
+
+    /// Whether the fill on `background` reads as light in `colorScheme`, for glass over it to match.
+    static func isLight(on background: RGBColor, in colorScheme: ColorScheme) -> Bool {
+        colorScheme != .dark && background.isLight
     }
 }
 
