@@ -21,6 +21,8 @@ nonisolated struct ExportResult: Sendable {
     let emptyCells: Int
     /// Photos whose copies couldn't be read, which export as the background too.
     let missingPhotos: Int
+    /// Layers' images whose copies couldn't be read, which are left out.
+    let missingLayerImages: Int
 
     var files: [URL] {
         slides.map(\.file)
@@ -74,12 +76,12 @@ nonisolated struct SlideExporter: SlideExporting {
         let name = Self.fileName(for: project.name)
         let digits = max(2, String(project.carouselSlideCount).count)
         var slides: [ExportedSlide] = []
-        var missingPhotos = 0
+        var missing = SlideRenderer.MissingImages()
         for slide in project.slides {
             try Task.checkCancellation()
             // One slide's decodes at a time, rather than all of them at once.
             try autoreleasepool {
-                missingPhotos += try SlideRenderer.render(slide, style: project.style, size: project.aspectRatio.exportSize) { image, size in
+                let rendered = try SlideRenderer.render(slide, style: project.style, size: project.aspectRatio.exportSize) { image, size in
                     decode(image, project.id, size)
                 } piece: { image in
                     try Task.checkCancellation()
@@ -92,12 +94,19 @@ nonisolated struct SlideExporter: SlideExporting {
                     try data.write(to: file)
                     slides.append(ExportedSlide(file: file, thumbnail: Self.thumbnail(of: file)))
                 }
+                missing.photos += rendered.photos
+                missing.layerImages += rendered.layerImages
             }
         }
         let emptyCells = project.slides.reduce(0) { count, slide in
             count + slide.cells.count { $0.image == nil }
         }
-        return ExportResult(slides: slides, emptyCells: emptyCells, missingPhotos: missingPhotos)
+        return ExportResult(
+            slides: slides,
+            emptyCells: emptyCells,
+            missingPhotos: missing.photos,
+            missingLayerImages: missing.layerImages
+        )
     }
 
     /// The project's name, safe as a file name, so shared files read as the project's.

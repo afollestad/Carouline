@@ -99,12 +99,118 @@ extension ScreenSnapshotting {
     }
 
     /// `project`'s screen in its navigation stack, from a library holding just it, with
-    /// `selection` selected to frame.
-    func projectScreen(_ project: Project, selection: CellAddress? = nil) -> some View {
+    /// `selection` selected to frame, and `missing` images' copies missing.
+    func projectScreen(_ project: Project, selection: CellAddress? = nil, missing: Set<UUID>? = nil) -> some View {
         NavigationStack {
             ProjectScreen(library: library([project]), projectID: project.id, selection: selection)
         }
-        .environment(\.imageLoader, imageLoader)
+        .environment(\.imageLoader, missing.map { MockImageLoader(missing: $0) } ?? imageLoader)
+    }
+
+    /// A photo under a shadowed title and highlighted, turned text, and a grid under a framed,
+    /// turned photo and a sticker. Kept out of `projects`, so the project list's baselines don't
+    /// change with it.
+    var layeredProject: Project {
+        Project(
+            id: fixtureID(8),
+            name: "Layered",
+            aspectRatio: .portrait,
+            slides: [
+                Slide(
+                    id: fixtureID(81),
+                    layout: .single,
+                    cells: [photo(181, 2048, 2730)],
+                    layers: [
+                        Layer(
+                            id: fixtureID(182),
+                            content: .text(TextLayer(text: "Lisbon", font: .serif, hasShadow: true)),
+                            placement: LayerPlacement(centerY: 0.14, scale: 1.4)
+                        ),
+                        Layer(
+                            id: fixtureID(183),
+                            content: .text(TextLayer(
+                                text: "Day one,\nby the river",
+                                font: .rounded,
+                                color: violet,
+                                alignment: .leading,
+                                isHighlighted: true
+                            )),
+                            placement: LayerPlacement(centerX: 0.36, centerY: 0.84, scale: 0.8, rotation: -0.06)
+                        )
+                    ]
+                ),
+                Slide(
+                    id: fixtureID(84),
+                    layout: .grid,
+                    cells: [photo(185, 2048, 1536), photo(186, 1536, 2048), Cell(), photo(187, 2048, 2048)],
+                    layers: [
+                        Layer(
+                            id: fixtureID(188),
+                            content: .image(ImageLayer(
+                                image: PlacedImage(id: fixtureID(189), assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536),
+                                borderWidth: 0.04
+                            )),
+                            placement: LayerPlacement(centerY: 0.42, scale: 1.2, rotation: 0.08)
+                        ),
+                        Layer(
+                            id: fixtureID(190),
+                            content: .image(ImageLayer(
+                                image: PlacedImage(id: layeredStickerID, assetIdentifier: nil, pixelWidth: 600, pixelHeight: 600, fileFormat: .png)
+                            )),
+                            placement: LayerPlacement(centerX: 0.75, centerY: 0.76, scale: 0.6)
+                        )
+                    ]
+                )
+            ],
+            createdAt: created
+        )
+    }
+
+    /// `layeredProject` with its grid first.
+    var layeredGridFirst: Project {
+        var project = layeredProject
+        project.slides.reverse()
+        return project
+    }
+
+    /// The sticker on `layeredProject`'s grid, which some snapshots leave without a copy.
+    var layeredStickerID: UUID {
+        fixtureID(191)
+    }
+
+    /// A wide photo cut across three slides, with highlighted text across its first cut, which
+    /// the carousel splits between two slides, and a title within its middle slide.
+    var layeredPanorama: Project {
+        Project(
+            id: fixtureID(9),
+            name: "Ridgeline",
+            aspectRatio: .portrait,
+            slides: [
+                Slide(
+                    id: fixtureID(92),
+                    layout: .panorama,
+                    span: 3,
+                    cells: [photo(193, 3072, 1024)],
+                    layers: [
+                        Layer(
+                            id: fixtureID(194),
+                            content: .text(TextLayer(text: "Swipe →", font: .rounded, color: violet, isHighlighted: true)),
+                            placement: LayerPlacement(centerX: 1, centerY: 0.8, scale: 2)
+                        ),
+                        Layer(
+                            id: fixtureID(195),
+                            content: .text(TextLayer(text: "Ridgeline", font: .futura, hasShadow: true)),
+                            placement: LayerPlacement(centerX: 1.5, centerY: 0.2, scale: 2)
+                        )
+                    ]
+                )
+            ],
+            createdAt: created
+        )
+    }
+
+    private var violet: RGBColor {
+        RGBColor(red: 0.47, green: 0.34, blue: 0.91)
     }
 
     /// Lisbon with its grid first, filled, empty and missing cells side by side.
@@ -121,15 +227,15 @@ extension ScreenSnapshotting {
         return project
     }
 
-    /// `project`'s export sheet, which renders the fixture photos as drawn, but for the missing one.
-    func exportSheet(_ project: Project) -> some View {
-        let missing = fixtureID(missingPhotoNumber)
+    /// `project`'s export sheet, which renders the fixture images as drawn, but for those
+    /// `missing`, by default the photo whose copy reads as missing.
+    func exportSheet(_ project: Project, missing: Set<UUID>? = nil) -> some View {
+        let missing = missing ?? [fixtureID(missingPhotoNumber)]
         let exporter = SlideExporter(paths: ProjectPaths(root: temporary.url, temporary: temporary.url)) { image, _, size in
-            guard image.id != missing else {
+            guard !missing.contains(image.id) else {
                 return nil
             }
-            let maxPixelSize = Int(max(size.width, size.height))
-            return SampleImages.image(for: image.id, width: image.pixelWidth, height: image.pixelHeight, maxPixelSize: maxPixelSize)
+            return SampleImages.image(for: image, maxPixelSize: Int(max(size.width, size.height)))
         }
         return ExportSheet(project: project, exporter: exporter)
             .environment(\.photoSaver, MockPhotoSaver())

@@ -20,7 +20,7 @@ final class DebugSettings {
 
     /// Swaps the real projects for `SampleProjects` in a store of their own.
     let usesSampleProjects: Bool
-    /// Leaves one sample photo's copy unwritten, so it shows as missing.
+    /// Leaves one sample photo's copy and the sample sticker's unwritten, so they show as missing.
     let missesSampleImage: Bool
     /// The project, by its place in the list, to open on launch.
     let openProjectIndex: Int?
@@ -29,7 +29,8 @@ final class DebugSettings {
     let sheet: Sheet?
 
     /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, leaving the real ones alone),
-    /// `-DebugMissingImages` (`YES` leaves a sample photo's copy out, so it shows as missing),
+    /// `-DebugMissingImages` (`YES` leaves a sample photo's copy and the sample sticker's out, so
+    /// they show as missing),
     /// `-DebugOpenProject` (a project's index in the list, from 0), `-DebugSelectCell` (a photo
     /// to frame in it, as slide and cell indexes like `2,0`) and `-DebugSheet` (`newProject` on
     /// the list, or `layout` or `export` in the open project) from `arguments`, ignoring

@@ -259,6 +259,7 @@ private struct ProjectThumbnail: View {
         Group {
             if let slide = project.slides.first {
                 GeometryReader { proxy in
+                    let canvas = CGSize(width: proxy.size.width * CGFloat(slide.span), height: proxy.size.height)
                     SlideView(slide: slide, style: project.style) { index in
                         if let image = slide.cells[index].image {
                             CellPhoto(image: image, projectID: project.id)
@@ -266,7 +267,16 @@ private struct ProjectThumbnail: View {
                             PlaceholderCell(background: project.style.background)
                         }
                     }
-                    .frame(width: proxy.size.width * CGFloat(slide.span), height: proxy.size.height)
+                    .frame(width: canvas.width, height: canvas.height)
+                    .overlay {
+                        SlideLayers(
+                            layers: slide.layers,
+                            projectID: project.id,
+                            span: slide.span,
+                            background: project.style.background,
+                            size: canvas
+                        )
+                    }
                 }
                 .clipped()
                 .overlay {

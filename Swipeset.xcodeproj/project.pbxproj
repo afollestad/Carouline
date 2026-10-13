@@ -31,6 +31,8 @@
 			membershipExceptions = (
 				Debug/AGENTS.md,
 				Debug/CLAUDE.md,
+				Layers/AGENTS.md,
+				Layers/CLAUDE.md,
 				Storage/AGENTS.md,
 				Storage/CLAUDE.md,
 			);

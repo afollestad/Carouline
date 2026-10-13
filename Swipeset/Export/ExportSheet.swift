@@ -161,6 +161,11 @@ struct ExportSheet: View {
                 ? "1 unavailable photo exports as the background."
                 : "\(result.missingPhotos) unavailable photos export as the background.")
         }
+        if result.missingLayerImages > 0 {
+            notes.append(result.missingLayerImages == 1
+                ? "1 unavailable layer image is left out."
+                : "\(result.missingLayerImages) unavailable layer images are left out.")
+        }
         if result.slides.count > carouselLimit {
             notes.append("Instagram takes up to \(carouselLimit) slides in a post.")
         }
@@ -220,12 +225,7 @@ struct ExportSheet: View {
                 exporter: SlideExporter(
                     paths: ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)
                 ) { image, _, size in
-                    SampleImages.image(
-                        for: image.id,
-                        width: image.pixelWidth,
-                        height: image.pixelHeight,
-                        maxPixelSize: Int(max(size.width, size.height))
-                    )
+                    SampleImages.image(for: image, maxPixelSize: Int(max(size.width, size.height)))
                 }
             )
             .environment(\.photoSaver, MockPhotoSaver())

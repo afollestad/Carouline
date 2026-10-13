@@ -43,6 +43,10 @@ struct SlideCard: View {
             }
             .frame(width: size.width, height: size.height)
             .overlay {
+                SlideLayers(layers: slide.layers, projectID: projectID, span: slide.span, background: style.background, size: size)
+            }
+            // Over the layers, so a cut still shows across one that crosses it.
+            .overlay {
                 if slide.span > 1 {
                     PanoramaSeams(span: slide.span)
                 }

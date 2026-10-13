@@ -91,7 +91,10 @@ nonisolated struct MockImageLoader: ImageLoading {
         guard !missing.contains(request.imageID) else {
             return nil
         }
-        return SampleImages.image(for: request.imageID, width: request.pixelWidth, height: request.pixelHeight, maxPixelSize: 512)
+        return switch request.fileFormat {
+        case .png: SampleImages.sticker(for: request.imageID, width: request.pixelWidth, height: request.pixelHeight, maxPixelSize: 512)
+        case .jpeg: SampleImages.image(for: request.imageID, width: request.pixelWidth, height: request.pixelHeight, maxPixelSize: 512)
+        }
     }
 
     func image(_ request: ImageRequest) async -> CGImage? {
