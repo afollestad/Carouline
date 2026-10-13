@@ -55,6 +55,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Doc comments explain why a constant has its value, not what the code does.
 - Pad a horizontal scroll view's content rather than using `contentMargins`, which stop view-aligned scrolling from snapping and center `scrollPosition`'s anchor between the margins. To rest targets in the middle, snap with a `ScrollTargetBehavior` of their offsets, as `SlideStrip` does, since `.viewAligned` rests leading edges on the screen's whatever its anchor.
 - Count and number the carousel with `Project.carouselSlideCount` and `slideNumbers`, never `slides.count` or indexes, since a panorama is one slide that posts as several.
+- A custom `ScrollTargetBehavior` also receives `scrollPosition` scrolls, whose target is the item's own rect with an anchor rather than the visible region, so snap only targets without an anchor.
 - Default isolation is `MainActor`: mark models that cross actors `nonisolated`, and heavy `async` work `@concurrent`, since approachable concurrency runs a `nonisolated async` function on its caller's actor.
 - Unit tests cover the model and snapshots cover screens.
 - Write test files into a `TemporaryDirectory` held by the suite, which removes it after each test, since the simulator doesn't empty a test host's `tmp` between runs. Await any task that outlives the call under test, or it writes the directory back after removal.

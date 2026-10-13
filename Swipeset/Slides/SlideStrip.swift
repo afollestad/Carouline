@@ -134,6 +134,12 @@ private struct StripSnapping: ScrollTargetBehavior {
     let offsets: [CGFloat]
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        // A scroll to a `scrollPosition` targets the item's own rect, anchored to center it,
+        // which already rests it on one of the offsets. Snapping that rect as if it were the
+        // visible region would stop the scroll short.
+        guard target.anchor == nil else {
+            return
+        }
         let proposed = target.rect.minX
         if let nearest = offsets.min(by: { abs($0 - proposed) < abs($1 - proposed) }) {
             target.rect.origin.x = nearest

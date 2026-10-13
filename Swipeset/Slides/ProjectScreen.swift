@@ -364,20 +364,21 @@ struct ProjectScreen: View {
     }
 
     #if DEBUG
-    /// Selects `-DebugSelectCell`'s photo, and opens `-DebugSheet`'s sheet after a moment, since a
-    /// presentation on the first frame doesn't render.
+    /// Selects `-DebugSelectCell`'s photo and opens `-DebugSheet`'s sheet after a moment, since a
+    /// presentation on the first frame doesn't render, and the strip can't scroll to a photo's
+    /// slide before it has measured the slides.
     private func openDebugSheet() async {
+        guard debug?.selectedCell != nil || debug?.sheet == .layout || debug?.sheet == .export else {
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(500))
         let slides = library.project(projectID)?.slides ?? []
         if let (slide, cell) = debug?.selectedCell, slides.indices.contains(slide) {
             select(CellAddress(projectID: projectID, slideID: slides[slide].id, index: cell))
         }
-        guard debug?.sheet == .layout || debug?.sheet == .export else {
-            return
-        }
-        try? await Task.sleep(for: .milliseconds(500))
         if debug?.sheet == .export {
             isExporting = true
-        } else {
+        } else if debug?.sheet == .layout {
             layoutPurpose = .newSlide
         }
     }
