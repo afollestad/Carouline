@@ -44,6 +44,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Glass over a slide takes its color scheme from what it sits on, not the system's, so it stays legible on a white slide in dark mode: the slide's background, a missing photo's placeholder, or for an empty cell's glass, the screen behind the slide.
 - Cap the slide strip and the selection bars at `accessibility1`, since slides leave fixed room for their captions and buttons. Sheets and the projects list stay uncapped.
 - Give text in glass sheets and popovers `Color.primary`, not gray: on iPad the popovers float over the slides, and a bright photo through the glass washes gray text out.
+- Draw the accent solid in glass sheets and popovers, with white on it, and give their icon-only toolbar buttons `Color.primary`, as `SheetCloseItem` does. A faint tint of the accent, or an accent glyph, washes out on the glass.
 - Keep `AccentColor` the icon's violet. Hold the light variant to 4.5:1 against white, and the dark one to 4.5:1 against the dark system background and 3:1 under a prominent button's white label.
 - Hide decorative shapes from accessibility. Every control needs a label, and an icon-only button a hint when its action isn't obvious.
 
