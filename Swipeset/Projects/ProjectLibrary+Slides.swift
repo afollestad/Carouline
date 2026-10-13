@@ -34,7 +34,7 @@ extension ProjectLibrary {
         guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }) else {
             return
         }
-        update(projectID, deletingImages: slide.cells.compactMap(\.image)) { project in
+        update(projectID, deletingImages: slide.images) { project in
             project.slides.removeAll { $0.id == slideID }
         }
     }
@@ -42,7 +42,7 @@ extension ProjectLibrary {
     /// Gives slide `slideID` a new layout, carrying its photos over in order and deleting any
     /// the new layout has no cell for. A panorama spans as many slides as its photo fills, which
     /// shows all of it once its framing is reset, since a zoom set for one slide's shape crops
-    /// a panorama to a strip.
+    /// a panorama to a strip. Its layers and blur carry over, the layers kept on the new span.
     func changeLayout(of slideID: UUID, in projectID: UUID, to layout: SlideLayout) {
         guard let project = project(projectID),
               let slide = project.slides.first(where: { $0.id == slideID }),
@@ -56,7 +56,7 @@ extension ProjectLibrary {
             cells[0].image?.crop = ImageCrop()
             span = Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio)
         }
-        let changed = Slide(id: slideID, layout: layout, span: span, cells: cells)
+        let changed = Slide(id: slideID, layout: layout, span: span, cells: cells, layers: slide.layers, blur: slide.blur)
         update(projectID, deletingImages: dropped) { project in
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return
@@ -65,7 +65,8 @@ extension ProjectLibrary {
         }
     }
 
-    /// Spreads panorama `slideID` across `span` slides, kept within `Slide.panoramaSpans`.
+    /// Spreads panorama `slideID` across `span` slides, kept within `Slide.panoramaSpans`, with
+    /// its layers kept on it.
     func setSpan(_ span: Int, of slideID: UUID, in projectID: UUID) {
         let span = Slide.clampedPanoramaSpan(span)
         guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }),
@@ -77,7 +78,7 @@ extension ProjectLibrary {
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return
             }
-            project.slides[index].span = span
+            project.slides[index].setSpan(span)
         }
     }
 

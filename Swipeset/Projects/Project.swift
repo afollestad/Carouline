@@ -50,8 +50,9 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
-    /// Every image the project's cells hold, which are the only files its folder should keep.
+    /// Every image the project's cells and layers hold, which are the only files its folder
+    /// should keep.
     var images: [PlacedImage] {
-        slides.flatMap { $0.cells.compactMap(\.image) }
+        slides.flatMap(\.images)
     }
 }

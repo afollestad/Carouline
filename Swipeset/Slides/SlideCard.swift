@@ -134,10 +134,20 @@ struct SlideCard: View {
     }
 
     private var deletionMessage: String {
-        switch slide.cells.compactMap(\.image).count {
-        case 0: slide.layout == .panorama ? "This panorama has no photo yet." : "This slide has no photos yet."
-        case 1: "Its photo is removed from the project. The original stays in your photo library."
-        case let count: "Its \(count) photos are removed from the project. The originals stay in your photo library."
+        let layers = slide.layers.count
+        switch (slide.cells.compactMap(\.image).count, layers) {
+        case (0, 0): return slide.layout == .panorama ? "This panorama has no photo yet." : "This slide has no photos yet."
+        case (0, 1): return "Its layer is deleted."
+        case (0, _): return "Its \(layers) layers are deleted."
+        case (let photos, _):
+            let photoNote = photos == 1
+                ? "Its photo is removed from the project. The original stays in your photo library."
+                : "Its \(photos) photos are removed from the project. The originals stay in your photo library."
+            return switch layers {
+            case 0: photoNote
+            case 1: "\(photoNote) Its layer is deleted too."
+            default: "\(photoNote) Its \(layers) layers are deleted too."
+            }
         }
     }
 }

@@ -83,6 +83,28 @@ struct ProjectStoreTests {
         #expect(!exists(paths.imageFile(named: orphan, in: project.id)))
     }
 
+    /// A layer's picture is the project's too, PNG or not, so it outlives the launch sweep.
+    @Test func keepsLayersCopiesThroughTheSweep() async throws {
+        let store = ProjectStore(paths: paths)
+        let sticker = PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10, fileFormat: .png)
+        let project = Project(
+            name: "Layers",
+            aspectRatio: .portrait,
+            slides: [Slide(layout: .single, layers: [Layer(content: .image(ImageLayer(image: sticker)))])],
+            createdAt: Self.created
+        )
+        try await store.save(project)
+        _ = try await store.adoptImage(at: try writeImport(), as: sticker.fileName, in: project.id)
+        let orphan = "\(UUID().uuidString).png"
+        _ = try await store.adoptImage(at: try writeImport(), as: orphan, in: project.id)
+
+        let stored = await ProjectStore(paths: paths).loadAll()
+
+        #expect(stored.projects == [project])
+        #expect(exists(paths.imageFile(named: sticker.fileName, in: project.id)))
+        #expect(!exists(paths.imageFile(named: orphan, in: project.id)))
+    }
+
     @Test func sweepsCrashLeftoversAndTemporaryFiles() async throws {
         let leftover = paths.folder(for: UUID())
         try FileManager.default.createDirectory(at: leftover.appending(path: "Images"), withIntermediateDirectories: true)

@@ -172,7 +172,7 @@ extension ProjectLibrary {
                 return
             }
             if let image, cell.image == nil, project.slides[slideIndex].layout == .panorama {
-                project.slides[slideIndex].span = Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio)
+                project.slides[slideIndex].setSpan(Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio))
             }
             project.slides[slideIndex].cells[address.index].image = image
         }
