@@ -37,10 +37,8 @@ struct LayoutSheet: View {
             .navigationTitle(current == nil ? "New Slide" : "Change Layout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .close) {
-                        dismiss()
-                    }
+                SheetCloseItem {
+                    dismiss()
                 }
             }
             .confirmationDialog(

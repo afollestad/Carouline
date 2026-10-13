@@ -52,10 +52,8 @@ struct ExportSheet: View {
             .navigationTitle("Export")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .close) {
-                        dismiss()
-                    }
+                SheetCloseItem {
+                    dismiss()
                 }
             }
         }

@@ -30,10 +30,8 @@ struct AspectRatioSheet: View {
             .navigationTitle("New Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .close) {
-                        dismiss()
-                    }
+                SheetCloseItem {
+                    dismiss()
                 }
             }
         }
