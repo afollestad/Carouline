@@ -9,9 +9,21 @@ import SwiftUI
 struct ProjectsScreen: View {
     let library: ProjectLibrary
     let onNewProject: () -> Void
+    @State private var size: CGSize = .zero
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// Two cards a row fill an iPad in landscape without stretching a row's few words across it,
+    /// and leave each name room that a third would cut short.
+    private static let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
+    private static let unreadableNote = "Swipeset leaves these as they are until you delete them."
 
     var body: some View {
         content
+            .onGeometryChange(for: CGSize.self) { proxy in
+                proxy.size
+            } action: { size in
+                self.size = size
+            }
             .background {
                 GlowBackdrop()
             }
@@ -38,44 +50,118 @@ struct ProjectsScreen: View {
                 Button("New Project", action: onNewProject)
                     .buttonStyle(.glassProminent)
             }
+        } else if usesGrid {
+            grid
         } else {
-            List {
-                Section {
-                    ForEach(library.projects) { project in
-                        ProjectRow(project: project) { name in
-                            library.rename(project.id, to: name)
-                        } onDelete: {
-                            library.delete(project.id)
-                        }
+            list
+        }
+    }
+
+    /// Whether the projects sit in a grid, on a regular-width screen wider than it's tall, as an
+    /// iPad's in landscape. A narrow window and portrait keep the list, and its swipe to delete.
+    private var usesGrid: Bool {
+        horizontalSizeClass == .regular && size.width > size.height
+    }
+
+    private var list: some View {
+        List {
+            Section {
+                ForEach(library.projects) { project in
+                    projectRow(project, isCard: false)
                         .glassRow()
+                }
+            }
+            if !library.unreadable.isEmpty {
+                Section {
+                    ForEach(library.unreadable) { project in
+                        unreadableRow(project, isCard: false)
+                            .glassRow()
+                    }
+                    // A row rather than the section's footer, which a plain list draws on an
+                    // opaque band across the glow.
+                    Text(Self.unreadableNote)
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondary)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 32, bottom: 4, trailing: 32))
+                        .listRowSeparator(.hidden)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+    }
+
+    /// The list's cards two to a row, spaced as the list spaces its rows.
+    private var grid: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                LazyVGrid(columns: Self.gridColumns, spacing: 10) {
+                    ForEach(library.projects) { project in
+                        projectRow(project, isCard: true)
                     }
                 }
                 if !library.unreadable.isEmpty {
-                    Section {
-                        ForEach(library.unreadable) { project in
-                            UnreadableRow(project: project) {
-                                library.delete(project)
+                    VStack(alignment: .leading, spacing: 8) {
+                        LazyVGrid(columns: Self.gridColumns, spacing: 10) {
+                            ForEach(library.unreadable) { project in
+                                unreadableRow(project, isCard: true)
                             }
-                            .glassRow()
                         }
-                        // A row rather than the section's footer, which a plain list draws on an
-                        // opaque band across the glow.
-                        Text("Swipeset leaves these as they are until you delete them.")
+                        Text(Self.unreadableNote)
                             .font(.footnote)
                             .foregroundStyle(Color.secondary)
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 32, bottom: 4, trailing: 32))
-                            .listRowSeparator(.hidden)
+                            .padding(.horizontal, 16)
                     }
                 }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 5)
+        }
+        // The cards draw their own glass and colors, which a link's default style would tint.
+        .buttonStyle(.plain)
+    }
+
+    private func projectRow(_ project: Project, isCard: Bool) -> some View {
+        ProjectRow(project: project, isCard: isCard) { name in
+            library.rename(project.id, to: name)
+        } onDelete: {
+            library.delete(project.id)
+        }
+    }
+
+    private func unreadableRow(_ project: UnreadableProject, isCard: Bool) -> some View {
+        UnreadableRow(project: project, isCard: isCard) {
+            library.delete(project)
         }
     }
 }
 
 private extension View {
+    /// A row of the grid as a glass card on the glow, with the padding the list's rows have
+    /// inside their glass. An openable card is all a target, and its glass answers a press and
+    /// the pointer, as a link's should; another stays still.
+    @ViewBuilder
+    func glassCard(_ isCard: Bool, isOpenable: Bool) -> some View {
+        if isCard {
+            let card = padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect(cornerRadius: 24))
+                .contentShape([.contextMenuPreview, .hoverEffect], .rect(cornerRadius: 24))
+            if isOpenable {
+                card
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
+                    .hoverEffect(.highlight)
+            } else {
+                card
+                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
+            }
+        } else {
+            self
+        }
+    }
+
     /// A row as its own glass card on the glow, apart from the rows around it.
     func glassRow() -> some View {
         listRowBackground(
@@ -91,6 +177,8 @@ private extension View {
 
 private struct ProjectRow: View {
     let project: Project
+    /// Whether it's a card in the grid, which draws its own glass and chevron, and can't swipe.
+    let isCard: Bool
     let onRename: (String) -> Void
     let onDelete: () -> Void
     @State private var isRenaming = false
@@ -109,7 +197,15 @@ private struct ProjectRow: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.secondary)
                 }
+                if isCard {
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.forward")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.secondary)
+                        .accessibilityHidden(true)
+                }
             }
+            .glassCard(isCard, isOpenable: true)
         }
         .accessibilityLabel("\(project.name), \(project.spokenSummary)")
         // Without the destructive role, which would start removing the row before the confirmation.
@@ -126,6 +222,14 @@ private struct ProjectRow: View {
             }
         }
         .accessibilityAction(named: "Rename", startRenaming)
+        .accessibilityActions {
+            // The list's swipe action is VoiceOver's way to delete there.
+            if isCard {
+                Button("Delete") {
+                    isConfirmingDelete = true
+                }
+            }
+        }
         .alert("Rename Project", isPresented: $isRenaming) {
             TextField("Name", text: $draftName)
             Button("Cancel", role: .cancel) {}
@@ -183,6 +287,8 @@ private struct ProjectThumbnail: View {
 
 private struct UnreadableRow: View {
     let project: UnreadableProject
+    /// Whether it's a card in the grid, which draws its own glass and can't swipe.
+    let isCard: Bool
     let onDelete: () -> Void
     @State private var isConfirmingDelete = false
 
@@ -202,7 +308,16 @@ private struct UnreadableRow: View {
                     .foregroundStyle(Color.secondary)
             }
         }
+        .glassCard(isCard, isOpenable: false)
         .accessibilityElement(children: .combine)
+        .accessibilityActions {
+            // The list's swipe action is VoiceOver's way to delete there.
+            if isCard {
+                Button("Delete") {
+                    isConfirmingDelete = true
+                }
+            }
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button("Delete", systemImage: "trash") {
                 isConfirmingDelete = true
