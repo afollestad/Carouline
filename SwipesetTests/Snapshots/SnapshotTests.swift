@@ -280,8 +280,10 @@ extension ScreenSnapshotting {
     }
 
     /// `project`'s export sheet, which renders the fixture images as drawn, but for those
-    /// `missing`, by default the photo whose copy reads as missing.
-    func exportSheet(_ project: Project, missing: Set<UUID>? = nil) -> some View {
+    /// `missing`, by default the photo whose copy reads as missing. The export runs before the
+    /// sheet shows, since a slow machine like CI's takes longer to write it than a screen gets to
+    /// settle, and would snapshot the sheet still preparing.
+    func exportSheet(_ project: Project, missing: Set<UUID>? = nil) async throws -> some View {
         let missing = missing ?? [fixtureID(missingPhotoNumber)]
         let exporter = SlideExporter(paths: ProjectPaths(root: temporary.url, temporary: temporary.url)) { image, _, size in
             guard !missing.contains(image.id) else {
@@ -289,7 +291,8 @@ extension ScreenSnapshotting {
             }
             return SampleImages.image(for: image, maxPixelSize: Int(max(size.width, size.height)))
         }
-        return ExportSheet(project: project, exporter: exporter)
+        let result = try await exporter.export(project)
+        return ExportSheet(project: project, exporter: FinishedExport(result: result))
             .environment(\.photoSaver, MockPhotoSaver())
     }
 
@@ -320,5 +323,14 @@ extension ScreenSnapshotting {
 
     private var created: Date {
         Date(timeIntervalSince1970: 1_800_000_000)
+    }
+}
+
+/// An export already written, which the sheet shows on its first update.
+private struct FinishedExport: SlideExporting {
+    let result: ExportResult
+
+    func export(_ project: Project) async throws -> ExportResult {
+        result
     }
 }

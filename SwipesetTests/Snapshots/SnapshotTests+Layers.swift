@@ -31,10 +31,10 @@ extension SnapshotTests {
 
     /// The export draws layers as the screen does, splits the panorama's across its slides, and
     /// notes a layer image it couldn't read.
-    @Test func exportLayers() async {
+    @Test func exportLayers() async throws {
         var project = layeredProject
         project.slides += layeredPanorama.slides
-        await assertScreenSnapshot(of: exportSheet(project, missing: [layeredStickerID]))
+        try await assertScreenSnapshot(of: exportSheet(project, missing: [layeredStickerID]))
     }
 
     @Test func layeredProjectList() async {

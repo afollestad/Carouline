@@ -38,8 +38,8 @@ extension WideSnapshotTests {
         await assertScreenSnapshot(of: StyleSheet(style: .constant(styledProject.style)) {}, on: .wide)
     }
 
-    @Test func exportSlides() async {
-        await assertScreenSnapshot(of: exportSheet(projects[0]), on: .wide)
+    @Test func exportSlides() async throws {
+        try await assertScreenSnapshot(of: exportSheet(projects[0]), on: .wide)
     }
 
     @Test func newSlideSheet() async {

@@ -42,8 +42,8 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: StyleSheet(style: .constant(styledProject.style)) {})
     }
 
-    @Test func exportSlides() async {
-        await assertScreenSnapshot(of: exportSheet(projects[0]))
+    @Test func exportSlides() async throws {
+        try await assertScreenSnapshot(of: exportSheet(projects[0]))
     }
 
     @Test func newSlideSheet() async {
@@ -68,7 +68,7 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(landscapePanorama))
     }
 
-    @Test func exportPanorama() async {
-        await assertScreenSnapshot(of: exportSheet(panoramaProject))
+    @Test func exportPanorama() async throws {
+        try await assertScreenSnapshot(of: exportSheet(panoramaProject))
     }
 }
