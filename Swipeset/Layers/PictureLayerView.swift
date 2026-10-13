@@ -23,19 +23,23 @@ struct PictureLayerView: View {
         let blur = LayerGeometry.blurRadius(of: picture, pictureSize: pictureSize)
         let isTransparent = picture.image.fileFormat == .png
         CellPhoto(image: picture.image, projectID: projectID, blur: isTransparent ? 0 : blur, isMissing: $isMissing) { absence in
-            switch absence {
-            case .loading where !isTransparent:
+            // A transparent picture's shape isn't known until it loads, so it fades in from
+            // nothing rather than over a square. A missing copy's placeholder goes over the
+            // blur, below.
+            if absence == .loading, !isTransparent {
                 PlaceholderCell(background: background, isLoading: true)
-            case .loading:
-                // A transparent picture's shape isn't known until it loads, so it fades in from
-                // nothing rather than over a square.
-                EmptyView()
-            case .missing:
-                MissingLayerPicture(background: background)
             }
         }
         .frame(width: pictureSize.width, height: pictureSize.height)
-        .modifier(SpreadingBlur(radius: isTransparent && !isMissing ? blur : 0, size: pictureSize))
+        // Blurred whether or not its copy is missing, since dropping the blur would rebuild the
+        // photo, and with it the state that found its copy missing.
+        .modifier(SpreadingBlur(radius: isTransparent ? blur : 0, size: pictureSize))
+        .overlay {
+            // Over the blur rather than in it, whose drawing group can't draw the menu's glass.
+            if isMissing {
+                MissingLayerPicture(background: background)
+            }
+        }
         .padding(border)
         .background {
             if picture.image.fileFormat == .jpeg {

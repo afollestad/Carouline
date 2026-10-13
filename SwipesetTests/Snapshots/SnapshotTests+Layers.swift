@@ -29,6 +29,20 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(layeredGridFirst, missing: [layeredStickerID]))
     }
 
+    /// A blurred sticker's placeholder shows sharp over where its blur would be, with its menu.
+    @Test func missingBlurredLayerImage() async {
+        var project = layeredGridFirst
+        project.slides[0].layers = project.slides[0].layers.map { layer in
+            var layer = layer
+            if case .image(var picture) = layer.content, picture.image.id == layeredStickerID {
+                picture.blur = 0.03
+                layer.content = .image(picture)
+            }
+            return layer
+        }
+        await assertScreenSnapshot(of: projectScreen(project, missing: [layeredStickerID]))
+    }
+
     /// The export draws layers as the screen does, splits the panorama's across its slides, and
     /// notes a layer image it couldn't read.
     @Test func exportLayers() async throws {
