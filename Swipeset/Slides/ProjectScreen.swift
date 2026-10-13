@@ -12,7 +12,7 @@ struct ProjectScreen: View {
     let projectID: UUID
     /// What's open over the screen. Asks go through it, since one made while another is up
     /// never shows.
-    @State private var presenter = PresentationQueue<Presentation>()
+    @State private var presenter = PresentationQueue<ProjectPresentation>()
     @State private var stripPosition: StripItem?
     /// The cell the photo picker fills, and the slide's other empty cells when it picks several.
     /// Kept apart from `presenter`, which the picker clears as it closes, possibly before it
@@ -27,6 +27,8 @@ struct ProjectScreen: View {
     /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
     @State private var quietRestores: Set<UUID> = []
     @Environment(\.photoLibrary) private var photoLibrary
+    /// The text size outside the strip, which caps its own, for the layers sheet it presents.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     #if DEBUG
     @Environment(DebugSettings.self) private var debug: DebugSettings?
     #endif
@@ -183,7 +185,7 @@ struct ProjectScreen: View {
 
     /// Whether `shown` is open, as a presentation modifier reads and dismisses it. A dismissal
     /// closes `shown` only while it's still open, never one opened since.
-    private func isPresenting(_ shown: Presentation) -> Binding<Bool> {
+    private func isPresenting(_ shown: ProjectPresentation) -> Binding<Bool> {
         Binding {
             presenter.current == shown
         } set: { isPresented in
@@ -242,6 +244,7 @@ struct ProjectScreen: View {
             session: session,
             layerSession: layerSession,
             layerActions: layerActions,
+            layersSlideID: layersSlideID,
             onBackgroundTap: { select(nil) },
             onAddSlide: { presenter.present(.layout(.newSlide)) },
             onChangeLayout: { presenter.present(.layout(.change($0))) },
@@ -304,6 +307,9 @@ struct ProjectScreen: View {
     private func select(_ address: CellAddress?) {
         saveLiveCrop()
         saveLivePlacement()
+        if let address {
+            followSelection(on: address.slideID, to: nil)
+        }
         layerSession.selection = nil
         session.selection = address
         if let address {
@@ -318,6 +324,9 @@ struct ProjectScreen: View {
     private func selectLayer(_ address: LayerAddress?) {
         saveLiveCrop()
         saveLivePlacement()
+        if let address {
+            followSelection(on: address.slideID, to: address)
+        }
         session.selection = nil
         layerSession.selection = address
         if let address {
@@ -327,32 +336,42 @@ struct ProjectScreen: View {
         }
     }
 
+    /// Moves an open layer editor on to the layer at `address`, or back to the list for a photo or
+    /// a layer with no editor, saving the draft first, so edits never land on the wrong layer. A
+    /// selection on another slide than the sheet's leaves the editor be.
+    private func followSelection(on slideID: UUID, to address: LayerAddress?) {
+        guard slideID == layersSlideID, let draftLayerID = layerSession.draftLayerID, draftLayerID != address?.layerID,
+              !layerSession.sheetPath.isEmpty else {
+            return
+        }
+        layerSession.saveDraft(to: library, projectID: projectID)
+        let layer = address.flatMap { library.layer(at: $0) }
+        layerSession.sheetPath = layer.flatMap { LayerActions.canEdit($0) ? [.text($0.id)] : nil } ?? []
+    }
+
     /// Saves a placement the size slider left unsaved, as VoiceOver's adjustments do, since they
     /// never end an edit.
     private func saveLivePlacement() {
         if let selection = layerSession.selection, let livePlacement = layerSession.livePlacement {
-            library.setPlacement(livePlacement, at: selection)
+            layerSession.commitPlacement(livePlacement, at: selection, to: library)
         }
         layerSession.livePlacement = nil
     }
 
+    private var layersSlideID: UUID? {
+        if case .layers(let slideID) = presenter.current { slideID } else { nil }
+    }
+
     private var layerActions: LayerActions {
-        LayerActions(
-            select: { selectLayer($0) },
-            setPlacement: { placement, address in
-                library.setPlacement(placement, at: address)
-            },
-            move: { address, offset in
-                withAnimation {
-                    library.moveLayer(at: address, by: offset)
-                }
-            },
-            delete: { address in
-                withAnimation {
-                    library.deleteLayer(at: address)
-                }
-            }
+        ProjectLayerActions(
+            library: library,
+            projectID: projectID,
+            session: layerSession,
+            presenter: $presenter,
+            dynamicTypeSize: dynamicTypeSize,
+            select: selectLayer
         )
+        .actions
     }
 
     /// Saves a crop the zoom slider left unsaved, as VoiceOver's adjustments and `axe slider` do,
@@ -399,28 +418,14 @@ struct ProjectScreen: View {
     }
 
     private func layoutSheet(for purpose: LayoutPurpose, in project: Project) -> some View {
-        let slide: Slide? = switch purpose {
-        case .newSlide: nil
-        case .change(let slideID): project.slides.first { $0.id == slideID }
-        }
-        return LayoutSheet(aspectRatio: project.aspectRatio, current: slide?.layout) { layout in
-            slide.map { ProjectLibrary.photosLost(changing: $0, to: layout) } ?? 0
-        } onChoose: { layout in
-            if let slide {
-                library.changeLayout(of: slide.id, in: projectID, to: layout)
+        SlideLayoutSheet(library: library, project: project, purpose: purpose) { slideID, isFirst in
+            if isFirst {
+                // The strip appears with its first slide in the middle already, and a scroll as
+                // it appears would push the slides down until the next scroll.
+                stripPosition = nil
             } else {
-                let isFirst = library.project(projectID)?.slides.isEmpty ?? false
-                guard let slideID = library.addSlide(layout, to: projectID) else {
-                    return
-                }
-                if isFirst {
-                    // The strip appears with its first slide in the middle already, and a scroll
-                    // as it appears would push the slides down until the next scroll.
-                    stripPosition = nil
-                } else {
-                    withAnimation {
-                        stripPosition = .slide(slideID)
-                    }
+                withAnimation {
+                    stripPosition = .slide(slideID)
                 }
             }
         }
@@ -431,7 +436,7 @@ struct ProjectScreen: View {
     /// `-DebugSheet`'s sheet, after a moment, since a presentation on the first frame doesn't
     /// render, and the strip can't scroll to a slide before it has measured the slides.
     private func openDebugSheet() async {
-        guard debug?.selectedCell != nil || debug?.selectedLayer != nil || debug?.sheet == .layout || debug?.sheet == .export else {
+        guard debug?.selectedCell != nil || debug?.selectedLayer != nil || (debug?.sheet).map({ $0 != .newProject }) == true else {
             return
         }
         try? await Task.sleep(for: .milliseconds(500))
@@ -442,30 +447,17 @@ struct ProjectScreen: View {
         if let (slide, layer) = debug?.selectedLayer, slides.indices.contains(slide), slides[slide].layers.indices.contains(layer) {
             selectLayer(LayerAddress(projectID: projectID, slideID: slides[slide].id, layerID: slides[slide].layers[layer].id))
         }
-        if debug?.sheet == .export {
-            presenter.present(.export)
-        } else if debug?.sheet == .layout {
-            presenter.present(.layout(.newSlide))
+        let layerSlideID = layerSession.selection?.slideID ?? slides.first?.id
+        switch debug?.sheet {
+        case .export: presenter.present(.export)
+        case .layout: presenter.present(.layout(.newSlide))
+        case .layers: layerSlideID.map { layerActions.openSheet($0, []) }
+        case .addLayer: layerSlideID.map { layerActions.openSheet($0, [.add]) }
+        case .editLayer: layerSession.selection.map { layerActions.edit($0) }
+        case .newProject, nil: break
         }
     }
     #endif
-}
-
-/// What the layout sheet is choosing for.
-private enum LayoutPurpose: Hashable, Identifiable {
-    case newSlide
-    case change(UUID)
-
-    var id: Self { self }
-}
-
-/// What the project screen opens over itself.
-private enum Presentation: Hashable {
-    case layout(LayoutPurpose)
-    case photoPicker
-    case camera(CellAddress)
-    case style
-    case export
 }
 
 #Preview {

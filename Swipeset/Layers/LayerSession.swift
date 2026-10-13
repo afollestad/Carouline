@@ -22,6 +22,23 @@ final class LayerSession {
     }
     /// The placement being dragged, pinched, twisted or slid to, before it's saved.
     var livePlacement: LayerPlacement?
+    /// The layers sheet's pages past its list, which its navigation stack shows.
+    var sheetPath: [LayersPage] = []
+    /// The height the keyboard and the sheet over it cover while a text layer is typed, which the
+    /// strip makes room above on a phone, so the slide stays in view.
+    var keyboardRoom: CGFloat = 0
+    /// The layer whose text is being typed, which drops the sheet to just its field. An editor
+    /// clears only its own, since SwiftUI doesn't order one editor's going and the next's coming.
+    var typingLayerID: UUID?
+    /// The edits of the layer editor on screen: a layer's content, or a new text layer entire,
+    /// which its slide draws as they're made, and `saveDraft(to:projectID:)` saves once.
+    var draft: Layer?
+    /// `draft`'s layer and slide. They change only as editing starts and stops, so every slide
+    /// can read them while only the edited slide reads `draft`, which changes with each keystroke.
+    private(set) var draftLayerID: UUID?
+    private(set) var draftSlideID: UUID?
+    /// Whether `draft` is a layer the library doesn't have yet.
+    private(set) var isDraftNew = false
     /// What the layer being moved has snapped to.
     private(set) var snap: LayerSnap
     /// How many snaps have taken hold mid-gesture, for a haptic each. One the layer sat in when
@@ -78,6 +95,66 @@ final class LayerSession {
         livePlacement = snapped.placement
     }
 
+    /// Starts editing `layer` on slide `slideID`, unless it's already the draft. A new layer
+    /// isn't in the library until its draft is saved.
+    func beginDraft(of layer: Layer, on slideID: UUID, isNew: Bool = false) {
+        guard draftLayerID != layer.id else {
+            return
+        }
+        draft = layer
+        draftLayerID = layer.id
+        draftSlideID = slideID
+        isDraftNew = isNew
+    }
+
+    /// The draft, when it's the layer `layerID`, as its slide and the layer bar show it.
+    func draftLayer(_ layerID: UUID) -> Layer? {
+        draftLayerID == layerID ? draft : nil
+    }
+
+    /// Saves the draft to `library` and, when `endingEdit`, ends it. A new layer is added if its
+    /// slide is still there; an edited one keeps its current placement, picture and place in
+    /// the stack, taking just the draft's content, and is left alone if it's been deleted. Text
+    /// left blank deletes its layer, or leaves a new one unsaved. Saving without ending, as the
+    /// app leaves the screen, keeps editing what's now in the library, and saves no blank text,
+    /// which may only have been cleared to type afresh.
+    func saveDraft(to library: ProjectLibrary, projectID: UUID, endingEdit: Bool = true) {
+        defer {
+            if endingEdit {
+                draft = nil
+                draftLayerID = nil
+                draftSlideID = nil
+                isDraftNew = false
+            }
+        }
+        guard let draft, let slideID = draftSlideID else {
+            return
+        }
+        let isBlank = if case .text(let text) = draft.content { text.isBlank } else { false }
+        if isBlank, !endingEdit || isDraftNew {
+            return
+        }
+        let address = LayerAddress(projectID: projectID, slideID: slideID, layerID: draft.id)
+        if isDraftNew {
+            if library.saveLayer(draft, in: slideID, of: projectID) {
+                isDraftNew = false
+            }
+        } else if library.layer(at: address) != nil {
+            library.setContent(draft.content, at: address)
+        }
+    }
+
+    /// Saves a gesture's or the size slider's `placement` for the layer at `address`: into a new
+    /// layer's draft, since the library doesn't have it yet, or else the library.
+    func commitPlacement(_ placement: LayerPlacement, at address: LayerAddress, to library: ProjectLibrary) {
+        if isDraftNew, draftLayerID == address.layerID {
+            let span = library.project(address.projectID)?.slides.first { $0.id == address.slideID }?.span ?? 1
+            draft?.placement = placement.clamped(span: span)
+        } else {
+            library.setPlacement(placement, at: address)
+        }
+    }
+
     /// Ends the gesture, returning the placement it left for saving, unless another layer was
     /// selected while it ran.
     func endMoving() -> LayerPlacement? {
@@ -100,4 +177,12 @@ struct LayerGesture {
     var magnification: CGFloat?
     /// Radians clockwise.
     var rotation: Double?
+}
+
+/// A page of the layers sheet past its list.
+enum LayersPage: Hashable {
+    /// Picks the kind of layer to add.
+    case add
+    /// Edits a text layer.
+    case text(UUID)
 }

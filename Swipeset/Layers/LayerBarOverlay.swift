@@ -54,13 +54,15 @@ struct LayerBarOverlay: ViewModifier {
                 },
                 onDelete: { actions.delete(selection) },
                 onCommitSize: onCommitSize,
+                onEdit: LayerActions.canEdit(layer) ? { actions.edit(selection) } : nil,
                 onDone: onDone
             )
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 
-    /// The selected layer, its place in its slide's stack, and the stack's height.
+    /// The selected layer, its place in its slide's stack, and the stack's height. A new
+    /// layer's draft, which the library doesn't have yet, sits on top.
     private struct SelectedLayer {
         let layer: Layer
         let index: Int
@@ -69,10 +71,15 @@ struct LayerBarOverlay: ViewModifier {
 
     private var selectedLayer: SelectedLayer? {
         guard let selection = session.selection,
-              let slide = project.slides.first(where: { $0.id == selection.slideID }),
-              let index = slide.layers.firstIndex(where: { $0.id == selection.layerID }) else {
+              let slide = project.slides.first(where: { $0.id == selection.slideID }) else {
             return nil
         }
-        return SelectedLayer(layer: slide.layers[index], index: index, count: slide.layers.count)
+        if let index = slide.layers.firstIndex(where: { $0.id == selection.layerID }) {
+            return SelectedLayer(layer: slide.layers[index], index: index, count: slide.layers.count)
+        }
+        guard session.isDraftNew, let draft = session.draftLayer(selection.layerID) else {
+            return nil
+        }
+        return SelectedLayer(layer: draft, index: slide.layers.count, count: slide.layers.count + 1)
     }
 }

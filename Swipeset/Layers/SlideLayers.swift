@@ -13,8 +13,30 @@ struct LayerActions {
     /// Moves the layer up its slide's stack, or down for a negative offset.
     let move: (LayerAddress, Int) -> Void
     let delete: (LayerAddress) -> Void
+    /// Opens the layers sheet at the layer's editor, if its kind has one yet.
+    let edit: (LayerAddress) -> Void
+    /// Opens the layers sheet for a slide, at its list or past it at the pages given.
+    let openSheet: (UUID, [LayersPage]) -> Void
+    /// Whether a slide's layers sheet is open, which the slide presents it by.
+    let isShowingSheet: (UUID) -> Binding<Bool>
+    /// A slide's layers sheet.
+    let sheet: (UUID) -> LayersSheet?
 
-    static let preview = LayerActions(select: { _ in }, setPlacement: { _, _ in }, move: { _, _ in }, delete: { _ in })
+    /// Whether `layer` has an editor yet, which `edit` opens.
+    static func canEdit(_ layer: Layer) -> Bool {
+        LayerKind(of: layer) == .text
+    }
+
+    static let preview = LayerActions(
+        select: { _ in },
+        setPlacement: { _, _ in },
+        move: { _, _ in },
+        delete: { _ in },
+        edit: { _ in },
+        openSheet: { _, _ in },
+        isShowingSheet: { _ in .constant(false) },
+        sheet: { _ in nil }
+    )
 }
 
 /// How a slide's layers respond on the strip, which thumbnails leave out.
@@ -28,6 +50,8 @@ struct LayerInteraction {
     let isAnythingSelected: Bool
     /// Whether a photo is selected, which drags beneath the layers rather than them taking touches.
     let isPhotoSelected: Bool
+    /// Whether the session's draft is on this slide, which then draws it in place of its layer.
+    let isDrafting: Bool
 }
 
 /// A slide's layers over a canvas of `size` spanning `span` slides, each where the export draws
@@ -45,13 +69,10 @@ struct SlideLayers: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
-                let position = LayerPosition(index: index, count: layers.count)
-                if let interaction, interaction.selectedLayerID == layer.id {
-                    LiveLayer(layer: layer, position: position, slide: self, interaction: interaction)
-                } else {
-                    PlacedLayer(layer: layer, placement: layer.placement, position: position, slide: self, interaction: interaction)
-                }
+            if let interaction, interaction.isDrafting {
+                DraftedLayers(slide: self, interaction: interaction)
+            } else {
+                stack(layers)
             }
             if let interaction, interaction.selectedLayerID != nil {
                 SnapGuides(session: interaction.session, canvas: LayerCanvas(size: size, span: span))
@@ -60,6 +81,18 @@ struct SlideLayers: View {
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipped()
         .allowsHitTesting(interaction.map { !$0.isPhotoSelected } ?? false)
+    }
+
+    /// `layers`, bottom to top, the selected one at its live placement.
+    func stack(_ layers: [Layer]) -> some View {
+        ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
+            let position = LayerPosition(index: index, count: layers.count)
+            if let interaction, interaction.selectedLayerID == layer.id {
+                LiveLayer(layer: layer, position: position, slide: self, interaction: interaction)
+            } else {
+                PlacedLayer(layer: layer, placement: layer.placement, position: position, slide: self, interaction: interaction)
+            }
+        }
     }
 
     func address(of layer: Layer) -> LayerAddress {
@@ -74,6 +107,26 @@ private struct LayerPosition {
 
     var isTop: Bool { index == count - 1 }
     var isBottom: Bool { index == 0 }
+}
+
+/// The slide's layers with the session's draft in place of its layer, or on top as a new one.
+/// Only this view reads the draft, which changes with each keystroke, so typing redraws just the
+/// edited slide.
+private struct DraftedLayers: View {
+    let slide: SlideLayers
+    let interaction: LayerInteraction
+
+    var body: some View {
+        var layers = slide.layers
+        if let draft = interaction.session.draft {
+            if let index = layers.firstIndex(where: { $0.id == draft.id }) {
+                layers[index].content = draft.content
+            } else if interaction.session.isDraftNew {
+                layers.append(draft)
+            }
+        }
+        return slide.stack(layers)
+    }
 }
 
 /// The selected layer, at the placement a gesture is moving it to. Only this view reads the
@@ -113,7 +166,8 @@ private struct PlacedLayer: View {
         let isSelected = interaction?.selectedLayerID == layer.id
         let content = LayerContentView(layer: layer, projectID: slide.projectID, background: slide.background, size: frame.size)
             .overlay {
-                if isSelected {
+                // Not around new text with nothing typed yet, which takes no room.
+                if isSelected, !frame.isEmpty {
                     // Outside the layer, so it never reads as a picture's border.
                     Rectangle()
                         .stroke(.tint, lineWidth: 2)
@@ -131,6 +185,8 @@ private struct PlacedLayer: View {
             .onTapGesture {
                 if !isSelected {
                     interaction?.actions.select(slide.address(of: layer))
+                } else if LayerActions.canEdit(layer) {
+                    interaction?.actions.edit(slide.address(of: layer))
                 }
             }
             // No menu while anything's selected, where a long press is the start of a drag, and
@@ -145,6 +201,14 @@ private struct PlacedLayer: View {
     @ViewBuilder
     private func menu(_ actions: LayerActions) -> some View {
         let address = slide.address(of: layer)
+        if LayerActions.canEdit(layer) {
+            Button("Edit…", systemImage: "pencil") {
+                // Selected too, as a row's tap does, so its slide comes to the middle and its
+                // outline shows what the editor edits.
+                actions.select(address)
+                actions.edit(address)
+            }
+        }
         Button("Bring Forward", systemImage: "square.2.layers.3d.top.filled") {
             actions.move(address, 1)
         }
@@ -271,7 +335,8 @@ struct LayerContentView: View {
         case .text(let text):
             TextLayerView(text: text, size: size)
                 .accessibilityElement()
-                .accessibilityLabel("Text layer, “\(text.text)”")
+                // New text has nothing to read out until it's typed.
+                .accessibilityLabel(text.isBlank ? "Text layer, empty" : "Text layer, “\(text.text)”")
         case .image(let picture):
             PictureLayerView(picture: picture, projectID: projectID, background: background, size: size)
         }
@@ -361,7 +426,8 @@ private struct MissingLayerPicture: View {
                     actions: .preview,
                     selectedLayerID: slide.layers[0].id,
                     isAnythingSelected: true,
-                    isPhotoSelected: false
+                    isPhotoSelected: false,
+                    isDrafting: false
                 )
             )
         }

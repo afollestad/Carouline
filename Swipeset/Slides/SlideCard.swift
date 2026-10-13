@@ -58,7 +58,8 @@ struct SlideCard: View {
                         actions: layerActions,
                         selectedLayerID: layerSession.selection?.slideID == slide.id ? layerSession.selection?.layerID : nil,
                         isAnythingSelected: isAnythingSelected,
-                        isPhotoSelected: session.selection != nil
+                        isPhotoSelected: session.selection != nil,
+                        isDrafting: layerSession.draftSlideID == slide.id
                     )
                 )
             }
@@ -91,6 +92,12 @@ struct SlideCard: View {
             .accessibilityLabel("\(spokenNumbers) Options")
             .frame(height: 44)
         }
+        // From the card, not its caption's glass button, whose style the sheet would take on. A
+        // sheet on iPhone, and on iPad a popover pointing at its slide.
+        .popover(isPresented: layerActions.isShowingSheet(slide.id)) {
+            layerActions.sheet(slide.id)
+                .frame(idealWidth: LayersSheet.popoverSize.width, idealHeight: LayersSheet.popoverSize.height)
+        }
         .confirmationDialog("Delete \(numbersText)?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
             Button(deleteTitle, role: .destructive, action: onDelete)
         } message: {
@@ -101,6 +108,12 @@ struct SlideCard: View {
     @ViewBuilder
     private var options: some View {
         Button("Change Layout…", systemImage: "rectangle.split.2x2", action: onChangeLayout)
+        Button("Add Layer…", systemImage: "square.2.layers.3d.top.filled") {
+            layerActions.openSheet(slide.id, [.add])
+        }
+        Button("Edit Layers…", systemImage: "square.3.layers.3d") {
+            layerActions.openSheet(slide.id, [])
+        }
         // Once there's a photo, since the first one sets the width to fit it.
         if slide.layout == .panorama, slide.cells.first?.image != nil {
             Picker(selection: Binding { slide.span } set: { onSetSpan($0) }) {

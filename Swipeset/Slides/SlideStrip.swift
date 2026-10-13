@@ -20,6 +20,9 @@ struct SlideStrip: View {
     let session: CropSession
     let layerSession: LayerSession
     let layerActions: LayerActions
+    /// The slide whose layers sheet is open, which the strip holds still for, so the slide the
+    /// sheet points at stays put.
+    let layersSlideID: UUID?
     /// Taps between the slides, which finish framing a photo or moving a layer.
     let onBackgroundTap: () -> Void
     let onAddSlide: () -> Void
@@ -28,12 +31,18 @@ struct SlideStrip: View {
     let onDelete: (UUID) -> Void
     let onSetSpan: (UUID, Int) -> Void
     @State private var size: CGSize = .zero
+    /// The strip's size before `bottomRoom` is taken from it.
+    @State private var fullSize: CGSize = .zero
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     /// The caption's height and the gap above it, which the slide makes room for.
     private static let captionSpace: CGFloat = 56
     private static let spacing: CGFloat = 20
     private static let addButtonSize: CGFloat = 56
+    /// The narrowest an iPad's layers popover can be squeezed beside its slide, and the room its
+    /// arrow and the screen's edge take.
+    private static let popoverMinWidth: CGFloat = 320
+    private static let popoverMargin: CGFloat = 24
 
     var body: some View {
         Group {
@@ -50,6 +59,34 @@ struct SlideStrip: View {
         } action: { size in
             self.size = size
         }
+        .padding(.bottom, bottomRoom)
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            fullSize = size
+        }
+        .animation(.smooth(duration: 0.25), value: bottomRoom)
+    }
+
+    /// Room under the slides, so the one being edited shrinks to stay in view: above the keyboard
+    /// and the short sheet over it while a phone types a text layer, and above an iPad's layers
+    /// popover when the slide leaves it no room beside.
+    private var bottomRoom: CGFloat {
+        if horizontalSizeClass == .compact {
+            return layerSession.keyboardRoom
+        }
+        guard let slide = project.slides.first(where: { $0.id == layersSlideID }) else {
+            return 0
+        }
+        // Measured at the full size, so the room taken can't change whether room is taken.
+        let sideRoom = (fullSize.width - cardSize(span: slide.span, in: fullSize).width) / 2
+        guard sideRoom < Self.popoverMinWidth + Self.popoverMargin else {
+            return 0
+        }
+        // The selection bar's room is kept already, and the popover covers it. Half the strip
+        // stays for the slide, however short the screen.
+        let room = LayersSheet.popoverSize.height + Self.popoverMargin - SelectionBar.reservedHeight
+        return min(room, fullSize.height / 2)
     }
 
     private var strip: some View {
@@ -77,6 +114,10 @@ struct SlideStrip: View {
                         onSetSpan: { onSetSpan(slide.id, $0) }
                     )
                     .id(StripItem.slide(slide.id))
+                    // The others hold still too while a slide's layers sheet is open, to fingers and
+                    // VoiceOver alike, so nothing on them is selected or edited out from under it.
+                    .allowsHitTesting(layersSlideID == nil || layersSlideID == slide.id)
+                    .accessibilityHidden(layersSlideID != nil && layersSlideID != slide.id)
                 }
                 AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
                     .id(StripItem.add)
@@ -96,7 +137,7 @@ struct SlideStrip: View {
         }
         .scrollTargetBehavior(snapping)
         // A drag on the selected photo or layer moves it rather than scrolling past it.
-        .scrollDisabled(isAnythingSelected)
+        .scrollDisabled(isAnythingSelected || layersSlideID != nil)
         .sensoryFeedback(.alignment, trigger: layerSession.snapsTaken)
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
@@ -144,11 +185,12 @@ struct SlideStrip: View {
             }
     }
 
-    /// The selected layer, and the slide it moves on at the size the strip draws it.
+    /// The selected layer, a new one's draft included, and the slide it moves on at the size the
+    /// strip draws it.
     private var selectedLayer: (Layer, LayerCanvas)? {
         guard let selection = layerSession.selection,
               let slide = project.slides.first(where: { $0.id == selection.slideID }),
-              let layer = slide.layers.first(where: { $0.id == selection.layerID }) else {
+              let layer = slide.layers.first(where: { $0.id == selection.layerID }) ?? layerSession.draftLayer(selection.layerID) else {
             return nil
         }
         return (layer, LayerCanvas(size: cardSize(span: slide.span), span: slide.span))
@@ -186,7 +228,8 @@ struct SlideStrip: View {
     /// The project's shape, `span` slides wide, fitted to the screen, leaving the slides either
     /// side peeking in at the edges so the strip reads as one to scroll. A panorama fits in the
     /// same room as a slide, so all of it can be framed at once.
-    private func cardSize(span: Int) -> CGSize {
+    private func cardSize(span: Int, in size: CGSize? = nil) -> CGSize {
+        let size = size ?? self.size
         let ratio = project.aspectRatio.widthOverHeight * CGFloat(span)
         let maxWidth = size.width * (horizontalSizeClass == .regular ? 0.7 : 0.82)
         let maxHeight = max(0, size.height - Self.captionSpace - SelectionBar.reservedHeight - 32)
@@ -284,6 +327,7 @@ private struct GhostSlide: View {
         session: CropSession(),
         layerSession: LayerSession(),
         layerActions: .preview,
+        layersSlideID: nil,
         onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },
@@ -304,6 +348,7 @@ private struct GhostSlide: View {
         session: CropSession(),
         layerSession: LayerSession(),
         layerActions: .preview,
+        layersSlideID: nil,
         onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },
@@ -324,6 +369,7 @@ private struct GhostSlide: View {
         session: CropSession(),
         layerSession: LayerSession(),
         layerActions: .preview,
+        layersSlideID: nil,
         onBackgroundTap: {},
         onAddSlide: {},
         onChangeLayout: { _ in },

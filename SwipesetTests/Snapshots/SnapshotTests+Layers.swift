@@ -58,4 +58,21 @@ extension SnapshotTests {
         let session = selecting(fixtureID(188), in: project, snap: LayerSnap(guideX: 0.5))
         await assertScreenSnapshot(of: projectScreen(project, layerSession: session))
     }
+
+    @Test func layersList() async {
+        await assertScreenSnapshot(of: layersSheet(layeredGridFirst))
+    }
+
+    @Test func layersListEmpty() async {
+        await assertScreenSnapshot(of: layersSheet(landscapeProject))
+    }
+
+    @Test func addLayerPage() async {
+        await assertScreenSnapshot(of: layersSheet(layeredProject, path: [.add]))
+    }
+
+    /// An existing layer's editor, which doesn't take the keyboard as a new one's does.
+    @Test func textLayerEditor() async {
+        await assertScreenSnapshot(of: layersSheet(layeredProject, path: [.text(fixtureID(183))]))
+    }
 }

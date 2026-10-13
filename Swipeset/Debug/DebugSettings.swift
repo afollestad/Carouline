@@ -16,6 +16,9 @@ final class DebugSettings {
         case newProject
         case layout
         case export
+        case layers
+        case addLayer
+        case editLayer
     }
 
     /// Swaps the real projects for `SampleProjects` in a store of their own.
@@ -36,8 +39,9 @@ final class DebugSettings {
     /// `-DebugOpenProject` (a project's index in the list, from 0), `-DebugSelectCell` (a photo
     /// to frame in it, as slide and cell indexes like `2,0`), `-DebugSelectLayer` (a layer to
     /// move in it, as slide and layer indexes like `2,0`, layers counted from the bottom) and
-    /// `-DebugSheet` (`newProject` on the list, or `layout` or `export` in the open project)
-    /// from `arguments`, ignoring values it can't parse.
+    /// `-DebugSheet` (`newProject` on the list, or `layout`, `export`, `layers`, `addLayer` or
+    /// `editLayer` in the open project, the last three for `-DebugSelectLayer`'s slide or else the
+    /// first, and `editLayer` for its text layer) from `arguments`, ignoring values it can't parse.
     init(arguments: [String: Any] = [:]) {
         usesSampleProjects = (arguments["DebugSampleProjects"] as? String).map(Self.isTrue) ?? false
         missesSampleImage = (arguments["DebugMissingImages"] as? String).map(Self.isTrue) ?? false

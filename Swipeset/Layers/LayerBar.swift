@@ -6,8 +6,8 @@
 import SwiftUI
 
 /// Glass controls for the selected layer along the bottom of the project screen: restack,
-/// straighten or delete it, size it, and finish. Restacking, straightening and deleting share
-/// a menu, which leaves the slider room to move in, as `SelectionBar` does for a photo.
+/// straighten or delete it, size it, edit it, and finish. Restacking, straightening and deleting
+/// share a menu, which leaves the slider room to move in, as `SelectionBar` does for a photo.
 struct LayerBar: View {
     let layer: Layer
     let session: LayerSession
@@ -19,6 +19,8 @@ struct LayerBar: View {
     let onDelete: () -> Void
     /// Saves the slider's size once it's let go.
     let onCommitSize: () -> Void
+    /// Opens the layer's editor, or nil when its kind has none yet.
+    let onEdit: (() -> Void)?
     let onDone: () -> Void
 
     var body: some View {
@@ -37,6 +39,10 @@ struct LayerBar: View {
                     Label("Layer Options", systemImage: "square.3.layers.3d")
                 }
                 sizeSlider
+                if let onEdit {
+                    Button("Edit Layer", systemImage: "pencil", action: onEdit)
+                        .accessibilityHint("Edits the layer's words, typeface and style")
+                }
                 Button("Done", systemImage: "checkmark", action: onDone)
                     .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
@@ -99,6 +105,7 @@ struct LayerBar: View {
             onStraighten: {},
             onDelete: {},
             onCommitSize: {},
+            onEdit: {},
             onDone: {}
         )
     }

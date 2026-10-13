@@ -12,14 +12,6 @@ struct StyleSheet: View {
     let onCommit: () -> Void
     @Environment(\.dismiss) private var dismiss
 
-    /// White and black, which most carousels use, and the icon's lavender and mint.
-    private static let swatches: [(name: String, color: RGBColor)] = [
-        ("White", .white),
-        ("Black", .black),
-        ("Lavender", RGBColor(red: 0.93, green: 0.91, blue: 0.99)),
-        ("Mint", RGBColor(red: 0.85, green: 0.97, blue: 0.91))
-    ]
-
     var body: some View {
         NavigationStack {
             Form {
@@ -30,15 +22,7 @@ struct StyleSheet: View {
                     widthSlider("Border", value: $style.border, maximum: SlideStyle.maximumBorder)
                 }
                 Section("Background") {
-                    ColorPicker("Color", selection: background, supportsOpacity: false)
-                    HStack(spacing: 12) {
-                        ForEach(Self.swatches, id: \.name) { swatch in
-                            SwatchButton(name: swatch.name, color: swatch.color, isSelected: style.background == swatch.color) {
-                                style.background = swatch.color
-                                onCommit()
-                            }
-                        }
-                    }
+                    ColorSwatches(title: "Color", color: $style.background, onCommit: onCommit)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -73,39 +57,6 @@ struct StyleSheet: View {
                 .frame(minWidth: 48, alignment: .trailing)
                 .accessibilityHidden(true)
         }
-    }
-
-    private var background: Binding<Color> {
-        Binding {
-            style.background.color
-        } set: { color in
-            style.background = RGBColor(UIColor(color))
-            onCommit()
-        }
-    }
-}
-
-private struct SwatchButton: View {
-    let name: String
-    let color: RGBColor
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(color.color)
-                .overlay {
-                    Circle()
-                        .strokeBorder(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator), lineWidth: isSelected ? 3 : 1)
-                }
-                .frame(width: 36, height: 36)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(name)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

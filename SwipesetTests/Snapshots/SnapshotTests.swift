@@ -177,6 +177,22 @@ extension ScreenSnapshotting {
         LayerSession(selection: LayerAddress(projectID: project.id, slideID: project.slides[0].id, layerID: layerID), snap: snap)
     }
 
+    /// The layers sheet for `project`'s first slide, at `path`.
+    func layersSheet(_ project: Project, path: [LayersPage] = []) -> some View {
+        let session = LayerSession()
+        session.sheetPath = path
+        return LayersSheet(
+            library: library([project]),
+            projectID: project.id,
+            slideID: project.slides[0].id,
+            session: session,
+            actions: .preview,
+            kinds: [.text],
+            dynamicTypeSize: .large
+        ) {}
+        .environment(\.imageLoader, imageLoader)
+    }
+
     /// `layeredProject` with its grid first.
     var layeredGridFirst: Project {
         var project = layeredProject

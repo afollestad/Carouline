@@ -16,4 +16,16 @@ extension WideSnapshotTests {
         let project = layeredProject
         await assertScreenSnapshot(of: projectScreen(project, layerSession: selecting(fixtureID(183), in: project)), on: .wide)
     }
+
+    @Test func layersList() async {
+        await assertScreenSnapshot(of: layersSheet(layeredGridFirst), on: .wide)
+    }
+
+    @Test func addLayerPage() async {
+        await assertScreenSnapshot(of: layersSheet(layeredProject, path: [.add]), on: .wide)
+    }
+
+    @Test func textLayerEditor() async {
+        await assertScreenSnapshot(of: layersSheet(layeredProject, path: [.text(fixtureID(183))]), on: .wide)
+    }
 }
