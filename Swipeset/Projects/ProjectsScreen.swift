@@ -16,9 +16,14 @@ struct ProjectsScreen: View {
     /// and leave each name room that a third would cut short.
     private static let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     private static let unreadableNote = "Swipeset leaves these as they are until you delete them."
+    /// Enough rows to read as a list while the library loads, and few enough that a short list
+    /// arriving in their place doesn't look like most of it went missing.
+    private static let loadingRowCount = 3
 
     var body: some View {
         content
+            // The rows fade in over the placeholders that stood in for them.
+            .animation(.easeOut(duration: 0.25), value: library.isLoaded)
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size
             } action: { size in
@@ -39,8 +44,8 @@ struct ProjectsScreen: View {
     @ViewBuilder
     private var content: some View {
         if !library.isLoaded {
-            // Loading takes a moment, which an empty state would flash through.
-            Color.clear
+            // Rather than an empty state, which loading would flash through, or a blank screen.
+            loading
         } else if library.projects.isEmpty, library.unreadable.isEmpty {
             ContentUnavailableView {
                 Label("No Projects", systemImage: "rectangle.stack")
@@ -120,6 +125,39 @@ struct ProjectsScreen: View {
         }
         // The cards draw their own glass and colors, which a link's default style would tint.
         .buttonStyle(.plain)
+    }
+
+    /// Placeholder rows in the shape of projects', where the list or the grid will put them.
+    private var loading: some View {
+        Group {
+            if usesGrid {
+                ScrollView {
+                    LazyVGrid(columns: Self.gridColumns, spacing: 10) {
+                        ForEach(0..<Self.loadingRowCount, id: \.self) { _ in
+                            LoadingRow()
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 5)
+                }
+            } else {
+                List {
+                    Section {
+                        ForEach(0..<Self.loadingRowCount, id: \.self) { _ in
+                            LoadingRow()
+                                .glassRow()
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .scrollDisabled(true)
+        // One element for the whole list, rather than rows of placeholder words.
+        .accessibilityRepresentation {
+            Text("Loading projects")
+        }
     }
 
     private func projectRow(_ project: Project, isInGrid: Bool) -> some View {
@@ -255,7 +293,17 @@ private struct ProjectThumbnail: View {
                     let canvas = CGSize(width: proxy.size.width * CGFloat(slide.span), height: proxy.size.height)
                     SlideView(slide: slide, style: project.style) { index in
                         if let image = slide.cells[index].image {
-                            CellPhoto(image: image, projectID: project.id, blur: LayerGeometry.blurRadius(slide.blur, slideWidth: proxy.size.width))
+                            CellPhoto(
+                                image: image,
+                                projectID: project.id,
+                                blur: LayerGeometry.blurRadius(slide.blur, slideWidth: proxy.size.width),
+                                isMissing: .constant(false)
+                            ) { absence in
+                                // A missing photo leaves the slide's background, as the export does.
+                                if absence == .loading {
+                                    PlaceholderCell(background: project.style.background, isLoading: true)
+                                }
+                            }
                         } else {
                             PlaceholderCell(background: project.style.background)
                         }
@@ -286,6 +334,31 @@ private struct ProjectThumbnail: View {
         .aspectRatio(project.aspectRatio.widthOverHeight, contentMode: .fit)
         .frame(width: 56, height: 56)
         .accessibilityHidden(true)
+    }
+}
+
+/// A project row's shape, with its thumbnail, name and summary as blocks, while the library loads.
+private struct LoadingRow: View {
+    var body: some View {
+        HStack(spacing: 14) {
+            // A portrait slide's shape, the default, in an empty project's thumbnail.
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.fill.tertiary)
+                .aspectRatio(AspectRatio.portrait.widthOverHeight, contentMode: .fit)
+                .frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: "Untitled Project")
+                    .font(.headline)
+                    .foregroundStyle(Color.primary)
+                Text(verbatim: "4:5 Portrait · 3 slides")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondary)
+            }
+            .redacted(reason: .placeholder)
+            Spacer(minLength: 0)
+        }
+        .loadingPulse()
+        .glassCard(isOpenable: false)
     }
 }
 
@@ -351,6 +424,12 @@ private struct UnreadableRow: View {
 #Preview("Projects") {
     NavigationStack {
         ProjectsScreen(library: ProjectLibrary(store: MockProjectStore(), projects: SampleProjects.all)) {}
+    }
+}
+
+#Preview("Loading") {
+    NavigationStack {
+        ProjectsScreen(library: ProjectLibrary(store: MockProjectStore())) {}
     }
 }
 

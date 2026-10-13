@@ -99,18 +99,21 @@ extension ScreenSnapshotting {
     }
 
     /// `project`'s screen in its navigation stack, from a library holding just it, with
-    /// `selection` selected to frame, `layerSession`'s layer selected, and `missing` images'
-    /// copies missing.
+    /// `selection` selected to frame, `layerSession`'s layer selected, `missing` images' copies
+    /// missing, and `loading` images' still loading.
     func projectScreen(
         _ project: Project,
         selection: CellAddress? = nil,
         layerSession: LayerSession? = nil,
-        missing: Set<UUID>? = nil
+        missing: Set<UUID>? = nil,
+        loading: Set<UUID> = []
     ) -> some View {
-        NavigationStack {
+        var loader = missing.map { MockImageLoader(missing: $0) } ?? imageLoader
+        loader.loading = loading
+        return NavigationStack {
             ProjectScreen(library: library([project]), projectID: project.id, selection: selection, layerSession: layerSession ?? LayerSession())
         }
-        .environment(\.imageLoader, missing.map { MockImageLoader(missing: $0) } ?? imageLoader)
+        .environment(\.imageLoader, loader)
     }
 
     /// A photo under a shadowed title and highlighted, turned text, and a grid under a framed,

@@ -5,16 +5,35 @@
 
 import SwiftUI
 
-/// A cell's photo, framed by its crop and decoded at the size it's shown, with `missing`
-/// in its place when the copy can't be read.
-struct CellPhoto<Missing: View>: View {
+/// Why a cell's photo isn't showing.
+enum PhotoAbsence {
+    /// Its copy is still decoding.
+    case loading
+    /// Its copy can't be read.
+    case missing
+}
+
+extension Animation {
+    /// A photo's fade in once it's decoded: quick enough not to hold it back, and long enough that
+    /// it arrives over its placeholder rather than popping in.
+    static let photoArrival = Animation.easeOut(duration: photoArrivalDuration)
+    /// The placeholder's fade out under it, once the photo has faded in, so what's behind the
+    /// slide never shows through the two halfway, as a white slide would glare in dark mode.
+    static let placeholderDeparture = Animation.easeOut(duration: photoArrivalDuration).delay(photoArrivalDuration)
+
+    private static let photoArrivalDuration: TimeInterval = 0.2
+}
+
+/// A cell's photo, framed by its crop and decoded at the size it's shown, with `placeholder`
+/// in its place while it loads and when the copy can't be read.
+struct CellPhoto<Placeholder: View>: View {
     let image: PlacedImage
     let projectID: UUID
     /// The photo's blur, as a Gaussian's sigma in points.
     var blur: CGFloat = 0
     /// Whether the copy turned out unreadable, for the cell to offer what it can do about it.
     @Binding var isMissing: Bool
-    @ViewBuilder let missing: () -> Missing
+    @ViewBuilder let placeholder: (PhotoAbsence) -> Placeholder
     @Environment(\.imageLoader) private var loader
     @Environment(\.displayScale) private var displayScale
     /// The last decode, kept on screen while a sharper one loads for a bigger size. Kept with
@@ -37,11 +56,20 @@ struct CellPhoto<Missing: View>: View {
             // None until the cell is measured, as the strip's aren't on its first pass, since the
             // decode for no size would only be thrown away for the real one.
             let decode = proxy.size.width > 0 && proxy.size.height > 0 ? request : nil
+            let shown = loadedImage ?? loader.cachedImage(request)
+            // Apart rather than one or the other, so the photo always fades in on top.
             ZStack {
-                if let shown = loadedImage ?? loader.cachedImage(request) {
+                if shown == nil {
+                    // In a stack of its own, so its transition is its leaving as the photo arrives,
+                    // not its turning from loading to missing within.
+                    ZStack {
+                        placeholder(isUnreadable ? .missing : .loading)
+                    }
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity.animation(.placeholderDeparture)))
+                }
+                if let shown {
                     photo(shown, frame: frame, cell: proxy.size)
-                } else if isUnreadable {
-                    missing()
+                        .transition(.opacity)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
@@ -55,7 +83,11 @@ struct CellPhoto<Missing: View>: View {
                     return
                 }
                 if let decoded {
-                    loaded = (decode.imageID, decoded)
+                    // Faded in only when it's the first of its photo to show, not when it
+                    // sharpens one on screen.
+                    withAnimation(loadedImage == nil ? .photoArrival : nil) {
+                        loaded = (decode.imageID, decoded)
+                    }
                 }
                 unreadableID = decoded == nil ? decode.imageID : nil
             }
@@ -132,19 +164,34 @@ enum ScreenBlur {
     }
 }
 
-extension CellPhoto where Missing == EmptyView {
-    /// The photo with nothing in its place when it's missing, as thumbnails show it.
-    init(image: PlacedImage, projectID: UUID, blur: CGFloat = 0) {
-        self.init(image: image, projectID: projectID, blur: blur, isMissing: .constant(false)) {
+extension CellPhoto where Placeholder == EmptyView {
+    /// The photo with nothing in its place while it loads or when it's missing, as the backdrop
+    /// shows it.
+    init(image: PlacedImage, projectID: UUID) {
+        self.init(image: image, projectID: projectID, isMissing: .constant(false)) { _ in
             EmptyView()
         }
     }
 }
 
-#Preview {
+#Preview("Loaded") {
     @Previewable @State var isMissing = false
-    CellPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 3072, pixelHeight: 2048), projectID: UUID(), isMissing: $isMissing) {
-        Text("Missing")
+    CellPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 3072, pixelHeight: 2048), projectID: UUID(), isMissing: $isMissing) { absence in
+        if absence == .missing {
+            Text("Missing")
+        }
     }
     .frame(width: 200, height: 300)
+}
+
+#Preview("Loading") {
+    @Previewable @State var isMissing = false
+    let image = PlacedImage(assetIdentifier: nil, pixelWidth: 3072, pixelHeight: 2048)
+    CellPhoto(image: image, projectID: UUID(), isMissing: $isMissing) { absence in
+        if absence == .loading {
+            PlaceholderCell(background: .white, isLoading: true)
+        }
+    }
+    .frame(width: 200, height: 300)
+    .environment(\.imageLoader, MockImageLoader(loading: [image.id]))
 }

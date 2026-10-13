@@ -16,6 +16,12 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(projects[0]))
     }
 
+    /// Placeholders stand in for photos still decoding, and the backdrop keeps its glow.
+    @Test func loadingPhotos() async {
+        let project = projects[0]
+        await assertScreenSnapshot(of: projectScreen(project, loading: Set(project.images.map(\.id))))
+    }
+
     @Test func darkPhotoGrid() async {
         await assertScreenSnapshot(of: projectScreen(gridFirst), appearance: .dark)
     }

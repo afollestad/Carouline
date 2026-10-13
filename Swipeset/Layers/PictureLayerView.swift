@@ -21,8 +21,17 @@ struct PictureLayerView: View {
         let pictureSize = CGSize(width: max(0, size.width - 2 * border), height: max(0, size.height - 2 * border))
         let blur = LayerGeometry.blurRadius(of: picture, pictureSize: pictureSize)
         let isTransparent = picture.image.fileFormat == .png
-        CellPhoto(image: picture.image, projectID: projectID, blur: isTransparent ? 0 : blur, isMissing: $isMissing) {
-            MissingLayerPicture(background: background)
+        CellPhoto(image: picture.image, projectID: projectID, blur: isTransparent ? 0 : blur, isMissing: $isMissing) { absence in
+            switch absence {
+            case .loading where !isTransparent:
+                PlaceholderCell(background: background, isLoading: true)
+            case .loading:
+                // A transparent picture's shape isn't known until it loads, so it fades in from
+                // nothing rather than over a square.
+                EmptyView()
+            case .missing:
+                MissingLayerPicture(background: background)
+            }
         }
         .frame(width: pictureSize.width, height: pictureSize.height)
         .modifier(SpreadingBlur(radius: isTransparent && !isMissing ? blur : 0, size: pictureSize))
@@ -95,6 +104,7 @@ private struct PictureOutline: View {
             if let shown = cached ?? outline {
                 Image(decorative: shown, scale: 1)
                     .resizable()
+                    .transition(.opacity)
             }
         }
         .task(id: Source(imageID: picture.image.id, width: picture.borderWidth, color: picture.borderColor, pixels: pixels)) {
@@ -117,7 +127,10 @@ private struct PictureOutline: View {
                 return
             }
             LayerImageEffects.keepScreenOutline(rendered, for: picture, pixels: pixels)
-            outline = rendered
+            // Faded in as its picture is, the first time, rather than after it.
+            withAnimation(outline == nil ? .photoArrival : nil) {
+                outline = rendered
+            }
         }
         .accessibilityHidden(true)
     }

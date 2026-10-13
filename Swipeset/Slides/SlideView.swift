@@ -60,12 +60,25 @@ extension SlideView where CellContent == PlaceholderCell {
 
 /// A cell's fill where no photo shows, as in an empty cell's thumbnail or behind a missing photo:
 /// dark gray in dark mode, so it doesn't glare on the dark screen, and otherwise dark on a light
-/// background and light on a dark one, so it shows on either.
+/// background and light on a dark one, so it shows on either. While `isLoading` it pulses, over
+/// black in dark mode, so it only ever dims there rather than letting the slide glare through.
 struct PlaceholderCell: View {
     let background: RGBColor
+    /// Whether it stands in for a photo still loading.
+    var isLoading = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        if isLoading {
+            fillShape
+                .loadingPulse()
+                .background(colorScheme == .dark ? Color.black : Color.clear)
+        } else {
+            fillShape
+        }
+    }
+
+    private var fillShape: some View {
         Rectangle()
             .fill(fill)
             .accessibilityHidden(true)

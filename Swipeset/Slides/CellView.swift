@@ -58,10 +58,6 @@ struct CellView: View {
     var body: some View {
         ZStack {
             if let image = cell.image {
-                // Behind the photo while it loads, and in its place when it's missing, in the
-                // screen's scheme rather than the one the cell's glass takes below.
-                PlaceholderCell(background: background)
-                    .environment(\.colorScheme, colorScheme)
                 photo(image)
             } else {
                 // Glass over what's behind the slide, as the strip's other chrome is, so an empty
@@ -136,6 +132,13 @@ struct CellView: View {
         session.selection == address
     }
 
+    /// The fill in the photo's place while it loads and when it's missing, in the screen's scheme
+    /// rather than the one the cell's glass takes below.
+    private func placeholder(isLoading: Bool) -> some View {
+        PlaceholderCell(background: background, isLoading: isLoading)
+            .environment(\.colorScheme, colorScheme)
+    }
+
     /// Shorter than this, as a wide panorama's cell is, the regular controls overflow the cell.
     private static let compactHeight: CGFloat = 52
 
@@ -150,11 +153,19 @@ struct CellView: View {
         if isSelected, let liveCrop = session.liveCrop {
             shown.crop = liveCrop
         }
-        let photo = CellPhoto(image: shown, projectID: address.projectID, blur: blur, isMissing: $isMissing) {
-            MissingPhoto(menu: missingMenu(image))
-                .task {
-                    actions.restorePhotoQuietly(address)
+        let photo = CellPhoto(image: shown, projectID: address.projectID, blur: blur, isMissing: $isMissing) { absence in
+            switch absence {
+            case .loading:
+                placeholder(isLoading: true)
+            case .missing:
+                ZStack {
+                    placeholder(isLoading: false)
+                    MissingPhoto(menu: missingMenu(image))
+                        .task {
+                            actions.restorePhotoQuietly(address)
+                        }
                 }
+            }
         }
         .id(image.id)
         .overlay {

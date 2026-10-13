@@ -86,9 +86,11 @@ nonisolated final class DiskImageLoader: ImageLoading, @unchecked Sendable {
 nonisolated struct MockImageLoader: ImageLoading {
     /// Images that load as missing.
     var missing: Set<UUID> = []
+    /// Images that never finish loading, as a slow decode shows until it lands.
+    var loading: Set<UUID> = []
 
     func cachedImage(_ request: ImageRequest) -> CGImage? {
-        guard !missing.contains(request.imageID) else {
+        guard !missing.contains(request.imageID), !loading.contains(request.imageID) else {
             return nil
         }
         return switch request.fileFormat {
@@ -98,7 +100,11 @@ nonisolated struct MockImageLoader: ImageLoading {
     }
 
     func image(_ request: ImageRequest) async -> CGImage? {
-        cachedImage(request)
+        if loading.contains(request.imageID) {
+            // Until the view waiting on it goes, which cancels the wait.
+            try? await Task.sleep(for: .seconds(3600))
+        }
+        return cachedImage(request)
     }
 }
 
