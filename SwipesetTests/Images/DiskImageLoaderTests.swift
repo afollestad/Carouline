@@ -19,7 +19,7 @@ struct DiskImageLoaderTests {
         let projectID = UUID()
         let image = PlacedImage(assetIdentifier: nil, pixelWidth: 3000, pixelHeight: 2000)
         try FileManager.default.createDirectory(at: paths.imagesFolder(for: projectID), withIntermediateDirectories: true)
-        try TestImages.writeJPEG(width: 3000, height: 2000, to: paths.imageFile(image.id, in: projectID))
+        try TestImages.writeJPEG(width: 3000, height: 2000, to: paths.imageFile(named: image.fileName, in: projectID))
         let loader = DiskImageLoader(paths: paths)
         let request = ImageRequest(projectID: projectID, image: image, displayedPixels: 400)
 

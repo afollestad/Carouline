@@ -43,7 +43,8 @@ nonisolated struct ProjectPaths: Sendable {
         folder(for: projectID).appending(path: "Images", directoryHint: .isDirectory)
     }
 
-    func imageFile(_ imageID: UUID, in projectID: UUID) -> URL {
-        imagesFolder(for: projectID).appending(path: PlacedImage.fileName(for: imageID), directoryHint: .notDirectory)
+    /// The copy named `fileName`, a `PlacedImage.fileName`, in project `projectID`.
+    func imageFile(named fileName: String, in projectID: UUID) -> URL {
+        imagesFolder(for: projectID).appending(path: fileName, directoryHint: .notDirectory)
     }
 }

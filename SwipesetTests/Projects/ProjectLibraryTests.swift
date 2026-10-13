@@ -92,14 +92,14 @@ struct ProjectLibraryTests {
         let copy = paths.imports.appending(path: "copy.jpg")
         try Data([0xFF, 0xD8]).write(to: copy)
         await library.flush()
-        #expect(try await library.store.adoptImage(at: copy, as: image.id, in: project.id))
+        #expect(try await library.store.adoptImage(at: copy, as: image.fileName, in: project.id))
         library.update(project.id) { $0.slides = [Slide(layout: .single, cells: [Cell(image: image)])] }
 
-        library.update(project.id, deletingImages: [image.id]) { $0.slides = [] }
+        library.update(project.id, deletingImages: [image]) { $0.slides = [] }
         await library.flush()
 
         #expect(await reloaded().first?.slides.isEmpty == true)
-        #expect(!FileManager.default.fileExists(atPath: paths.imageFile(image.id, in: project.id).path(percentEncoded: false)))
+        #expect(!FileManager.default.fileExists(atPath: paths.imageFile(named: image.fileName, in: project.id).path(percentEncoded: false)))
     }
 
     /// Every window asks the library to load, and a second load would sweep again.
@@ -146,11 +146,11 @@ private actor FailingStore: ProjectStoring {
         throw Failure()
     }
 
-    func adoptImage(at source: URL, as imageID: UUID, in projectID: UUID) throws -> Bool {
+    func adoptImage(at source: URL, as fileName: String, in projectID: UUID) throws -> Bool {
         throw Failure()
     }
 
-    func deleteImages(_ imageIDs: [UUID], in projectID: UUID) {}
+    func deleteImages(_ fileNames: [String], in projectID: UUID) {}
 }
 
 /// A store that counts its loads and keeps nothing.
@@ -171,9 +171,9 @@ private actor CountingStore: ProjectStoring {
 
     func delete(_ unreadable: UnreadableProject) {}
 
-    func adoptImage(at source: URL, as imageID: UUID, in projectID: UUID) -> Bool {
+    func adoptImage(at source: URL, as fileName: String, in projectID: UUID) -> Bool {
         true
     }
 
-    func deleteImages(_ imageIDs: [UUID], in projectID: UUID) {}
+    func deleteImages(_ fileNames: [String], in projectID: UUID) {}
 }

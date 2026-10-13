@@ -42,7 +42,7 @@ struct ProjectLibraryImagesTests {
         guard let image else {
             return false
         }
-        return FileManager.default.fileExists(atPath: paths.imageFile(image.id, in: projectID).path(percentEncoded: false))
+        return FileManager.default.fileExists(atPath: paths.imageFile(named: image.fileName, in: projectID).path(percentEncoded: false))
     }
 
     @Test func importsAPhotoIntoItsCellAndKeepsItsLibraryIdentifier() async throws {
@@ -114,7 +114,7 @@ struct ProjectLibraryImagesTests {
         #expect(span() == 3)
         await library.flush()
         let image = try #require(library.photo(at: address))
-        try FileManager.default.removeItem(at: paths.imageFile(image.id, in: address.projectID))
+        try FileManager.default.removeItem(at: paths.imageFile(named: image.fileName, in: address.projectID))
         let outcome = await library.restorePhoto(at: address, from: MockPhotoLibrary(assets: ["A/L0/001"]), asking: false)
         await library.flush()
 
@@ -254,7 +254,7 @@ struct ProjectLibraryImagesTests {
         library.setCrop(ImageCrop(scale: 2, centerX: 0.3, centerY: 0.5), at: address)
         await library.flush()
         let image = try #require(library.photo(at: address))
-        try FileManager.default.removeItem(at: paths.imageFile(image.id, in: address.projectID))
+        try FileManager.default.removeItem(at: paths.imageFile(named: image.fileName, in: address.projectID))
         return MissingCopy(library: library, address: address, missing: image)
     }
 

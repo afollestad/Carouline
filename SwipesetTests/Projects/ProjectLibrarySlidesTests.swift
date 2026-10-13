@@ -64,7 +64,7 @@ struct ProjectLibrarySlidesTests {
         await library.flush()
 
         #expect(slides(library, projectID).isEmpty)
-        #expect(!exists(paths.imageFile(image.id, in: projectID)))
+        #expect(!exists(paths.imageFile(named: image.fileName, in: projectID)))
     }
 
     @Test func changingLayoutPacksPhotosAndDeletesTheOverflow() async throws {
@@ -82,8 +82,8 @@ struct ProjectLibrarySlidesTests {
         let changed = try #require(slides(library, projectID).first)
         #expect(changed.layout == .single)
         #expect(changed.cells.map(\.image?.id) == [kept.id])
-        #expect(exists(paths.imageFile(kept.id, in: projectID)))
-        #expect(!exists(paths.imageFile(dropped.id, in: projectID)))
+        #expect(exists(paths.imageFile(named: kept.fileName, in: projectID)))
+        #expect(!exists(paths.imageFile(named: dropped.fileName, in: projectID)))
     }
 
     @Test func addsAPanoramaAcrossTheDefaultSpan() async throws {
@@ -112,7 +112,7 @@ struct ProjectLibrarySlidesTests {
         #expect(panorama.span == 5)
         #expect(panorama.cells.map(\.image?.id) == [kept.id])
         #expect(panorama.cells[0].image?.crop == ImageCrop())
-        #expect(!exists(paths.imageFile(dropped.id, in: projectID)))
+        #expect(!exists(paths.imageFile(named: dropped.fileName, in: projectID)))
     }
 
     @Test func aPanoramaTurnedSlideKeepsItsPhotoInTheFirstCell() async throws {
@@ -175,7 +175,7 @@ struct ProjectLibrarySlidesTests {
         let copy = paths.imports.appending(path: "\(image.id).jpg")
         try Data([0xFF, 0xD8]).write(to: copy)
         await library.flush()
-        #expect(try await library.store.adoptImage(at: copy, as: image.id, in: projectID))
+        #expect(try await library.store.adoptImage(at: copy, as: image.fileName, in: projectID))
         library.update(projectID) { project in
             if let index = project.slides.firstIndex(where: { $0.id == slideID }) {
                 project.slides[index].cells[cell].image = image

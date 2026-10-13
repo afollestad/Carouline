@@ -15,10 +15,12 @@ nonisolated protocol ProjectStoring: Sendable {
     func save(_ project: Project) async throws
     func delete(projectID: UUID) async throws
     func delete(_ unreadable: UnreadableProject) async throws
-    /// Moves an imported copy at `source` into `projectID`'s folder as `imageID`. Returns false,
-    /// having deleted the copy, when the project was deleted while it imported.
-    func adoptImage(at source: URL, as imageID: UUID, in projectID: UUID) async throws -> Bool
-    func deleteImages(_ imageIDs: [UUID], in projectID: UUID) async
+    /// Moves an imported copy at `source` into `projectID`'s folder as `fileName`, its
+    /// `PlacedImage.fileName`. Returns false, having deleted the copy, when the project was
+    /// deleted while it imported.
+    func adoptImage(at source: URL, as fileName: String, in projectID: UUID) async throws -> Bool
+    /// Deletes the copies named `fileNames`, each a `PlacedImage.fileName`.
+    func deleteImages(_ fileNames: [String], in projectID: UUID) async
 }
 
 /// What a launch finds on disk, newest first.
@@ -36,7 +38,7 @@ nonisolated struct UnreadableProject: Identifiable, Hashable, Sendable {
 }
 
 /// Keeps each project in its own folder under `ProjectPaths.projects`, as `project.json` beside
-/// an `Images` folder of copies named by `PlacedImage.id`.
+/// an `Images` folder of copies named by `PlacedImage.fileName`.
 actor ProjectStore: ProjectStoring {
     nonisolated let paths: ProjectPaths
     /// Projects deleted this launch. A save or import still in flight for one would otherwise
@@ -97,19 +99,19 @@ actor ProjectStore: ProjectStoring {
         try discard(unreadable.folder)
     }
 
-    func adoptImage(at source: URL, as imageID: UUID, in projectID: UUID) throws -> Bool {
+    func adoptImage(at source: URL, as fileName: String, in projectID: UUID) throws -> Bool {
         guard !deleted.contains(projectID) else {
             try? FileManager.default.removeItem(at: source)
             return false
         }
         try FileManager.default.createDirectory(at: paths.imagesFolder(for: projectID), withIntermediateDirectories: true)
-        try FileManager.default.moveItem(at: source, to: paths.imageFile(imageID, in: projectID))
+        try FileManager.default.moveItem(at: source, to: paths.imageFile(named: fileName, in: projectID))
         return true
     }
 
-    func deleteImages(_ imageIDs: [UUID], in projectID: UUID) {
-        for imageID in imageIDs {
-            try? FileManager.default.removeItem(at: paths.imageFile(imageID, in: projectID))
+    func deleteImages(_ fileNames: [String], in projectID: UUID) {
+        for fileName in fileNames {
+            try? FileManager.default.removeItem(at: paths.imageFile(named: fileName, in: projectID))
         }
     }
 
@@ -170,9 +172,9 @@ actor MockProjectStore: ProjectStoring {
 
     func delete(_ unreadable: UnreadableProject) {}
 
-    func adoptImage(at source: URL, as imageID: UUID, in projectID: UUID) -> Bool {
+    func adoptImage(at source: URL, as fileName: String, in projectID: UUID) -> Bool {
         projects[projectID] != nil
     }
 
-    func deleteImages(_ imageIDs: [UUID], in projectID: UUID) {}
+    func deleteImages(_ fileNames: [String], in projectID: UUID) {}
 }

@@ -90,7 +90,7 @@ final class ProjectLibrary {
 
     /// Changes project `id` and saves it, then deletes `deletingImages`, the copies the change
     /// stopped referring to.
-    func update(_ id: UUID, deletingImages: [UUID] = [], _ change: (inout Project) -> Void) {
+    func update(_ id: UUID, deletingImages: [PlacedImage] = [], _ change: (inout Project) -> Void) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else {
             return
         }
@@ -99,10 +99,11 @@ final class ProjectLibrary {
         project.modifiedAt = .now
         projects.remove(at: index)
         projects.insert(project, at: 0)
+        let fileNames = deletingImages.map(\.fileName)
         write { store in
             try await store.save(project)
-            if !deletingImages.isEmpty {
-                await store.deleteImages(deletingImages, in: id)
+            if !fileNames.isEmpty {
+                await store.deleteImages(fileNames, in: id)
             }
         }
     }

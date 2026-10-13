@@ -23,7 +23,7 @@ enum SampleStore {
             try? ProjectFile.encode(project).write(to: paths.file(for: project.id), options: .atomic)
             for image in project.images where !(missingImage && image.id == SampleProjects.missingImageID) {
                 if let drawn = SampleImages.image(for: image.id, width: image.pixelWidth, height: image.pixelHeight) {
-                    try? ImageImporter.write(drawn, to: paths.imageFile(image.id, in: project.id))
+                    try? ImageImporter.write(drawn, to: paths.imageFile(named: image.fileName, in: project.id), format: image.fileFormat)
                 }
             }
         }

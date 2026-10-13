@@ -10,6 +10,7 @@ import SwiftUI
 nonisolated struct ImageRequest: Hashable, Sendable {
     let projectID: UUID
     let imageID: UUID
+    let fileFormat: ImageFileFormat
     /// The copy's own size, which a decode never exceeds.
     let pixelWidth: Int
     let pixelHeight: Int
@@ -18,6 +19,7 @@ nonisolated struct ImageRequest: Hashable, Sendable {
     init(projectID: UUID, image: PlacedImage, displayedPixels: CGFloat) {
         self.projectID = projectID
         imageID = image.id
+        fileFormat = image.fileFormat
         pixelWidth = image.pixelWidth
         pixelHeight = image.pixelHeight
         maxPixelSize = Self.bucket(for: displayedPixels)
@@ -60,7 +62,8 @@ nonisolated final class DiskImageLoader: ImageLoading, @unchecked Sendable {
         if let cached = cachedImage(request) {
             return cached
         }
-        let url = paths.imageFile(request.imageID, in: request.projectID)
+        let fileName = PlacedImage.fileName(for: request.imageID, format: request.fileFormat)
+        let url = paths.imageFile(named: fileName, in: request.projectID)
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceShouldCacheImmediately: true,

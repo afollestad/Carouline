@@ -34,7 +34,7 @@ extension ProjectLibrary {
         guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }) else {
             return
         }
-        update(projectID, deletingImages: slide.cells.compactMap(\.image?.id)) { project in
+        update(projectID, deletingImages: slide.cells.compactMap(\.image)) { project in
             project.slides.removeAll { $0.id == slideID }
         }
     }
@@ -57,7 +57,7 @@ extension ProjectLibrary {
             span = Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio)
         }
         let changed = Slide(id: slideID, layout: layout, span: span, cells: cells)
-        update(projectID, deletingImages: dropped.map(\.id)) { project in
+        update(projectID, deletingImages: dropped) { project in
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return
             }

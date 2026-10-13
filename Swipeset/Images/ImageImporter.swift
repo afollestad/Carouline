@@ -55,9 +55,15 @@ nonisolated enum ImageImporter {
         case unwritable
     }
 
-    /// Writes `source`'s copy, within `limit`, to `destination` and returns its pixel size.
+    /// A copy written out: its pixel size, upright, and how it's encoded.
+    struct Copy: Hashable, Sendable {
+        let size: CGSize
+        let format: ImageFileFormat
+    }
+
+    /// Writes `source`'s copy, within `limit`, to `destination`.
     @concurrent
-    static func makeCopy(of source: PhotoSource, at destination: URL, limit: CopyLimit) async throws -> CGSize {
+    static func makeCopy(of source: PhotoSource, at destination: URL, limit: CopyLimit) async throws -> Copy {
         let imageSource: CGImageSource? = switch source {
         case .file(let url):
             CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary)
@@ -85,16 +91,22 @@ nonisolated enum ImageImporter {
         guard let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else {
             throw ImportError.unreadable
         }
-        try write(image, to: destination)
-        return CGSize(width: image.width, height: image.height)
+        try write(image, to: destination, format: .jpeg)
+        return Copy(size: CGSize(width: image.width, height: image.height), format: .jpeg)
     }
 
-    /// Encodes `image` as a JPEG, keeping its color profile, so a wide-gamut photo stays wide.
-    static func write(_ image: CGImage, to destination: URL, quality: Double = 0.9) throws {
-        guard let output = CGImageDestinationCreateWithURL(destination as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
+    /// Encodes `image` in `format`, keeping its color profile, so a wide-gamut photo stays wide.
+    /// A PNG keeps its transparency; a JPEG has none, and ImageIO flattens it onto white.
+    static func write(_ image: CGImage, to destination: URL, format: ImageFileFormat, quality: Double = 0.9) throws {
+        let type = switch format {
+        case .jpeg: UTType.jpeg
+        case .png: UTType.png
+        }
+        guard let output = CGImageDestinationCreateWithURL(destination as CFURL, type.identifier as CFString, 1, nil) else {
             throw ImportError.unwritable
         }
-        CGImageDestinationAddImage(output, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        let options = format == .jpeg ? [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary : nil
+        CGImageDestinationAddImage(output, image, options)
         guard CGImageDestinationFinalize(output) else {
             throw ImportError.unwritable
         }

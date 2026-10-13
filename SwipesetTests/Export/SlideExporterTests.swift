@@ -5,7 +5,6 @@
 
 import CoreGraphics
 import Foundation
-import ImageIO
 import os
 import Testing
 @testable import Swipeset
@@ -47,7 +46,7 @@ struct SlideExporterTests {
 
         let file = try #require(try await exporter.export(project).files.first)
 
-        let image = try #require(Self.decode(file))
+        let image = try #require(TestImages.decode(file))
         #expect(CGSize(width: image.width, height: image.height) == ratio.exportSize)
         #expect(image.bitsPerComponent == 8)
         #expect(image.colorSpace?.name == CGColorSpace.sRGB)
@@ -69,10 +68,10 @@ struct SlideExporterTests {
 
         let file = try #require(try await exporter.export(project).files.first)
 
-        let image = try #require(Self.decode(file))
+        let image = try #require(TestImages.decode(file))
         // The border's corner, and the middle of the gap between the two cells.
         for point in [CGPoint(x: 10, y: 10), CGPoint(x: 540, y: 540)] {
-            let pixel = try #require(Self.pixel(of: image, at: point))
+            let pixel = try #require(TestImages.pixel(of: image, at: point))
             #expect(pixel.green > 230 && pixel.red < 25 && pixel.blue < 25)
         }
     }
@@ -85,9 +84,9 @@ struct SlideExporterTests {
 
         let file = try #require(try await exporter.export(project).files.first)
 
-        let image = try #require(Self.decode(file))
-        let left = try #require(Self.pixel(of: image, at: CGPoint(x: 270, y: 540)))
-        let right = try #require(Self.pixel(of: image, at: CGPoint(x: 810, y: 540)))
+        let image = try #require(TestImages.decode(file))
+        let left = try #require(TestImages.pixel(of: image, at: CGPoint(x: 270, y: 540)))
+        let right = try #require(TestImages.pixel(of: image, at: CGPoint(x: 810, y: 540)))
         #expect(left.red > 230 && left.blue < 25)
         #expect(right.blue > 230 && right.red < 25)
     }
@@ -111,7 +110,7 @@ struct SlideExporterTests {
 
         #expect(files.map(\.lastPathComponent) == ["Wide 01.jpg", "Wide 02.jpg", "Wide 03.jpg", "Wide 04.jpg"])
         for file in files {
-            let image = try #require(Self.decode(file))
+            let image = try #require(TestImages.decode(file))
             #expect(CGSize(width: image.width, height: image.height) == AspectRatio.square.exportSize)
         }
     }
@@ -124,15 +123,15 @@ struct SlideExporterTests {
 
         let files = try await exporter.export(project).files
 
-        let first = try #require(Self.decode(files[0]))
-        let second = try #require(Self.decode(files[1]))
+        let first = try #require(TestImages.decode(files[0]))
+        let second = try #require(TestImages.decode(files[1]))
         // Clear of where the photo's halves blend, upscaled from a small image.
-        let left = try #require(Self.pixel(of: first, at: CGPoint(x: 1050, y: 540)))
-        let right = try #require(Self.pixel(of: second, at: CGPoint(x: 30, y: 540)))
+        let left = try #require(TestImages.pixel(of: first, at: CGPoint(x: 1050, y: 540)))
+        let right = try #require(TestImages.pixel(of: second, at: CGPoint(x: 30, y: 540)))
         #expect(left.red > 230 && left.blue < 25)
         #expect(right.blue > 230 && right.red < 25)
         for (image, x) in [(first, CGFloat(1079)), (second, CGFloat(0))] {
-            let edge = try #require(Self.pixel(of: image, at: CGPoint(x: x, y: 540)))
+            let edge = try #require(TestImages.pixel(of: image, at: CGPoint(x: x, y: 540)))
             #expect(edge.green < 25)
         }
     }
@@ -143,16 +142,16 @@ struct SlideExporterTests {
 
         let files = try await exporter.export(project).files
 
-        let first = try #require(Self.decode(files[0]))
-        let second = try #require(Self.decode(files[1]))
+        let first = try #require(TestImages.decode(files[0]))
+        let second = try #require(TestImages.decode(files[1]))
         // The border, a twentieth of one slide, on the outer edges.
         for (image, x) in [(first, CGFloat(20)), (second, CGFloat(1060))] {
-            let pixel = try #require(Self.pixel(of: image, at: CGPoint(x: x, y: 540)))
+            let pixel = try #require(TestImages.pixel(of: image, at: CGPoint(x: x, y: 540)))
             #expect(pixel.green > 230 && pixel.red < 25 && pixel.blue < 25)
         }
         // The photo, not the border, either side of the cut.
         for (image, x) in [(first, CGFloat(1079)), (second, CGFloat(0))] {
-            let pixel = try #require(Self.pixel(of: image, at: CGPoint(x: x, y: 540)))
+            let pixel = try #require(TestImages.pixel(of: image, at: CGPoint(x: x, y: 540)))
             #expect(pixel.green < 25)
         }
     }
@@ -191,30 +190,5 @@ struct SlideExporterTests {
 
         let sessions = try FileManager.default.contentsOfDirectory(atPath: paths.exports.path(percentEncoded: false))
         #expect(sessions == [latest.files[0].deletingLastPathComponent().lastPathComponent])
-    }
-
-    // MARK: Helpers
-
-    private static func decode(_ file: URL) -> CGImage? {
-        CGImageSourceCreateWithURL(file as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
-    }
-
-    private struct Pixel {
-        let red: Int
-        let green: Int
-        let blue: Int
-    }
-
-    /// The 8-bit sRGB color at `point`, measured from the top-left.
-    private static func pixel(of image: CGImage, at point: CGPoint) -> Pixel? {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: space,
-                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
-            return nil
-        }
-        let height = CGFloat(image.height)
-        context.draw(image, in: CGRect(x: -point.x, y: point.y - height + 1, width: CGFloat(image.width), height: height))
-        return Pixel(red: Int(bytes[0]), green: Int(bytes[1]), blue: Int(bytes[2]))
     }
 }

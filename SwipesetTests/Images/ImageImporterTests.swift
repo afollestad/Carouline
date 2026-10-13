@@ -25,7 +25,7 @@ struct ImageImporterTests {
         try TestImages.writeJPEG(width: 6000, height: 4000, to: source)
         let copy = try file("copy.jpg")
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy, limit: cell)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy, limit: cell).size
 
         #expect(size == CGSize(width: 3072, height: 2048))
         #expect(TestImages.pixelSize(of: copy) == size)
@@ -35,8 +35,8 @@ struct ImageImporterTests {
         let source = try file("photo.jpg")
         try TestImages.writeJPEG(width: 4000, height: 3000, to: source)
 
-        let inCell = try await ImageImporter.makeCopy(of: .file(source), at: try file("cell.jpg"), limit: cell)
-        let inPanorama = try await ImageImporter.makeCopy(of: .file(source), at: try file("panorama.jpg"), limit: panorama)
+        let inCell = try await ImageImporter.makeCopy(of: .file(source), at: try file("cell.jpg"), limit: cell).size
+        let inPanorama = try await ImageImporter.makeCopy(of: .file(source), at: try file("panorama.jpg"), limit: panorama).size
 
         #expect(inCell == CGSize(width: 3072, height: 2304))
         #expect(inPanorama == CGSize(width: 4000, height: 3000))
@@ -48,7 +48,7 @@ struct ImageImporterTests {
         let source = try file("wide.jpg")
         try TestImages.writeJPEG(width: 6000, height: 1500, to: source)
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell).size
 
         #expect(size == CGSize(width: 6000, height: 1500))
     }
@@ -58,7 +58,7 @@ struct ImageImporterTests {
         let source = try file("turned.jpg")
         try TestImages.writeJPEG(width: 6000, height: 1500, orientation: 6, to: source)
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell).size
 
         #expect(size == CGSize(width: 768, height: 3072))
     }
@@ -83,7 +83,7 @@ struct ImageImporterTests {
         let source = try file("small.jpg")
         try TestImages.writeJPEG(width: 800, height: 600, to: source)
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: try file("copy.jpg"), limit: cell).size
 
         #expect(size == CGSize(width: 800, height: 600))
     }
@@ -94,7 +94,7 @@ struct ImageImporterTests {
         try TestImages.writeJPEG(width: 400, height: 200, orientation: 6, to: source)
         let copy = try file("copy.jpg")
 
-        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy, limit: cell)
+        let size = try await ImageImporter.makeCopy(of: .file(source), at: copy, limit: cell).size
 
         #expect(size == CGSize(width: 200, height: 400))
         #expect(TestImages.pixelSize(of: copy) == size)
@@ -104,9 +104,26 @@ struct ImageImporterTests {
         let drawn = try #require(SampleImages.image(for: UUID(), width: 400, height: 200))
         let capture = UIImage(cgImage: drawn, scale: 1, orientation: .right)
 
-        let size = try await ImageImporter.makeCopy(of: .image(capture), at: try file("copy.jpg"), limit: cell)
+        let size = try await ImageImporter.makeCopy(of: .image(capture), at: try file("copy.jpg"), limit: cell).size
 
         #expect(size == CGSize(width: 200, height: 400))
+    }
+
+    /// A cell's copy is a JPEG, which has no transparency, so a cut-out picture's clear parts
+    /// turn white, as they show on most backgrounds, rather than black.
+    @Test func flattensAClearPictureOntoWhite() async throws {
+        let source = try file("cutout.png")
+        try TestImages.writePNG(width: 200, height: 100, to: source)
+        let copy = try file("copy.jpg")
+
+        let made = try await ImageImporter.makeCopy(of: .file(source), at: copy, limit: cell)
+
+        #expect(made.format == .jpeg)
+        let image = try #require(TestImages.decode(copy))
+        let clear = try #require(TestImages.pixel(of: image, at: CGPoint(x: 50, y: 50)))
+        let opaque = try #require(TestImages.pixel(of: image, at: CGPoint(x: 150, y: 50)))
+        #expect(clear.red > 250 && clear.green > 250 && clear.blue > 250)
+        #expect(opaque.red < 5 && opaque.green < 5 && opaque.blue > 250)
     }
 
     @Test func refusesAFileThatIsntAnImage() async throws {

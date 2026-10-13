@@ -51,7 +51,7 @@ nonisolated struct SlideExporter: SlideExporting {
                 kCGImageSourceShouldCacheImmediately: true,
                 kCGImageSourceThumbnailMaxPixelSize: Int(max(size.width, size.height).rounded(.up))
             ]
-            let url = paths.imageFile(image.id, in: projectID)
+            let url = paths.imageFile(named: image.fileName, in: projectID)
             guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary) else {
                 return nil
             }

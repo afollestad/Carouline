@@ -40,7 +40,7 @@ struct ProjectStoreTests {
 
         try await store.delete(projectID: project.id)
         try await store.save(project)
-        let kept = try await store.adoptImage(at: image, as: UUID(), in: project.id)
+        let kept = try await store.adoptImage(at: image, as: "\(UUID().uuidString).jpg", in: project.id)
 
         #expect(!kept)
         #expect(!exists(image))
@@ -52,14 +52,14 @@ struct ProjectStoreTests {
         let store = ProjectStore(paths: paths)
         let project = Project(name: "Photos", aspectRatio: .portrait)
         try await store.save(project)
-        let imageID = UUID()
+        let fileName = "\(UUID().uuidString).jpg"
 
-        let kept = try await store.adoptImage(at: try writeImport(), as: imageID, in: project.id)
+        let kept = try await store.adoptImage(at: try writeImport(), as: fileName, in: project.id)
 
         #expect(kept)
-        #expect(exists(paths.imageFile(imageID, in: project.id)))
-        await store.deleteImages([imageID], in: project.id)
-        #expect(!exists(paths.imageFile(imageID, in: project.id)))
+        #expect(exists(paths.imageFile(named: fileName, in: project.id)))
+        await store.deleteImages([fileName], in: project.id)
+        #expect(!exists(paths.imageFile(named: fileName, in: project.id)))
     }
 
     @Test func sweepsCopiesNoProjectRefersTo() async throws {
@@ -72,15 +72,15 @@ struct ProjectStoreTests {
             createdAt: Self.created
         )
         try await store.save(project)
-        _ = try await store.adoptImage(at: try writeImport(), as: image.id, in: project.id)
-        let orphan = UUID()
+        _ = try await store.adoptImage(at: try writeImport(), as: image.fileName, in: project.id)
+        let orphan = "\(UUID().uuidString).jpg"
         _ = try await store.adoptImage(at: try writeImport(), as: orphan, in: project.id)
 
         let stored = await ProjectStore(paths: paths).loadAll()
 
         #expect(stored.projects == [project])
-        #expect(exists(paths.imageFile(image.id, in: project.id)))
-        #expect(!exists(paths.imageFile(orphan, in: project.id)))
+        #expect(exists(paths.imageFile(named: image.fileName, in: project.id)))
+        #expect(!exists(paths.imageFile(named: orphan, in: project.id)))
     }
 
     @Test func sweepsCrashLeftoversAndTemporaryFiles() async throws {
@@ -106,7 +106,7 @@ struct ProjectStoreTests {
         let newer = paths.file(for: newerID)
         try FileManager.default.createDirectory(at: paths.imagesFolder(for: newerID), withIntermediateDirectories: true)
         try Data(#"{"formatVersion": 9, "project": {}}"#.utf8).write(to: newer)
-        let newerImage = paths.imageFile(UUID(), in: newerID)
+        let newerImage = paths.imageFile(named: "\(UUID().uuidString).jpg", in: newerID)
         try Data([1]).write(to: newerImage)
         let damagedID = UUID()
         try FileManager.default.createDirectory(at: paths.folder(for: damagedID), withIntermediateDirectories: true)

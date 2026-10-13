@@ -52,7 +52,8 @@ extension ProjectLibrary {
         }
 
         let imageID = UUID()
-        let staging = store.paths.imports.appending(path: PlacedImage.fileName(for: imageID))
+        // Named for the import alone, since its format, and so its file name, comes from the copy.
+        let staging = store.paths.imports.appending(path: imageID.uuidString)
         var picked: URL?
         defer {
             for file in [picked, staging].compactMap(\.self) {
@@ -67,24 +68,25 @@ extension ProjectLibrary {
                 picked = url
             }
             try FileManager.default.createDirectory(at: store.paths.imports, withIntermediateDirectories: true)
-            let size = try await ImageImporter.makeCopy(of: photo, at: staging, limit: copyLimit(for: address))
-            guard importTokens[address] == token,
-                  try await store.adoptImage(at: staging, as: imageID, in: address.projectID) else {
-                return
-            }
+            let copy = try await ImageImporter.makeCopy(of: photo, at: staging, limit: copyLimit(for: address))
             let image = PlacedImage(
                 id: imageID,
                 assetIdentifier: assetIdentifier,
-                pixelWidth: Int(size.width),
-                pixelHeight: Int(size.height),
-                crop: crop
+                pixelWidth: Int(copy.size.width),
+                pixelHeight: Int(copy.size.height),
+                crop: crop,
+                fileFormat: copy.format
             )
+            guard importTokens[address] == token,
+                  try await store.adoptImage(at: staging, as: image.fileName, in: address.projectID) else {
+                return
+            }
             // The cell may have gone, a newer pick replaced this one, or the photo it was meant
             // for been removed or replaced, while the copy was written.
             guard importTokens[address] == token,
                   expectedImageID == nil || self.photo(at: address)?.id == expectedImageID,
                   place(image, at: address) else {
-                write { await $0.deleteImages([imageID], in: address.projectID) }
+                write { await $0.deleteImages([image.fileName], in: address.projectID) }
                 return
             }
         } catch {
@@ -165,7 +167,7 @@ extension ProjectLibrary {
         guard let cell = cell(at: address) else {
             return false
         }
-        update(address.projectID, deletingImages: cell.image.map { [$0.id] } ?? []) { project in
+        update(address.projectID, deletingImages: cell.image.map { [$0] } ?? []) { project in
             guard let slideIndex = project.slides.firstIndex(where: { $0.id == address.slideID }) else {
                 return
             }
