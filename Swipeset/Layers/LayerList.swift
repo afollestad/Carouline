@@ -16,6 +16,8 @@ struct LayerList: View {
     let onAdd: (LayerKind) -> Void
     let close: () -> Void
 
+    @State private var editMode = EditMode.inactive
+
     var body: some View {
         // Read from the library each time, so the rows' offsets always match what's shown.
         let layers = Array((slide?.layers ?? []).reversed())
@@ -56,12 +58,28 @@ struct LayerList: View {
             session.endSlideBlur(to: library, projectID: projectID)
         }
         .toolbar {
+            // Its reorder grips are the only sign that a row can be dragged. Hidden, not disabled, with
+            // nothing to edit, since a disabled one all but vanishes on the glass.
+            if !layers.isEmpty {
+                ToolbarItem(placement: .primaryAction) {
+                    EditButton()
+                        // Edit in primary, as the close button is, and Done's checkmark on solid accent.
+                        .tint(editMode.isEditing ? Color.accentColor : Color.primary)
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Layer", systemImage: "plus") {
                     session.sheetPath.append(.add)
                 }
                 // As the close button is, which the accent loses its contrast beside on the glass.
                 .tint(Color.primary)
+            }
+        }
+        .environment(\.editMode, $editMode)
+        // Deleting the last layer hides Done, which would leave the list stuck editing.
+        .onChange(of: layers.isEmpty) { _, isEmpty in
+            if isEmpty {
+                editMode = .inactive
             }
         }
     }
@@ -114,14 +132,21 @@ struct LayerList: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Color.secondary)
-                    .accessibilityHidden(true)
+                // The reorder grip takes its place while editing.
+                if !editMode.isEditing {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.secondary)
+                        .accessibilityHidden(true)
+                }
             }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        // A tap does nothing while editing, as in other lists. Not `disabled`, which grays the text
+        // out on the glass.
+        .allowsHitTesting(!editMode.isEditing)
+        .modifier(LiftsWholeRow())
         .accessibilityHint("Selects the layer and edits it")
         .accessibilityActions {
             if !isTop {
@@ -176,6 +201,87 @@ struct LayerList: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Layout, \(slide?.layout.name ?? ""), beneath every layer")
+    }
+}
+
+/// Lifts a row to reorder whole and rounded. The list lifts it square, its corners filled over
+/// the section's rounding, and a drag-preview shape the size of the content alone narrows the row
+/// as it lifts and widens it with a jump once dropped. A dropped row keeps these corners for about
+/// 0.8 s, until UIKit's set-down crossfade ends and hands the row back, which no API shortens.
+private struct LiftsWholeRow: ViewModifier {
+    /// The row's cell in the content's space, which takes in the edit mode's controls.
+    @State private var rowBounds: CGRect?
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RowBoundsReader { rowBounds = $0 }
+            }
+            .contentShape(.dragPreview, RowShape(rowBounds: rowBounds))
+    }
+
+    private struct RowShape: Shape {
+        let rowBounds: CGRect?
+
+        /// The inset grouped list's section corners, measured, since no API exposes them.
+        private let cornerRadius: CGFloat = 26
+
+        func path(in rect: CGRect) -> Path {
+            Path(roundedRect: rowBounds ?? rect, cornerRadius: cornerRadius)
+        }
+    }
+}
+
+/// Reads the bounds of the list cell around it, in its own space. SwiftUI's geometry stops at a
+/// row's content, which edit mode's controls sit outside of.
+private struct RowBoundsReader: UIViewRepresentable {
+    let onChange: (CGRect) -> Void
+
+    func makeUIView(context: Context) -> ReaderView {
+        ReaderView(onChange: onChange)
+    }
+
+    func updateUIView(_ view: ReaderView, context: Context) {
+        view.onChange = onChange
+    }
+
+    final class ReaderView: UIView {
+        var onChange: (CGRect) -> Void
+        private var reported: CGRect?
+
+        init(onChange: @escaping (CGRect) -> Void) {
+            self.onChange = onChange
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        // Its first layout can come before the row is in its cell.
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            setNeedsLayout()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            report()
+        }
+
+        private func report() {
+            var view = superview
+            while let candidate = view, !(candidate is UICollectionViewCell) {
+                view = candidate.superview
+            }
+            guard let cell = view else { return }
+            let bounds = convert(cell.bounds, from: cell)
+            guard bounds != reported else { return }
+            reported = bounds
+            // After this layout pass, since the state it sets is read by the view being laid out.
+            DispatchQueue.main.async { [onChange] in onChange(bounds) }
+        }
     }
 }
 
