@@ -8,6 +8,8 @@ import SwiftUI
 /// A kind of layer to add, as a tile like the new project sheet's.
 struct LayerKindTile: View {
     let kind: LayerKind
+    /// Whether one is on its way in, which the tile shows in place of its illustration.
+    var isAdding = false
     let action: () -> Void
 
     var body: some View {
@@ -17,8 +19,12 @@ struct LayerKindTile: View {
                     .fill(.tint.opacity(0.18))
                     .strokeBorder(.tint, lineWidth: 2)
                     .overlay {
-                        illustration
-                            .foregroundStyle(.tint)
+                        if isAdding {
+                            ProgressView()
+                        } else {
+                            illustration
+                                .foregroundStyle(.tint)
+                        }
                     }
                     .frame(width: 72, height: 72)
                     .padding(.bottom, 4)
@@ -40,6 +46,7 @@ struct LayerKindTile: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(kind.name)
+        .accessibilityValue(isAdding ? "Adding" : "")
         .accessibilityHint(kind.summary)
     }
 

@@ -242,6 +242,7 @@ struct ProjectScreen: View {
             project: project,
             position: $stripPosition,
             importingCells: library.importingCells,
+            importingLayers: library.importingLayers,
             cellActions: cellActions,
             session: session,
             layerSession: layerSession,
@@ -338,9 +339,9 @@ struct ProjectScreen: View {
         }
     }
 
-    /// Moves an open layer editor on to the layer at `address`, or back to the list for a photo or
-    /// a layer with no editor, saving the draft first, so edits never land on the wrong layer. A
-    /// selection on another slide than the sheet's leaves the editor be.
+    /// Moves an open layer editor on to the layer at `address`, or back to the list for a photo,
+    /// saving the draft first, so edits never land on the wrong layer. A selection on another
+    /// slide than the sheet's leaves the editor be.
     private func followSelection(on slideID: UUID, to address: LayerAddress?) {
         guard slideID == layersSlideID, let draftLayerID = layerSession.draftLayerID, draftLayerID != address?.layerID,
               !layerSession.sheetPath.isEmpty else {
@@ -348,7 +349,7 @@ struct ProjectScreen: View {
         }
         layerSession.saveDraft(to: library, projectID: projectID)
         let layer = address.flatMap { library.layer(at: $0) }
-        layerSession.sheetPath = layer.flatMap { LayerActions.canEdit($0) ? [.text($0.id)] : nil } ?? []
+        layerSession.sheetPath = layer.map { [.editor(for: $0)] } ?? []
     }
 
     /// Saves a placement the size slider left unsaved, as VoiceOver's adjustments do, since they
@@ -371,7 +372,8 @@ struct ProjectScreen: View {
             session: layerSession,
             presenter: $presenter,
             dynamicTypeSize: dynamicTypeSize,
-            select: selectLayer
+            select: selectLayer,
+            photoSelection: { session.selection }
         )
         .actions
     }

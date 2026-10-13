@@ -15,11 +15,15 @@ nonisolated enum PhotoSource: Sendable {
     case image(UIImage)
 }
 
-/// Makes the app's own copy of a photo: upright, no larger than its slides can use, as a JPEG.
+/// Makes the app's own copy of a photo: upright, no larger than its slides can use, as a JPEG,
+/// or as a PNG for a layer's picture with transparency to keep.
 nonisolated enum ImageImporter {
     /// Room for a full zoom into the smallest cells of a 1080-pixel export, while a 48-megapixel
     /// photo's copy stays near a tenth of its size.
     static let maximumPixelSize = 3072
+    /// A layer's picture at its largest in a 1080-pixel export: its longer side half a slide at
+    /// its natural size, `LayerGeometry.pictureSide`, times the largest scale, which is four.
+    static let maximumLayerPixelSize = 2160
 
     /// The most of a photo a copy keeps.
     struct CopyLimit: Hashable, Sendable {
@@ -64,6 +68,55 @@ nonisolated enum ImageImporter {
     /// Writes `source`'s copy, within `limit`, to `destination`.
     @concurrent
     static func makeCopy(of source: PhotoSource, at destination: URL, limit: CopyLimit) async throws -> Copy {
+        let image = try upright(source, longestSide: limit.longestSide)
+        try write(image, to: destination, format: .jpeg)
+        return Copy(size: CGSize(width: image.width, height: image.height), format: .jpeg)
+    }
+
+    /// Writes `source`'s copy for a layer to `destination`, no larger than a layer draws: a PNG
+    /// when a file has transparency to keep, as a sticker or a logo cut out of its background
+    /// does, and otherwise a JPEG, which is far smaller. A camera capture has none to keep.
+    @concurrent
+    static func makeLayerCopy(of source: PhotoSource, at destination: URL) async throws -> Copy {
+        let image = try upright(source) { _, _ in maximumLayerPixelSize }
+        let format: ImageFileFormat = hasTransparency(image) ? .png : .jpeg
+        try write(image, to: destination, format: format)
+        return Copy(size: CGSize(width: image.width, height: image.height), format: format)
+    }
+
+    /// Whether any of `image`'s pixels is less than opaque. An alpha channel alone doesn't say,
+    /// since screenshots and many other opaque PNGs carry one.
+    static func hasTransparency(_ image: CGImage) -> Bool {
+        switch image.alphaInfo {
+        case .none, .noneSkipFirst, .noneSkipLast:
+            return false
+        default:
+            break
+        }
+        let width = image.width
+        let height = image.height
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
+        ) else {
+            return true
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let data = context.data else {
+            return true
+        }
+        let alphas = UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: width * height)
+        return alphas.contains { $0 < .max }
+    }
+
+    /// `source` decoded upright, its longer side no more than `longestSide` gives for its upright
+    /// width and height.
+    private static func upright(_ source: PhotoSource, longestSide: (Int, Int) -> Int) throws -> CGImage {
         let imageSource: CGImageSource? = switch source {
         case .file(let url):
             CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary)
@@ -86,13 +139,12 @@ nonisolated enum ImageImporter {
             // Bakes the EXIF orientation into the pixels, so the copy needs none.
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: limit.longestSide(width: width, height: height)
+            kCGImageSourceThumbnailMaxPixelSize: longestSide(width, height)
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else {
             throw ImportError.unreadable
         }
-        try write(image, to: destination, format: .jpeg)
-        return Copy(size: CGSize(width: image.width, height: image.height), format: .jpeg)
+        return image
     }
 
     /// Encodes `image` in `format`, keeping its color profile, so a wide-gamut photo stays wide.

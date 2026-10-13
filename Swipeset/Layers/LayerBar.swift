@@ -19,8 +19,8 @@ struct LayerBar: View {
     let onDelete: () -> Void
     /// Saves the slider's size once it's let go.
     let onCommitSize: () -> Void
-    /// Opens the layer's editor, or nil when its kind has none yet.
-    let onEdit: (() -> Void)?
+    /// Opens the layer's editor.
+    let onEdit: () -> Void
     let onDone: () -> Void
 
     var body: some View {
@@ -39,10 +39,8 @@ struct LayerBar: View {
                     Label("Layer Options", systemImage: "square.3.layers.3d")
                 }
                 sizeSlider
-                if let onEdit {
-                    Button("Edit Layer", systemImage: "pencil", action: onEdit)
-                        .accessibilityHint("Edits the layer's words, typeface and style")
-                }
+                Button("Edit Layer", systemImage: "pencil", action: onEdit)
+                    .accessibilityHint(LayerKind(of: layer).editHint)
                 Button("Done", systemImage: "checkmark", action: onDone)
                     .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)

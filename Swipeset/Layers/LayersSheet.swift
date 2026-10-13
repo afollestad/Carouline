@@ -3,6 +3,7 @@
 //  Swipeset
 //
 
+import PhotosUI
 import SwiftUI
 
 /// One sheet for a slide's layers: the list, the page for adding one, and each kind's editor,
@@ -13,14 +14,16 @@ struct LayersSheet: View {
     let slideID: UUID
     @Bindable var session: LayerSession
     let actions: LayerActions
-    /// The kinds of layer it offers to add.
-    let kinds: [LayerKind]
     /// The screen's text size. The strip caps its own, which the sheet, presented from a slide,
     /// would otherwise take, and sheets stay uncapped.
     let dynamicTypeSize: DynamicTypeSize
     /// Runs as the sheet's content goes, once it no longer covers the screen.
     let onGone: () -> Void
     @State private var detent = PresentationDetent.medium
+    /// The picker for a picture to add, opened from the sheet, since one opened from the screen
+    /// can't show over it.
+    @State private var isPickingImage = false
+    @State private var pickedImage: PhotosPickerItem?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -43,14 +46,13 @@ struct LayersSheet: View {
                 slideID: slideID,
                 session: session,
                 actions: actions,
-                kinds: kinds,
                 onAdd: add,
                 close: close
             )
             .navigationDestination(for: LayersPage.self) { page in
                 switch page {
                 case .add:
-                    AddLayerPage(kinds: kinds, onAdd: add, close: close)
+                    AddLayerPage(library: library, slideID: slideID, onAdd: add, close: close)
                 case .text(let layerID):
                     TextLayerEditor(
                         layerID: layerID,
@@ -63,7 +65,34 @@ struct LayersSheet: View {
                     // A new page for each layer, even one swapped in where another's was, so each
                     // starts and saves its own draft.
                     .id(layerID)
+                case .image(let layerID):
+                    ImageLayerEditor(
+                        layerID: layerID,
+                        library: library,
+                        projectID: projectID,
+                        slideID: slideID,
+                        session: session,
+                        close: close
+                    )
+                    .id(layerID)
                 }
+            }
+        }
+        .photosPicker(
+            isPresented: $isPickingImage,
+            selection: $pickedImage,
+            matching: .images,
+            // As stored, so a PNG keeps its transparency.
+            preferredItemEncoding: .current,
+            photoLibrary: .shared()
+        )
+        .onChange(of: pickedImage) { _, item in
+            guard let item else {
+                return
+            }
+            pickedImage = nil
+            actions.importImage(slideID, item.itemIdentifier) {
+                try await item.loadTransferable(type: PickedPhoto.self).map { .file($0.url) }
             }
         }
         .presentationDetents([typingDetent, .medium, .large], selection: $detent)
@@ -101,6 +130,7 @@ struct LayersSheet: View {
 
     /// Adds a layer of `kind`: new text starts as a draft in the middle of the slide, or of a
     /// panorama's middle slide, since its own middle can fall on a cut, and opens in its editor.
+    /// A picture is picked first, and lands there once it's copied.
     private func add(_ kind: LayerKind) {
         guard let project = library.project(projectID), let slide = project.slides.first(where: { $0.id == slideID }) else {
             return
@@ -109,14 +139,14 @@ struct LayersSheet: View {
         case .text:
             let layer = Layer(
                 content: .text(TextLayer(on: project.style.background)),
-                placement: LayerPlacement(centerX: Double(slide.span / 2) + 0.5)
+                placement: .middle(ofSpan: slide.span)
             )
             session.saveDraft(to: library, projectID: projectID)
             session.beginDraft(of: layer, on: slideID, isNew: true)
             actions.select(LayerAddress(projectID: projectID, slideID: slideID, layerID: layer.id))
             session.sheetPath = [.text(layer.id)]
         case .image:
-            break
+            isPickingImage = true
         }
     }
 }
@@ -131,7 +161,6 @@ struct LayersSheet: View {
                 slideID: project.slides[0].id,
                 session: LayerSession(),
                 actions: .preview,
-                kinds: [.text],
                 dynamicTypeSize: .large
             ) {}
         }

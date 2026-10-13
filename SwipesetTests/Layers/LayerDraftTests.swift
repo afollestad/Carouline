@@ -42,7 +42,8 @@ struct LayerDraftTests {
             session: session,
             presenter: presenter ?? .constant(PresentationQueue()),
             dynamicTypeSize: .large,
-            select: { session.selection = $0 }
+            select: { session.selection = $0 },
+            photoSelection: { nil }
         )
         .actions
     }
@@ -229,8 +230,7 @@ struct LayerDraftTests {
         #expect(session.draftLayer(layer.id) != nil)
     }
 
-    /// Only text has an editor yet.
-    @Test func editsOnlyText() {
+    @Test func editsAPictureInItsOwnEditor() {
         let session = LayerSession()
         var presenter = PresentationQueue<ProjectPresentation>()
         let picture = Layer(content: .image(ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10))))
@@ -238,8 +238,8 @@ struct LayerDraftTests {
 
         actions(session: session, presenter: Binding { presenter } set: { presenter = $0 }).edit(address(picture))
 
-        #expect(presenter.current == nil)
-        #expect(session.sheetPath.isEmpty)
+        #expect(presenter.current == .layers(slideID))
+        #expect(session.sheetPath == [.image(picture.id)])
     }
 
     /// Deleting new text that's still only a draft drops it, and its sheet, rather than the library's.

@@ -13,7 +13,6 @@ struct LayerList: View {
     let slideID: UUID
     let session: LayerSession
     let actions: LayerActions
-    let kinds: [LayerKind]
     let onAdd: (LayerKind) -> Void
     let close: () -> Void
 
@@ -70,19 +69,16 @@ struct LayerList: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("This slide has no layers yet.")
                 .font(.subheadline)
-            LayerKindTiles(kinds: kinds, onAdd: onAdd)
+            LayerKindTiles(isAddingImage: library.importingLayers[slideID] != nil, onAdd: onAdd)
         }
         .listRowBackground(Color.clear)
     }
 
     private func row(_ layer: Layer, isTop: Bool, isBottom: Bool) -> some View {
         let address = address(of: layer.id)
-        let opensEditor = editorPage(for: layer) != nil
         return Button {
             actions.select(address)
-            if let page = editorPage(for: layer) {
-                session.sheetPath.append(page)
-            }
+            session.sheetPath.append(.editor(for: layer))
         } label: {
             HStack(spacing: 12) {
                 LayerPreview(layer: layer, projectID: projectID)
@@ -96,17 +92,15 @@ struct LayerList: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                if opensEditor {
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Color.secondary)
-                        .accessibilityHidden(true)
-                }
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.secondary)
+                    .accessibilityHidden(true)
             }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityHint(opensEditor ? "Selects the layer and edits it" : "Selects the layer on the slide")
+        .accessibilityHint("Selects the layer and edits it")
         .accessibilityActions {
             if !isTop {
                 Button("Bring Forward") { actions.move(address, 1) }
@@ -114,14 +108,6 @@ struct LayerList: View {
             if !isBottom {
                 Button("Send Backward") { actions.move(address, -1) }
             }
-        }
-    }
-
-    /// The page that edits `layer`, if its kind has one yet.
-    private func editorPage(for layer: Layer) -> LayersPage? {
-        switch layer.content {
-        case .text: .text(layer.id)
-        case .image: nil
         }
     }
 
@@ -174,7 +160,6 @@ struct LayerList: View {
             slideID: slide.id,
             session: LayerSession(),
             actions: .preview,
-            kinds: [.text],
             onAdd: { _ in },
             close: {}
         )

@@ -28,4 +28,8 @@ extension WideSnapshotTests {
     @Test func textLayerEditor() async {
         await assertScreenSnapshot(of: layersSheet(layeredProject, path: [.text(fixtureID(183))]), on: .wide)
     }
+
+    @Test func imageLayerEditor() async {
+        await assertScreenSnapshot(of: layersSheet(layeredGridFirst, path: [.image(fixtureID(188))]), on: .wide)
+    }
 }

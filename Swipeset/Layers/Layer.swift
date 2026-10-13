@@ -58,6 +58,12 @@ nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
         self.rotation = rotation
     }
 
+    /// Where a new layer goes on a slide `span` slides wide: the middle of the slide, or of a
+    /// panorama's middle slide, since a panorama's own middle can fall on a cut.
+    static func middle(ofSpan span: Int) -> LayerPlacement {
+        LayerPlacement(centerX: Double(max(1, span) / 2) + 0.5)
+    }
+
     /// A fifth of its natural size is about as small as a layer's text stays readable in an
     /// export, and four times makes a natural-size image two slides wide, past filling one.
     static let scales = 0.2...4.0

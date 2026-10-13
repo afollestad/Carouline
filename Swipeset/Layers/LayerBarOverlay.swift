@@ -54,7 +54,7 @@ struct LayerBarOverlay: ViewModifier {
                 },
                 onDelete: { actions.delete(selection) },
                 onCommitSize: onCommitSize,
-                onEdit: LayerActions.canEdit(layer) ? { actions.edit(selection) } : nil,
+                onEdit: { actions.edit(selection) },
                 onDone: onDone
             )
             .transition(.move(edge: .bottom).combined(with: .opacity))

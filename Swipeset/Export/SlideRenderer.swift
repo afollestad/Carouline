@@ -55,7 +55,7 @@ nonisolated enum SlideRenderer {
                         context.cgContext.restoreGState()
                     }
                     for layer in slide.layers {
-                        LayerRenderer.draw(layer, image: pictures[layer.id], in: context.cgContext, canvas: canvas, span: slide.span)
+                        LayerRenderer.draw(layer, picture: pictures[layer.id], in: context.cgContext, canvas: canvas, span: slide.span)
                     }
                 }
                 try piece(rendered)
@@ -86,22 +86,23 @@ nonisolated enum SlideRenderer {
         }
     }
 
-    /// Each picture layer's picture decoded at the size it's drawn, by layer, counting those missing.
+    /// Each picture layer's picture decoded at the size it's drawn, with its outline, by layer,
+    /// counting those missing.
     private static func decodedPictures(
         of slide: Slide,
         canvas: CGSize,
         missing: inout Int,
         image: (PlacedImage, CGSize) -> CGImage?
-    ) -> [UUID: CGImage] {
+    ) -> [UUID: LayerRenderer.Picture] {
         let slideWidth = LayerGeometry.slideWidth(canvas: canvas, span: slide.span)
-        var pictures: [UUID: CGImage] = [:]
+        var pictures: [UUID: LayerRenderer.Picture] = [:]
         for layer in slide.layers {
             guard case .image(let picture) = layer.content else {
                 continue
             }
             let size = LayerGeometry.pictureSize(of: picture.image, scale: layer.placement.scale, slideWidth: slideWidth)
             if let decoded = image(picture.image, size) {
-                pictures[layer.id] = decoded
+                pictures[layer.id] = LayerRenderer.Picture(decoded, for: picture)
             } else {
                 missing += 1
             }

@@ -30,6 +30,14 @@ enum LayerKind: CaseIterable, Hashable {
         }
     }
 
+    /// What its editor changes, as the layer bar's Edit button tells VoiceOver.
+    var editHint: String {
+        switch self {
+        case .text: "Edits the layer's words, typeface and style"
+        case .image: "Edits the picture's border"
+        }
+    }
+
     /// What adding one does, as the add page's tile says it.
     var summary: String {
         switch self {

@@ -99,12 +99,16 @@ struct LayerRendererTests {
         #expect(isWhite(try pixel(image, 200, 540)))
     }
 
-    /// A transparent picture's clear parts show the slide through them, and it draws no ring.
-    @Test func showsTheSlideThroughATransparentPicture() async throws {
+    /// A transparent picture's border outlines its shape, rather than ringing its box, and its
+    /// clear parts show the slide through them.
+    @Test func outlinesATransparentPicture() async throws {
         let image = try await export([Slide(layout: .single, layers: [picture(.png, border: 0.1)])]).images[0]
 
-        #expect(isWhite(try pixel(image, 400, 540)))
+        // A 540-pixel picture from 270 to 810, opaque from 540, and a 54-pixel outline around that.
         #expect(isRed(try pixel(image, 680, 540)))
+        #expect(isBlack(try pixel(image, 515, 540)))
+        #expect(isBlack(try pixel(image, 680, 243)))
+        #expect(isWhite(try pixel(image, 400, 540)))
         #expect(isWhite(try pixel(image, 240, 540)))
     }
 

@@ -16,10 +16,10 @@ struct StyleSheet: View {
         NavigationStack {
             Form {
                 Section("Spacing") {
-                    widthSlider("Spacing", value: $style.spacing, maximum: SlideStyle.maximumSpacing)
+                    PercentSlider(title: "Spacing", value: $style.spacing, maximum: SlideStyle.maximumSpacing, onCommit: onCommit)
                 }
                 Section("Border") {
-                    widthSlider("Border", value: $style.border, maximum: SlideStyle.maximumBorder)
+                    PercentSlider(title: "Border", value: $style.border, maximum: SlideStyle.maximumBorder, onCommit: onCommit)
                 }
                 Section("Background") {
                     ColorSwatches(title: "Color", color: $style.background, onCommit: onCommit)
@@ -39,24 +39,6 @@ struct StyleSheet: View {
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         .foregroundStyle(Color.primary)
         .tint(.accentColor)
-    }
-
-    /// A slider for a share of the slide's width, read out as a percentage.
-    private func widthSlider(_ title: String, value: Binding<Double>, maximum: Double) -> some View {
-        HStack(spacing: 12) {
-            Slider(value: value, in: 0...maximum) {
-                Text(title)
-            } onEditingChanged: { isEditing in
-                if !isEditing {
-                    onCommit()
-                }
-            }
-            Text(value.wrappedValue, format: .percent.precision(.fractionLength(1)))
-                .monospacedDigit()
-                .foregroundStyle(Color.primary)
-                .frame(minWidth: 48, alignment: .trailing)
-                .accessibilityHidden(true)
-        }
     }
 }
 

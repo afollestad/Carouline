@@ -16,6 +16,8 @@ final class ProjectLibrary {
     private(set) var isLoaded: Bool
     /// Cells with a photo on its way in.
     var importingCells: Set<CellAddress> = []
+    /// Slides with pictures on their way in as layers, and how many each.
+    var importingLayers: [UUID: Int] = [:]
     /// The last write or import that failed, until someone shows it.
     var failure: LibraryFailure?
 

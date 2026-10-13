@@ -17,6 +17,8 @@ struct SlideCard: View {
     let style: SlideStyle
     let size: CGSize
     let importingCells: Set<CellAddress>
+    /// Whether a picture is on its way onto the slide as a layer.
+    var isImportingLayer = false
     let cellActions: CellActions
     let session: CropSession
     let layerSession: LayerSession
@@ -67,6 +69,21 @@ struct SlideCard: View {
             .overlay {
                 if slide.span > 1 {
                     PanoramaSeams(span: slide.span)
+                }
+            }
+            // Where the picture lands once it's copied.
+            .overlay {
+                if isImportingLayer {
+                    ProgressView()
+                        .padding(14)
+                        .glassEffect(.regular, in: .circle)
+                        // From the slide, as glass over a slide takes its scheme.
+                        .environment(\.colorScheme, style.background.isLight ? .light : .dark)
+                        .position(
+                            x: size.width * LayerPlacement.middle(ofSpan: slide.span).centerX / CGFloat(max(1, slide.span)),
+                            y: size.height / 2
+                        )
+                        .accessibilityLabel("Adding a picture")
                 }
             }
             // A hairline, so a slide the color of the screen still shows its edges.

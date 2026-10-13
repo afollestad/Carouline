@@ -75,4 +75,8 @@ extension SnapshotTests {
     @Test func textLayerEditor() async {
         await assertScreenSnapshot(of: layersSheet(layeredProject, path: [.text(fixtureID(183))]))
     }
+
+    @Test func imageLayerEditor() async {
+        await assertScreenSnapshot(of: layersSheet(layeredGridFirst, path: [.image(fixtureID(188))]))
+    }
 }

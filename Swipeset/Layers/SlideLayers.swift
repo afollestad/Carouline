@@ -13,19 +13,17 @@ struct LayerActions {
     /// Moves the layer up its slide's stack, or down for a negative offset.
     let move: (LayerAddress, Int) -> Void
     let delete: (LayerAddress) -> Void
-    /// Opens the layers sheet at the layer's editor, if its kind has one yet.
+    /// Opens the layers sheet at the layer's editor.
     let edit: (LayerAddress) -> Void
     /// Opens the layers sheet for a slide, at its list or past it at the pages given.
     let openSheet: (UUID, [LayersPage]) -> Void
+    /// Copies a picture onto a slide as a layer, with its library identifier, from what the
+    /// picker hands over.
+    let importImage: (UUID, String?, @escaping @Sendable () async throws -> PhotoSource?) -> Void
     /// Whether a slide's layers sheet is open, which the slide presents it by.
     let isShowingSheet: (UUID) -> Binding<Bool>
     /// A slide's layers sheet.
     let sheet: (UUID) -> LayersSheet?
-
-    /// Whether `layer` has an editor yet, which `edit` opens.
-    static func canEdit(_ layer: Layer) -> Bool {
-        LayerKind(of: layer) == .text
-    }
 
     static let preview = LayerActions(
         select: { _ in },
@@ -34,6 +32,7 @@ struct LayerActions {
         delete: { _ in },
         edit: { _ in },
         openSheet: { _, _ in },
+        importImage: { _, _, _ in },
         isShowingSheet: { _ in .constant(false) },
         sheet: { _ in nil }
     )
@@ -185,7 +184,7 @@ private struct PlacedLayer: View {
             .onTapGesture {
                 if !isSelected {
                     interaction?.actions.select(slide.address(of: layer))
-                } else if LayerActions.canEdit(layer) {
+                } else {
                     interaction?.actions.edit(slide.address(of: layer))
                 }
             }
@@ -201,13 +200,11 @@ private struct PlacedLayer: View {
     @ViewBuilder
     private func menu(_ actions: LayerActions) -> some View {
         let address = slide.address(of: layer)
-        if LayerActions.canEdit(layer) {
-            Button("Edit…", systemImage: "pencil") {
-                // Selected too, as a row's tap does, so its slide comes to the middle and its
-                // outline shows what the editor edits.
-                actions.select(address)
-                actions.edit(address)
-            }
+        Button("Edit…", systemImage: "pencil") {
+            // Selected too, as a row's tap does, so its slide comes to the middle and its
+            // outline shows what the editor edits.
+            actions.select(address)
+            actions.edit(address)
         }
         Button("Bring Forward", systemImage: "square.2.layers.3d.top.filled") {
             actions.move(address, 1)
@@ -367,45 +364,6 @@ private struct TextLayerView: View {
     private var scale: CGFloat {
         let reference = TextLayerLayout.make(for: text).boxSize(isHighlighted: text.isHighlighted)
         return reference.width > 0 ? size.width / reference.width : 0
-    }
-}
-
-/// A picture in its frame, inside its border, which an opaque picture fills as a ring of its
-/// border color.
-private struct PictureLayerView: View {
-    let picture: ImageLayer
-    let projectID: UUID
-    let background: RGBColor
-    let size: CGSize
-    @State private var isMissing = false
-
-    var body: some View {
-        let border = LayerGeometry.borderWidth(of: picture, inFrame: size)
-        CellPhoto(image: picture.image, projectID: projectID, isMissing: $isMissing) {
-            MissingLayerPicture(background: background)
-        }
-        .frame(width: max(0, size.width - 2 * border), height: max(0, size.height - 2 * border))
-        .padding(border)
-        .background(picture.image.fileFormat == .jpeg ? picture.borderColor.color : .clear)
-        .accessibilityElement()
-        .accessibilityLabel(isMissing ? "Image layer, unavailable" : "Image layer")
-        .accessibilityAddTraits(isMissing ? [] : .isImage)
-    }
-}
-
-/// What a picture layer shows when its copy can't be read: the fill a missing photo shows, with
-/// a warning.
-private struct MissingLayerPicture: View {
-    let background: RGBColor
-
-    var body: some View {
-        ZStack {
-            PlaceholderCell(background: background)
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title3)
-                .foregroundStyle(Color.secondary)
-                .accessibilityHidden(true)
-        }
     }
 }
 

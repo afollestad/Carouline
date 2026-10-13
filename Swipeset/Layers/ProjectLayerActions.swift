@@ -15,6 +15,8 @@ struct ProjectLayerActions {
     let dynamicTypeSize: DynamicTypeSize
     /// Selects a layer, or none, as the screen does, saving what was selected.
     let select: (LayerAddress?) -> Void
+    /// The photo selected to frame, which a picture's import mustn't take the selection from.
+    let photoSelection: () -> CellAddress?
 
     var actions: LayerActions {
         LayerActions(
@@ -33,12 +35,17 @@ struct ProjectLayerActions {
             },
             delete: delete,
             edit: { address in
-                guard let layer = library.layer(at: address) ?? session.draftLayer(address.layerID), LayerActions.canEdit(layer) else {
+                guard let layer = library.layer(at: address) ?? session.draftLayer(address.layerID) else {
                     return
                 }
-                open(address.slideID, at: [.text(address.layerID)])
+                open(address.slideID, at: [.editor(for: layer)])
             },
             openSheet: open,
+            importImage: { slideID, assetIdentifier, source in
+                Task {
+                    await importImage(into: slideID, assetIdentifier: assetIdentifier, from: source)
+                }
+            },
             isShowingSheet: { slideID in
                 Binding {
                     presenter.current == .layers(slideID)
@@ -56,6 +63,27 @@ struct ProjectLayerActions {
     private func open(_ slideID: UUID, at path: [LayersPage]) {
         session.sheetPath = path
         presenter.present(.layers(slideID))
+    }
+
+    /// Copies the picture `source` produces onto slide `slideID` as a new layer, then selects it
+    /// and opens its editor, as long as the slide's sheet is still open and nothing else has been
+    /// selected meanwhile. Otherwise it just lands on its slide, leaving the selection, the strip
+    /// and the sheet as they are. The editor opens only from the page it was picked from.
+    func importImage(into slideID: UUID, assetIdentifier: String?, from source: @escaping @Sendable () async throws -> PhotoSource?) async {
+        let selection = session.selection
+        let photo = photoSelection()
+        let path = session.sheetPath
+        guard let address = await library.importImageLayer(into: slideID, of: projectID, assetIdentifier: assetIdentifier, from: source) else {
+            return
+        }
+        AccessibilityNotification.Announcement("Picture added").post()
+        guard presenter.current == .layers(slideID), session.selection == selection, photoSelection() == photo else {
+            return
+        }
+        select(address)
+        if session.sheetPath == path {
+            session.sheetPath = [.image(address.layerID)]
+        }
     }
 
     /// Deletes the layer at `address`. A new text layer is still only its draft, which is
@@ -79,7 +107,6 @@ struct ProjectLayerActions {
             slideID: slideID,
             session: session,
             actions: actions,
-            kinds: [.text],
             dynamicTypeSize: dynamicTypeSize
         ) {
             // However it went: one whose slide was deleted under it never sets `isShowingSheet`.

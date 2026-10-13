@@ -16,6 +16,8 @@ struct SlideStrip: View {
     let project: Project
     @Binding var position: StripItem?
     let importingCells: Set<CellAddress>
+    /// Slides with pictures on their way in as layers.
+    var importingLayers: [UUID: Int] = [:]
     let cellActions: CellActions
     let session: CropSession
     let layerSession: LayerSession
@@ -104,6 +106,7 @@ struct SlideStrip: View {
                         style: project.style,
                         size: cardSize(span: slide.span),
                         importingCells: importingCells,
+                        isImportingLayer: importingLayers[slide.id] != nil,
                         cellActions: cellActions,
                         session: session,
                         layerSession: layerSession,

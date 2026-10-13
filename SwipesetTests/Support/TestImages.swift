@@ -20,9 +20,10 @@ enum TestImages {
         #expect(CGImageDestinationFinalize(destination))
     }
 
-    /// A PNG of `width` by `height` pixels at `url`, clear on its left half and opaque blue on
-    /// its right, as a sticker or a logo cut out of its background is.
-    static func writePNG(width: Int, height: Int, to url: URL) throws {
+    /// A PNG of `width` by `height` pixels at `url`, with an alpha channel, clear on its left half
+    /// and opaque blue on its right, as a sticker or a logo cut out of its background is, or blue
+    /// all over when `isOpaque`, as a screenshot is.
+    static func writePNG(width: Int, height: Int, isOpaque: Bool = false, to url: URL) throws {
         let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(CGContext(
             data: nil,
@@ -34,7 +35,8 @@ enum TestImages {
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ))
         context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 1, alpha: 1))
-        context.fill(CGRect(x: width / 2, y: 0, width: width - width / 2, height: height))
+        let clearWidth = isOpaque ? 0 : width / 2
+        context.fill(CGRect(x: clearWidth, y: 0, width: width - clearWidth, height: height))
         let image = try #require(context.makeImage())
         let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
         CGImageDestinationAddImage(destination, image, nil)

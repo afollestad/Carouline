@@ -15,9 +15,21 @@ nonisolated enum LayerRenderer {
     static let shadowBlur: CGFloat = 0.16
     static let shadowOpacity: CGFloat = 0.55
 
+    /// A picture layer's picture decoded at the size it's drawn, with the outline its border
+    /// traces when it's transparent, made once however many of a panorama's pieces it crosses.
+    struct Picture {
+        let image: CGImage
+        let outline: CGImage?
+
+        init(_ image: CGImage, for picture: ImageLayer) {
+            self.image = image
+            outline = picture.image.fileFormat == .png ? LayerImageEffects.outline(of: image, for: picture) : nil
+        }
+    }
+
     /// Draws `layer` on a canvas of `canvas` spanning `span` slides, turned about its center.
-    /// `image` is its picture decoded, or nil when the copy is missing, which draws nothing.
-    static func draw(_ layer: Layer, image: CGImage?, in context: CGContext, canvas: CGSize, span: Int) {
+    /// `picture` is its picture decoded, or nil when the copy is missing, which draws nothing.
+    static func draw(_ layer: Layer, picture: Picture?, in context: CGContext, canvas: CGSize, span: Int) {
         let frame = LayerGeometry.frame(of: layer, canvas: canvas, span: span)
         context.saveGState()
         defer { context.restoreGState() }
@@ -27,9 +39,9 @@ nonisolated enum LayerRenderer {
         switch layer.content {
         case .text(let text):
             drawText(text, in: context, box: box)
-        case .image(let picture):
-            if let image {
-                drawPicture(picture, image: image, in: context, box: box)
+        case .image(let content):
+            if let picture {
+                drawPicture(content, decoded: picture, in: context, box: box)
             }
         }
     }
@@ -104,14 +116,18 @@ nonisolated enum LayerRenderer {
         )
     }
 
-    /// Draws a picture into `box` inside its border, which an opaque picture fills as a ring of
-    /// its border color, and a transparent one leaves clear.
-    private static func drawPicture(_ picture: ImageLayer, image: CGImage, in context: CGContext, box: CGRect) {
+    /// Draws a picture into `box` inside its border: over a ring of its border color for an opaque
+    /// picture, and over an outline tracing its shape for a transparent one.
+    private static func drawPicture(_ picture: ImageLayer, decoded: Picture, in context: CGContext, box: CGRect) {
         let border = LayerGeometry.borderWidth(of: picture, inFrame: box.size)
-        if picture.image.fileFormat == .jpeg, border > 0 {
-            context.setFillColor(picture.borderColor.uiColor.cgColor)
-            context.fill(box)
+        if border > 0 {
+            if picture.image.fileFormat == .jpeg {
+                context.setFillColor(picture.borderColor.uiColor.cgColor)
+                context.fill(box)
+            } else if let outline = decoded.outline {
+                UIImage(cgImage: outline).draw(in: box)
+            }
         }
-        UIImage(cgImage: image).draw(in: box.insetBy(dx: border, dy: border))
+        UIImage(cgImage: decoded.image).draw(in: box.insetBy(dx: border, dy: border))
     }
 }

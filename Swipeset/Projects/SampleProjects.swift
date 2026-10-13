@@ -68,11 +68,13 @@ nonisolated enum SampleProjects {
         placement: LayerPlacement(centerY: 0.45, scale: 1.2, rotation: -0.08)
     )
 
-    /// A sticker cut out of its background, in the grid's empty corner.
+    /// A sticker cut out of its background, outlined as a die-cut one is, in the grid's empty
+    /// corner.
     private static let sticker = Layer(
         id: sampleID(203),
         content: .image(ImageLayer(
-            image: PlacedImage(id: sampleID(108), assetIdentifier: nil, pixelWidth: 600, pixelHeight: 600, fileFormat: .png)
+            image: PlacedImage(id: sampleID(108), assetIdentifier: nil, pixelWidth: 600, pixelHeight: 600, fileFormat: .png),
+            borderWidth: 0.05
         )),
         placement: LayerPlacement(centerX: 0.76, centerY: 0.78, scale: 0.6)
     )

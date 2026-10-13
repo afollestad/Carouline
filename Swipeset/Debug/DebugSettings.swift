@@ -41,7 +41,7 @@ final class DebugSettings {
     /// move in it, as slide and layer indexes like `2,0`, layers counted from the bottom) and
     /// `-DebugSheet` (`newProject` on the list, or `layout`, `export`, `layers`, `addLayer` or
     /// `editLayer` in the open project, the last three for `-DebugSelectLayer`'s slide or else the
-    /// first, and `editLayer` for its text layer) from `arguments`, ignoring values it can't parse.
+    /// first, and `editLayer` for its layer) from `arguments`, ignoring values it can't parse.
     init(arguments: [String: Any] = [:]) {
         usesSampleProjects = (arguments["DebugSampleProjects"] as? String).map(Self.isTrue) ?? false
         missesSampleImage = (arguments["DebugMissingImages"] as? String).map(Self.isTrue) ?? false

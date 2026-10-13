@@ -55,34 +55,22 @@ struct TextLayerEditor: View {
                 }
             }
         }
-        .onAppear {
-            // Another layer's editor may not have gone yet, and SwiftUI doesn't order the two.
-            if session.draftLayerID != layerID {
-                session.saveDraft(to: library, projectID: projectID)
-            }
-            let address = LayerAddress(projectID: projectID, slideID: slideID, layerID: layerID)
-            if let layer = library.layer(at: address) {
-                session.beginDraft(of: layer, on: slideID)
-            }
-            // A new layer has nothing to show until it's typed.
-            if session.isDraftNew, text.isBlank {
-                isTyping = true
-            }
-        }
-        .onDisappear {
-            // Not while its page is back in the path, as after switching away and straight back,
-            // where the new page for the layer has begun editing it already. Closing the sheet
-            // leaves the path be, and the sheet saves then.
-            guard !session.sheetPath.contains(.text(layerID)) else {
-                return
-            }
-            // Only its own typing and draft: the next layer's editor may have begun its own already.
+        .modifier(LayerDraftEditing(
+            page: .text(layerID),
+            address: LayerAddress(projectID: projectID, slideID: slideID, layerID: layerID),
+            library: library,
+            session: session
+        ) {
+            // Only its own typing: the next layer's editor may have begun its own already.
             if session.typingLayerID == layerID {
                 session.typingLayerID = nil
                 session.keyboardRoom = 0
             }
-            if session.draftLayerID == layerID {
-                session.saveDraft(to: library, projectID: projectID)
+        })
+        .onAppear {
+            // A new layer has nothing to show until it's typed.
+            if session.isDraftNew, text.isBlank {
+                isTyping = true
             }
         }
         .onChange(of: isTyping) { _, isTyping in
@@ -93,13 +81,6 @@ struct TextLayerEditor: View {
             }
             updateKeyboardRoom()
         }
-        // A layer deleted while its editor is open, from the slide or with it, leaves nothing to
-        // edit. Only its own page goes, since the path may already be on to another layer's.
-        .onChange(of: isGone, initial: true) { _, isGone in
-            if isGone {
-                session.sheetPath.removeAll { $0 == .text(layerID) }
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
             keyboardHeight = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect)?.height ?? 0
             updateKeyboardRoom()
@@ -108,12 +89,6 @@ struct TextLayerEditor: View {
             keyboardHeight = 0
             updateKeyboardRoom()
         }
-    }
-
-    /// Whether the layer is in neither the library nor, while it's new, the draft.
-    private var isGone: Bool {
-        let address = LayerAddress(projectID: projectID, slideID: slideID, layerID: layerID)
-        return library.layer(at: address) == nil && !(session.isDraftNew && session.draftLayerID == layerID)
     }
 
     /// The text layer being edited, or blank text before its draft begins.

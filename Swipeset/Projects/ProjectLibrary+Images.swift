@@ -51,6 +51,43 @@ extension ProjectLibrary {
             }
         }
 
+        let limit = copyLimit(for: address)
+        let request = CopyRequest(projectID: address.projectID, assetIdentifier: assetIdentifier, crop: crop) { photo, destination in
+            try await ImageImporter.makeCopy(of: photo, at: destination, limit: limit)
+        }
+        do {
+            // The cell may go, a newer pick replace this one, or the photo it's meant for be removed
+            // or replaced, while the copy is written.
+            try await adoptCopy(request, from: source) {
+                importTokens[address] == token
+            } place: { image in
+                (expectedImageID == nil || self.photo(at: address)?.id == expectedImageID) && place(image, at: address)
+            }
+        } catch {
+            if let failureKind {
+                failure = LibraryFailure(kind: failureKind, error: error)
+            }
+        }
+    }
+
+    /// A copy for `adoptCopy`: the project it joins, what it keeps of its photo, and how it's made.
+    struct CopyRequest {
+        let projectID: UUID
+        let assetIdentifier: String?
+        let crop: ImageCrop
+        let make: @Sendable (PhotoSource, URL) async throws -> ImageImporter.Copy
+    }
+
+    /// Copies the photo `source` produces into `request`'s project and offers it to `place`,
+    /// deleting it again if `place` turns it down, or if `isCurrent` says the import has been
+    /// overtaken meanwhile. A nil from `source` changes nothing. The picked and staged files go
+    /// whatever happens.
+    func adoptCopy(
+        _ request: CopyRequest,
+        from source: @Sendable () async throws -> PhotoSource?,
+        isCurrent: () -> Bool,
+        place: (PlacedImage) -> Bool
+    ) async throws {
         let imageID = UUID()
         // Named for the import alone, since its format, and so its file name, comes from the copy.
         let staging = store.paths.imports.appending(path: imageID.uuidString)
@@ -60,39 +97,28 @@ extension ProjectLibrary {
                 try? FileManager.default.removeItem(at: file)
             }
         }
-        do {
-            guard let photo = try await source() else {
-                return
-            }
-            if case .file(let url) = photo {
-                picked = url
-            }
-            try FileManager.default.createDirectory(at: store.paths.imports, withIntermediateDirectories: true)
-            let copy = try await ImageImporter.makeCopy(of: photo, at: staging, limit: copyLimit(for: address))
-            let image = PlacedImage(
-                id: imageID,
-                assetIdentifier: assetIdentifier,
-                pixelWidth: Int(copy.size.width),
-                pixelHeight: Int(copy.size.height),
-                crop: crop,
-                fileFormat: copy.format
-            )
-            guard importTokens[address] == token,
-                  try await store.adoptImage(at: staging, as: image.fileName, in: address.projectID) else {
-                return
-            }
-            // The cell may have gone, a newer pick replaced this one, or the photo it was meant
-            // for been removed or replaced, while the copy was written.
-            guard importTokens[address] == token,
-                  expectedImageID == nil || self.photo(at: address)?.id == expectedImageID,
-                  place(image, at: address) else {
-                write { await $0.deleteImages([image.fileName], in: address.projectID) }
-                return
-            }
-        } catch {
-            if let failureKind {
-                failure = LibraryFailure(kind: failureKind, error: error)
-            }
+        guard let photo = try await source() else {
+            return
+        }
+        if case .file(let url) = photo {
+            picked = url
+        }
+        try FileManager.default.createDirectory(at: store.paths.imports, withIntermediateDirectories: true)
+        let copy = try await request.make(photo, staging)
+        let image = PlacedImage(
+            id: imageID,
+            assetIdentifier: request.assetIdentifier,
+            pixelWidth: Int(copy.size.width),
+            pixelHeight: Int(copy.size.height),
+            crop: request.crop,
+            fileFormat: copy.format
+        )
+        guard isCurrent(), try await store.adoptImage(at: staging, as: image.fileName, in: request.projectID) else {
+            return
+        }
+        guard isCurrent(), place(image) else {
+            write { await $0.deleteImages([image.fileName], in: request.projectID) }
+            return
         }
     }
 

@@ -185,4 +185,14 @@ enum LayersPage: Hashable {
     case add
     /// Edits a text layer.
     case text(UUID)
+    /// Edits a picture layer.
+    case image(UUID)
+
+    /// The page that edits `layer`.
+    static func editor(for layer: Layer) -> LayersPage {
+        switch layer.content {
+        case .text: .text(layer.id)
+        case .image: .image(layer.id)
+        }
+    }
 }

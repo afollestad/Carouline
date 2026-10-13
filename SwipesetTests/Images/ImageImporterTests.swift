@@ -126,6 +126,42 @@ struct ImageImporterTests {
         #expect(opaque.red < 5 && opaque.green < 5 && opaque.blue > 250)
     }
 
+    @Test func keepsALayerPicturesTransparencyAsAPNG() async throws {
+        let source = try file("cutout.png")
+        try TestImages.writePNG(width: 200, height: 100, to: source)
+        let copy = try file("layer")
+
+        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy)
+
+        #expect(made.format == .png)
+        let image = try #require(TestImages.decode(copy))
+        #expect(TestImages.pixel(of: image, at: CGPoint(x: 50, y: 50))?.alpha == 0)
+        #expect(TestImages.pixel(of: image, at: CGPoint(x: 150, y: 50)) == TestImages.Pixel(red: 0, green: 0, blue: 255, alpha: 255))
+    }
+
+    /// An alpha channel with nothing clear in it, as screenshots have, keeps nothing a JPEG loses.
+    @Test func copiesAnOpaquePNGLayerPictureAsAJPEG() async throws {
+        let source = try file("screenshot.png")
+        try TestImages.writePNG(width: 200, height: 100, isOpaque: true, to: source)
+        let copy = try file("layer")
+
+        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy)
+
+        #expect(made.format == .jpeg)
+        #expect(TestImages.decode(copy) != nil)
+    }
+
+    @Test func shrinksALayerPictureToTheLargestALayerDraws() async throws {
+        let source = try file("large.jpg")
+        try TestImages.writeJPEG(width: 4000, height: 3000, to: source)
+        let copy = try file("layer")
+
+        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy)
+
+        #expect(made.size == CGSize(width: 2160, height: 1620))
+        #expect(made.format == .jpeg)
+    }
+
     @Test func refusesAFileThatIsntAnImage() async throws {
         let source = try file("note.jpg")
         try Data("not an image".utf8).write(to: source)

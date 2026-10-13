@@ -161,7 +161,8 @@ extension ScreenSnapshotting {
                         Layer(
                             id: fixtureID(190),
                             content: .image(ImageLayer(
-                                image: PlacedImage(id: layeredStickerID, assetIdentifier: nil, pixelWidth: 600, pixelHeight: 600, fileFormat: .png)
+                                image: PlacedImage(id: layeredStickerID, assetIdentifier: nil, pixelWidth: 600, pixelHeight: 600, fileFormat: .png),
+                                borderWidth: 0.05
                             )),
                             placement: LayerPlacement(centerX: 0.75, centerY: 0.76, scale: 0.6)
                         )
@@ -187,7 +188,6 @@ extension ScreenSnapshotting {
             slideID: project.slides[0].id,
             session: session,
             actions: .preview,
-            kinds: [.text],
             dynamicTypeSize: .large
         ) {}
         .environment(\.imageLoader, imageLoader)

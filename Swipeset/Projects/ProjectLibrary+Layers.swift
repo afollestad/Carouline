@@ -43,6 +43,45 @@ extension ProjectLibrary {
         return true
     }
 
+    /// Copies the picture `source` produces onto slide `slideID` as a new layer on top, in the
+    /// slide's middle, returning where it went, or nil when there was nothing to copy, the copy
+    /// failed, or the slide went meanwhile. Each import adds a layer of its own, so a second pick
+    /// for the slide never replaces the first, however long either takes.
+    func importImageLayer(
+        into slideID: UUID,
+        of projectID: UUID,
+        assetIdentifier: String?,
+        from source: @escaping @Sendable () async throws -> PhotoSource?
+    ) async -> LayerAddress? {
+        importingLayers[slideID, default: 0] += 1
+        defer {
+            let remaining = (importingLayers[slideID] ?? 1) - 1
+            importingLayers[slideID] = remaining > 0 ? remaining : nil
+        }
+        let request = CopyRequest(projectID: projectID, assetIdentifier: assetIdentifier, crop: ImageCrop()) { photo, destination in
+            try await ImageImporter.makeLayerCopy(of: photo, at: destination)
+        }
+        var address: LayerAddress?
+        do {
+            try await adoptCopy(request, from: source) {
+                true
+            } place: { image in
+                guard let span = slide(slideID, in: projectID)?.span else {
+                    return false
+                }
+                let layer = Layer(content: .image(ImageLayer(image: image)), placement: .middle(ofSpan: span))
+                guard saveLayer(layer, in: slideID, of: projectID) else {
+                    return false
+                }
+                address = LayerAddress(projectID: projectID, slideID: slideID, layerID: layer.id)
+                return true
+            }
+        } catch {
+            failure = LibraryFailure(kind: .importPhoto, error: error)
+        }
+        return address
+    }
+
     /// Gives the layer at `address` `content`, as its editor leaves it, keeping the rest of the
     /// layer as it is now, so an edit never undoes a move made meanwhile. A picture keeps the
     /// copy it shows, since an editor changes its border and blur, never which picture it is.
