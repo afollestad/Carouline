@@ -44,10 +44,6 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(styledProject))
     }
 
-    @Test func styleSheet() async {
-        await assertScreenSnapshot(of: StyleSheet(style: .constant(styledProject.style)) {})
-    }
-
     @Test func exportSlides() async throws {
         try await assertScreenSnapshot(of: exportSheet(projects[0]))
     }

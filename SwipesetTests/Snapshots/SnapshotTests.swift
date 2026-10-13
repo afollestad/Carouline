@@ -275,10 +275,11 @@ extension ScreenSnapshotting {
         return project
     }
 
-    /// The grid on black, with wide spacing and a border.
+    /// The grid alone on black, with wide spacing and a border, beside slides in the standard
+    /// style.
     var styledProject: Project {
         var project = gridFirst
-        project.style = SlideStyle(spacing: 0.03, border: 0.05, background: .black)
+        project.slides[0].style = SlideStyle(spacing: 0.03, border: 0.05, background: .black)
         return project
     }
 

@@ -63,8 +63,8 @@ struct SlideExporterTests {
 
     @Test func fillsGapsAndBorderWithTheBackground() async throws {
         let style = SlideStyle(spacing: 0.05, border: 0.05, background: RGBColor(red: 0, green: 1, blue: 0))
-        let slide = Slide(layout: .twoColumns, cells: [photo(), photo()])
-        let project = Project(name: "Style", aspectRatio: .square, style: style, slides: [slide])
+        let slide = Slide(layout: .twoColumns, cells: [photo(), photo()], style: style)
+        let project = Project(name: "Style", aspectRatio: .square, slides: [slide])
 
         let file = try #require(try await exporter.export(project).files.first)
 
@@ -79,8 +79,8 @@ struct SlideExporterTests {
     /// A tall cell shows a slice of the wide photo; its crop decides which half.
     @Test func placesPhotosByTheirCrop() async throws {
         let style = SlideStyle(spacing: 0, border: 0, background: .white)
-        let slide = Slide(layout: .twoColumns, cells: [photo(centerX: 0.25), photo(centerX: 0.75)])
-        let project = Project(name: "Crop", aspectRatio: .square, style: style, slides: [slide])
+        let slide = Slide(layout: .twoColumns, cells: [photo(centerX: 0.25), photo(centerX: 0.75)], style: style)
+        let project = Project(name: "Crop", aspectRatio: .square, slides: [slide])
 
         let file = try #require(try await exporter.export(project).files.first)
 
@@ -119,7 +119,7 @@ struct SlideExporterTests {
     /// the second, and nothing of the green background shows where the two meet.
     @Test func cutsAPanoramaWithoutASeam() async throws {
         let style = SlideStyle(spacing: 0, border: 0, background: RGBColor(red: 0, green: 1, blue: 0))
-        let project = Project(name: "Seam", aspectRatio: .square, style: style, slides: [Slide(layout: .panorama, span: 2, cells: [photo()])])
+        let project = Project(name: "Seam", aspectRatio: .square, slides: [Slide(layout: .panorama, span: 2, cells: [photo()], style: style)])
 
         let files = try await exporter.export(project).files
 
@@ -138,7 +138,7 @@ struct SlideExporterTests {
 
     @Test func framesAPanoramaOnlyAtItsOuterEdges() async throws {
         let style = SlideStyle(spacing: 0, border: 0.05, background: RGBColor(red: 0, green: 1, blue: 0))
-        let project = Project(name: "Frame", aspectRatio: .square, style: style, slides: [Slide(layout: .panorama, span: 2, cells: [photo()])])
+        let project = Project(name: "Frame", aspectRatio: .square, slides: [Slide(layout: .panorama, span: 2, cells: [photo()], style: style)])
 
         let files = try await exporter.export(project).files
 
@@ -153,6 +153,31 @@ struct SlideExporterTests {
         for (image, x) in [(first, CGFloat(1079)), (second, CGFloat(0))] {
             let pixel = try #require(TestImages.pixel(of: image, at: CGPoint(x: x, y: 540)))
             #expect(pixel.green < 25)
+        }
+    }
+
+    /// Each slide's border is its own background, on every slide a panorama posts as.
+    @Test func givesEachSlideItsOwnStyle() async throws {
+        let backgrounds = [RGBColor(red: 0, green: 1, blue: 0), RGBColor(red: 1, green: 0, blue: 0), RGBColor(red: 0, green: 0, blue: 1)]
+        let styles = backgrounds.map { SlideStyle(spacing: 0, border: 0.05, background: $0) }
+        let slides = [
+            Slide(layout: .single, cells: [photo()], style: styles[0]),
+            Slide(layout: .panorama, span: 2, cells: [photo()], style: styles[1]),
+            Slide(layout: .single, cells: [photo()], style: styles[2])
+        ]
+        let project = Project(name: "Mixed", aspectRatio: .square, slides: slides)
+
+        let files = try await exporter.export(project).files
+
+        // A panorama's border frames only its outer edges.
+        let borders: [(x: CGFloat, color: RGBColor)] = [(20, backgrounds[0]), (20, backgrounds[1]), (1060, backgrounds[1]), (20, backgrounds[2])]
+        #expect(files.count == borders.count)
+        for (file, border) in zip(files, borders) {
+            let image = try #require(TestImages.decode(file))
+            let pixel = try #require(TestImages.pixel(of: image, at: CGPoint(x: border.x, y: 540)))
+            #expect(abs(Double(pixel.red) - border.color.red * 255) < 25)
+            #expect(abs(Double(pixel.green) - border.color.green * 255) < 25)
+            #expect(abs(Double(pixel.blue) - border.color.blue * 255) < 25)
         }
     }
 

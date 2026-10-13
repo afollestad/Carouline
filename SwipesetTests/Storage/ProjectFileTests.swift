@@ -8,215 +8,10 @@ import Testing
 @testable import Swipeset
 
 struct ProjectFileTests {
-    /// A project as version 1 saves it. Every build must keep reading it.
-    private static let version1 = """
-        {
-          "formatVersion" : 1,
-          "project" : {
-            "aspectRatio" : "4:5",
-            "createdAt" : "2026-10-12T15:00:00Z",
-            "id" : "6A1F2B3C-0000-4000-8000-000000000001",
-            "modifiedAt" : "2026-10-12T16:30:00Z",
-            "name" : "Lisbon",
-            "slides" : [
-              {
-                "cells" : [
-                  {
-                    "image" : {
-                      "assetIdentifier" : "ABC123/L0/001",
-                      "crop" : {
-                        "centerX" : 0.25,
-                        "centerY" : 0.5,
-                        "scale" : 1.5
-                      },
-                      "id" : "6A1F2B3C-0000-4000-8000-000000000003",
-                      "pixelHeight" : 3072,
-                      "pixelWidth" : 2304
-                    }
-                  },
-                  {
-
-                  }
-                ],
-                "id" : "6A1F2B3C-0000-4000-8000-000000000002",
-                "layout" : "twoColumns"
-              }
-            ],
-            "style" : {
-              "background" : {
-                "blue" : 1,
-                "green" : 1,
-                "red" : 1
-              },
-              "border" : 0,
-              "spacing" : 0.01
-            }
-          }
-        }
-        """
-
-    /// A project as version 2 saves it, with a slide and a panorama. Every build must keep reading it.
-    private static let version2 = """
-        {
-          "formatVersion" : 2,
-          "project" : {
-            "aspectRatio" : "4:5",
-            "createdAt" : "2026-10-12T15:00:00Z",
-            "id" : "6A1F2B3C-0000-4000-8000-000000000001",
-            "modifiedAt" : "2026-10-12T16:30:00Z",
-            "name" : "Lisbon",
-            "slides" : [
-              {
-                "cells" : [
-                  {
-
-                  }
-                ],
-                "id" : "6A1F2B3C-0000-4000-8000-000000000002",
-                "layout" : "single",
-                "span" : 1
-              },
-              {
-                "cells" : [
-                  {
-                    "image" : {
-                      "assetIdentifier" : "ABC123/L0/001",
-                      "crop" : {
-                        "centerX" : 0.5,
-                        "centerY" : 0.5,
-                        "scale" : 1
-                      },
-                      "id" : "6A1F2B3C-0000-4000-8000-000000000004",
-                      "pixelHeight" : 1000,
-                      "pixelWidth" : 4000
-                    }
-                  }
-                ],
-                "id" : "6A1F2B3C-0000-4000-8000-000000000003",
-                "layout" : "panorama",
-                "span" : 4
-              }
-            ],
-            "style" : {
-              "background" : {
-                "blue" : 1,
-                "green" : 1,
-                "red" : 1
-              },
-              "border" : 0,
-              "spacing" : 0.01
-            }
-          }
-        }
-        """
-
-    /// A project as version 3 saves it, with a blurred slide under a text layer and a PNG
-    /// picture layer. Every build must keep reading it.
-    private static let version3 = """
-        {
-          "formatVersion" : 3,
-          "project" : {
-            "aspectRatio" : "4:5",
-            "createdAt" : "2026-10-12T15:00:00Z",
-            "id" : "6A1F2B3C-0000-4000-8000-000000000001",
-            "modifiedAt" : "2026-10-12T16:30:00Z",
-            "name" : "Lisbon",
-            "slides" : [
-              {
-                "blur" : 0.02,
-                "cells" : [
-                  {
-                    "image" : {
-                      "crop" : {
-                        "centerX" : 0.5,
-                        "centerY" : 0.5,
-                        "scale" : 2
-                      },
-                      "id" : "6A1F2B3C-0000-4000-8000-000000000003",
-                      "pixelHeight" : 3072,
-                      "pixelWidth" : 2304
-                    }
-                  }
-                ],
-                "id" : "6A1F2B3C-0000-4000-8000-000000000002",
-                "layers" : [
-                  {
-                    "content" : {
-                      "text" : {
-                        "alignment" : "leading",
-                        "color" : {
-                          "blue" : 1,
-                          "green" : 1,
-                          "red" : 1
-                        },
-                        "font" : "serif",
-                        "hasShadow" : true,
-                        "isHighlighted" : false,
-                        "text" : "Lisbon"
-                      }
-                    },
-                    "id" : "6A1F2B3C-0000-4000-8000-000000000004",
-                    "placement" : {
-                      "centerX" : 0.25,
-                      "centerY" : 0.2,
-                      "rotation" : -0.1,
-                      "scale" : 1.5
-                    }
-                  },
-                  {
-                    "content" : {
-                      "image" : {
-                        "blur" : 0,
-                        "borderColor" : {
-                          "blue" : 1,
-                          "green" : 1,
-                          "red" : 1
-                        },
-                        "borderWidth" : 0.05,
-                        "image" : {
-                          "crop" : {
-                            "centerX" : 0.5,
-                            "centerY" : 0.5,
-                            "scale" : 1
-                          },
-                          "fileFormat" : "png",
-                          "id" : "6A1F2B3C-0000-4000-8000-000000000006",
-                          "pixelHeight" : 600,
-                          "pixelWidth" : 800
-                        }
-                      }
-                    },
-                    "id" : "6A1F2B3C-0000-4000-8000-000000000005",
-                    "placement" : {
-                      "centerX" : 0.7,
-                      "centerY" : 0.75,
-                      "rotation" : 0,
-                      "scale" : 0.75
-                    }
-                  }
-                ],
-                "layout" : "single",
-                "span" : 1
-              }
-            ],
-            "style" : {
-              "background" : {
-                "blue" : 1,
-                "green" : 1,
-                "red" : 1
-              },
-              "border" : 0,
-              "spacing" : 0.01
-            }
-          }
-        }
-        """
-
     @Test func readsVersion1() throws {
         let project = try ProjectFile.decode(Data(Self.version1.utf8))
         #expect(project.name == "Lisbon")
         #expect(project.aspectRatio == .portrait)
-        #expect(project.style == .standard)
         #expect(project.createdAt == Date(timeIntervalSince1970: 1_791_817_200))
         let slide = try #require(project.slides.first)
         #expect(slide.layout == .twoColumns)
@@ -230,6 +25,7 @@ struct ProjectFileTests {
         #expect(image.fileFormat == .jpeg)
         #expect(slide.layers.isEmpty)
         #expect(slide.blur == 0)
+        #expect(slide.style == .standard)
     }
 
     @Test func readsVersion2() throws {
@@ -240,7 +36,7 @@ struct ProjectFileTests {
         let image = try #require(project.slides[1].cells.first?.image)
         #expect(image.pixelSize == CGSize(width: 4000, height: 1000))
         #expect(image.fileFormat == .jpeg)
-        #expect(project.slides.allSatisfy { $0.layers.isEmpty && $0.blur == 0 })
+        #expect(project.slides.allSatisfy { $0.layers.isEmpty && $0.blur == 0 && $0.style == .standard })
     }
 
     @Test func readsVersion3() throws {
@@ -258,6 +54,43 @@ struct ProjectFileTests {
         #expect(picture.image.fileName == "6A1F2B3C-0000-4000-8000-000000000006.png")
         #expect(picture.borderWidth == 0.05)
         #expect(project.images.map(\.fileFormat) == [.jpeg, .png])
+        #expect(slide.style == .standard)
+    }
+
+    @Test func readsVersion4() throws {
+        let project = try ProjectFile.decode(Data(Self.version4.utf8))
+        #expect(project.slides.map(\.style) == [.standard, SlideStyle(spacing: 0.02, border: 0.03, background: .black)])
+        #expect(project.slides.map(\.blur) == [0, 0.02])
+        // Writes back as read, with the style on every slide, even the standard one.
+        #expect(String(bytes: try ProjectFile.encode(project), encoding: .utf8) == Self.version4)
+    }
+
+    /// Versions 1 to 3 kept one style on the project, which every slide takes.
+    @Test func movesTheProjectStyleOntoEverySlide() throws {
+        let json = Self.version2
+            .replacingOccurrences(of: "\"spacing\" : 0.01", with: "\"spacing\" : 0.04")
+            .replacingOccurrences(of: "\"blue\" : 1", with: "\"blue\" : 0")
+            .replacingOccurrences(of: "\"green\" : 1", with: "\"green\" : 0")
+            .replacingOccurrences(of: "\"red\" : 1", with: "\"red\" : 0")
+        let project = try ProjectFile.decode(Data(json.utf8))
+        let style = SlideStyle(spacing: 0.04, border: 0, background: .black)
+        #expect(project.slides.map(\.style) == [style, style])
+    }
+
+    /// Every build before version 4 wrote the project's style, so a file without it is damaged.
+    @Test func refusesAnOldProjectWithoutItsStyle() {
+        let json = Self.version2.replacingOccurrences(of: "\"style\"", with: "\"unused\"")
+        #expect(throws: ProjectFile.ReadError.damaged) {
+            try ProjectFile.decode(Data(json.utf8))
+        }
+    }
+
+    /// A style past its range is clamped, whether a slide's own or one an older project held.
+    @Test func clampsStyles() throws {
+        let legacy = Self.version3.replacingOccurrences(of: "\"spacing\" : 0.01", with: "\"spacing\" : 0.5")
+        #expect(try ProjectFile.decode(Data(legacy.utf8)).slides[0].style.spacing == SlideStyle.maximumSpacing)
+        let current = Self.version4.replacingOccurrences(of: "\"border\" : 0.03", with: "\"border\" : -1")
+        #expect(try ProjectFile.decode(Data(current.utf8)).slides[1].style.border == 0)
     }
 
     /// Layer values out of range are clamped rather than refused, which keeps every photo and
@@ -300,12 +133,13 @@ struct ProjectFileTests {
     @Test func roundTrips() throws {
         let image = PlacedImage(assetIdentifier: "A/B/C", pixelWidth: 3072, pixelHeight: 2048, crop: ImageCrop(scale: 2, centerX: 0.4, centerY: 0.6))
         let sticker = PlacedImage(assetIdentifier: nil, pixelWidth: 500, pixelHeight: 500, fileFormat: .png)
+        let framed = SlideStyle(spacing: 0.03, border: 0.02, background: RGBColor(red: 0.1, green: 0.2, blue: 0.3))
+        let flush = SlideStyle(spacing: 0, border: 0, background: .black)
         let project = Project(
             name: "Trip",
             aspectRatio: .landscape,
-            style: SlideStyle(spacing: 0.03, border: 0.02, background: RGBColor(red: 0.1, green: 0.2, blue: 0.3)),
             slides: [
-                Slide(layout: .grid, cells: [Cell(image: image), Cell(), Cell(), Cell()]),
+                Slide(layout: .grid, cells: [Cell(image: image), Cell(), Cell(), Cell()], style: framed),
                 Slide(
                     layout: .panorama,
                     span: 6,
@@ -313,7 +147,8 @@ struct ProjectFileTests {
                         Layer(content: .text(TextLayer(text: "Across", font: .script, isHighlighted: true)), placement: LayerPlacement(centerX: 3)),
                         Layer(content: .image(ImageLayer(image: sticker, borderWidth: 0.04, blur: 0.01)))
                     ],
-                    blur: 0.01
+                    blur: 0.01,
+                    style: flush
                 )
             ],
             createdAt: Date(timeIntervalSince1970: 1_800_000_000)

@@ -227,14 +227,18 @@ struct ProjectLibraryLayersTests {
         #expect(layers(library, projectID, slideID).first?.placement.centerX == 2.5)
     }
 
-    @Test func changingLayoutKeepsLayersAndBlur() async throws {
+    @Test func changingLayoutKeepsLayersBlurAndStyle() async throws {
         let fixture = try await makeLibrary(.panorama)
         let library = fixture.library
         let projectID = fixture.projectID
         let slideID = fixture.slideID
         let layer = text(placement: LayerPlacement(centerX: 2.25))
         library.saveLayer(layer, in: slideID, of: projectID)
-        library.update(projectID) { $0.slides[0].blur = 0.02 }
+        let style = SlideStyle(spacing: 0.02, border: 0.03, background: .black)
+        library.update(projectID) { project in
+            project.slides[0].blur = 0.02
+            project.slides[0].style = style
+        }
 
         library.changeLayout(of: slideID, in: projectID, to: .grid)
 
@@ -242,6 +246,7 @@ struct ProjectLibraryLayersTests {
         #expect(slide.layers.map(\.id) == [layer.id])
         #expect(slide.layers.first?.placement.centerX == 0.25)
         #expect(slide.blur == 0.02)
+        #expect(slide.style == style)
     }
 
     @Test func deletingASlideDeletesItsLayersCopies() async throws {
@@ -258,27 +263,46 @@ struct ProjectLibraryLayersTests {
         #expect(!copyExists(layer.image, in: projectID))
     }
 
-    /// A slide's blur is kept in range, and its slider's drag saves once, as it's let go, and
-    /// not at all when it's left where it was.
-    @Test func blursASlideOncePerDrag() async throws {
+    /// A slide's blur and style are kept in range, and an edit saves once, as it ends, and not
+    /// at all when they're left where they were.
+    @Test func stylesASlideOncePerEdit() async throws {
         let store = CountingStore()
         let library = ProjectLibrary(store: store, projects: [])
         let projectID = library.createProject(aspectRatio: .portrait).id
-        let slideID = try #require(library.addSlide(.single, to: projectID))
+        let slideID = try #require(library.addSlide(.grid, to: projectID))
         await library.flush()
         let saves = await store.saves
         let session = LayerSession()
+        func slide() throws -> Slide {
+            try #require(library.project(projectID)?.slides.first { $0.id == slideID })
+        }
 
-        session.beginSlideBlur(0, on: slideID)
+        session.beginStyling(try slide())
         for step in 1...20 {
             session.slideBlur = Double(step) / 100
+            session.slideStyle.spacing = Double(step) / 100
         }
-        session.endSlideBlur(to: library, projectID: projectID)
-        library.setBlur(Slide.maximumBlur, of: slideID, in: projectID)
+        session.endStyling(to: library, projectID: projectID)
         await library.flush()
 
-        #expect(library.project(projectID)?.slides.first?.blur == Slide.maximumBlur)
+        #expect(try slide().blur == Slide.maximumBlur)
+        #expect(try slide().style.spacing == SlideStyle.maximumSpacing)
         #expect(await store.saves == saves + 1)
-        #expect(session.blurringSlideID == nil)
+        #expect(session.stylingSlideID == nil)
+
+        // Left where it was, or never begun.
+        session.beginStyling(try slide())
+        session.endStyling(to: library, projectID: projectID)
+        session.endStyling(to: library, projectID: projectID)
+        await library.flush()
+        #expect(await store.saves == saves + 1)
+
+        // A color alone, as the picker leaves one.
+        session.beginStyling(try slide())
+        session.slideStyle.background = .black
+        session.endStyling(to: library, projectID: projectID)
+        await library.flush()
+        #expect(try slide().style.background == .black)
+        #expect(await store.saves == saves + 2)
     }
 }

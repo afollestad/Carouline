@@ -14,7 +14,6 @@ struct SlideCard: View {
     let count: Int
     let canMoveLeft: Bool
     let canMoveRight: Bool
-    let style: SlideStyle
     let size: CGSize
     let importingCells: Set<CellAddress>
     /// Whether a picture is on its way onto the slide as a layer.
@@ -35,7 +34,6 @@ struct SlideCard: View {
                 slide: slide,
                 projectID: projectID,
                 numbers: numbers,
-                style: style,
                 size: size,
                 importingCells: importingCells,
                 cellActions: cellActions,
@@ -50,7 +48,7 @@ struct SlideCard: View {
                     projectID: projectID,
                     slideID: slide.id,
                     span: slide.span,
-                    background: style.background,
+                    background: slide.style.background,
                     size: size,
                     interaction: LayerInteraction(
                         session: layerSession,
@@ -75,7 +73,7 @@ struct SlideCard: View {
                         .padding(14)
                         .glassEffect(.regular, in: .circle)
                         // From the slide, as glass over a slide takes its scheme.
-                        .environment(\.colorScheme, style.background.isLight ? .light : .dark)
+                        .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
                         .position(
                             x: size.width * LayerPlacement.middle(ofSpan: slide.span).centerX / CGFloat(max(1, slide.span)),
                             y: size.height / 2
@@ -203,12 +201,12 @@ struct SlideCard: View {
 }
 
 /// A slide's cells, each with its photo or the way to add one. The only part of the card that
-/// reads a blur the layers sheet's slider is dragging, so each step redraws the photos alone.
+/// reads a blur or style the layers sheet is editing, so each step redraws the photos alone,
+/// rather than the card, which hosts the sheet's popover.
 private struct CardPhotos: View {
     let slide: Slide
     let projectID: UUID
     let numbers: ClosedRange<Int>
-    let style: SlideStyle
     let size: CGSize
     let importingCells: Set<CellAddress>
     let cellActions: CellActions
@@ -217,8 +215,9 @@ private struct CardPhotos: View {
     let isAnythingSelected: Bool
 
     var body: some View {
-        let shownBlur = layerSession.blurringSlideID == slide.id ? layerSession.slideBlur : slide.blur
-        let blur = LayerGeometry.blurRadius(shownBlur, slideWidth: size.width / CGFloat(max(1, slide.span)))
+        let isStyling = layerSession.stylingSlideID == slide.id
+        let style = isStyling ? layerSession.slideStyle : slide.style
+        let blur = LayerGeometry.blurRadius(isStyling ? layerSession.slideBlur : slide.blur, slideWidth: size.width / CGFloat(max(1, slide.span)))
         SlideView(slide: slide, style: style, revealsEmptyCells: true) { index in
             let address = CellAddress(projectID: projectID, slideID: slide.id, index: index)
             CellView(
@@ -261,7 +260,6 @@ private struct CardPhotos: View {
         count: project.carouselSlideCount,
         canMoveLeft: true,
         canMoveRight: true,
-        style: project.style,
         size: CGSize(width: 300, height: 375),
         importingCells: [],
         cellActions: .preview,

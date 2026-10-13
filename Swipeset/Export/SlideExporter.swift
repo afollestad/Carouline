@@ -81,7 +81,7 @@ nonisolated struct SlideExporter: SlideExporting {
             try Task.checkCancellation()
             // One slide's decodes at a time, rather than all of them at once.
             try autoreleasepool {
-                let rendered = try SlideRenderer.render(slide, style: project.style, size: project.aspectRatio.exportSize) { image, size in
+                let rendered = try SlideRenderer.render(slide, size: project.aspectRatio.exportSize) { image, size in
                     decode(image, project.id, size)
                 } piece: { image in
                     try Task.checkCancellation()

@@ -6,7 +6,9 @@
 import SwiftUI
 
 /// The layers sheet's first page: a slide's layers, top first, to restack and delete, over its
-/// layout, which stays at the bottom.
+/// layout, which stays at the bottom, and the slide's style and blur beneath them. The style and
+/// blur draw live on the slide as they're edited, and save once a slider is let go, a swatch is
+/// picked, or the page goes.
 struct LayerList: View {
     let library: ProjectLibrary
     let projectID: UUID
@@ -17,6 +19,8 @@ struct LayerList: View {
     let close: () -> Void
 
     @State private var editMode = EditMode.inactive
+
+    private static let styleTitles = ["Spacing", "Border", "Blur"]
 
     var body: some View {
         // Read from the library each time, so the rows' offsets always match what's shown.
@@ -46,17 +50,19 @@ struct LayerList: View {
             // Its own section, so no drag can drop a layer beneath it.
             Section {
                 layoutRow
-                // A share of the most, which reads plainer than a share of the slide's width.
-                PercentSlider(title: "Blur", value: blur, maximum: 1, fractionLength: 0, showsTitle: true) {
-                    session.endSlideBlur(to: library, projectID: projectID)
-                }
+                styleSlider("Spacing", value: share(of: \.spacing, maximum: SlideStyle.maximumSpacing))
+                styleSlider("Border", value: share(of: \.border, maximum: SlideStyle.maximumBorder))
+                styleSlider("Blur", value: blur)
             }
+            Section {
+                ColorSwatches(title: "Background", color: background, onCommit: endStyling)
+            }
+            ApplyStyleSection(library: library, projectID: projectID, slideID: slideID, session: session)
         }
         .layerPage("Layers", close: close)
-        // VoiceOver's adjustments never end a drag, so what they leave is saved as the list goes.
-        .onDisappear {
-            session.endSlideBlur(to: library, projectID: projectID)
-        }
+        // VoiceOver's adjustments never end a drag, and the color picker never says it's done, so
+        // what they leave is saved as the list goes.
+        .onDisappear(perform: endStyling)
         .toolbar {
             // Its reorder grips are the only sign that a row can be dragged. Hidden, not disabled, with
             // nothing to edit, since a disabled one all but vanishes on the glass.
@@ -88,16 +94,76 @@ struct LayerList: View {
         library.project(projectID)?.slides.first { $0.id == slideID }
     }
 
-    /// The slide's blur, as a share of the most, dragged live on the slide and saved once let go.
+    /// The slide's style as it's shown: as edited, or else as saved.
+    private var shownStyle: SlideStyle {
+        session.stylingSlideID == slideID ? session.slideStyle : slide?.style ?? .standard
+    }
+
+    /// A share of the most, which reads plainer than a share of the slide's width.
+    private func styleSlider(_ title: String, value: Binding<Double>) -> some View {
+        PercentSlider(
+            title: title,
+            value: value,
+            maximum: 1,
+            fractionLength: 0,
+            showsTitle: true,
+            alignedTitles: Self.styleTitles,
+            onCommit: endStyling
+        )
+    }
+
+    /// `keyPath` of the slide's style, as a share of `maximum`.
+    private func share(of keyPath: WritableKeyPath<SlideStyle, Double>, maximum: Double) -> Binding<Double> {
+        Binding {
+            shownStyle[keyPath: keyPath] / maximum
+        } set: { share in
+            if beginStyling() {
+                session.slideStyle[keyPath: keyPath] = Self.wholePercent(share) * maximum
+            }
+        }
+    }
+
+    /// The slide's blur, as a share of the most.
     private var blur: Binding<Double> {
         Binding {
-            (session.blurringSlideID == slideID ? session.slideBlur : slide?.blur ?? 0) / Slide.maximumBlur
+            (session.stylingSlideID == slideID ? session.slideBlur : slide?.blur ?? 0) / Slide.maximumBlur
         } set: { share in
-            if session.blurringSlideID != slideID {
-                session.beginSlideBlur(slide?.blur ?? 0, on: slideID)
+            if beginStyling() {
+                session.slideBlur = Self.wholePercent(share) * Slide.maximumBlur
             }
-            session.slideBlur = share * Slide.maximumBlur
         }
+    }
+
+    private var background: Binding<RGBColor> {
+        Binding {
+            shownStyle.background
+        } set: { color in
+            if beginStyling() {
+                session.slideStyle.background = color
+            }
+        }
+    }
+
+    /// `share` rounded to the percent the slider reads, so slides that read alike are alike.
+    private static func wholePercent(_ share: Double) -> Double {
+        (share * 100).rounded() / 100
+    }
+
+    /// Starts editing the slide's style and blur, unless it already is, first saving any other
+    /// slide's. False once the slide's gone.
+    private func beginStyling() -> Bool {
+        guard let slide else {
+            return false
+        }
+        if session.stylingSlideID != slideID {
+            endStyling()
+            session.beginStyling(slide)
+        }
+        return true
+    }
+
+    private func endStyling() {
+        session.endStyling(to: library, projectID: projectID)
     }
 
     private func address(of layerID: UUID) -> LayerAddress {
@@ -201,6 +267,50 @@ struct LayerList: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Layout, \(slide?.layout.name ?? ""), beneath every layer")
+    }
+}
+
+/// Gives every slide this one's style, once another slide's differs from the one shown. Apart
+/// from the list, so only it redraws as the style is dragged.
+private struct ApplyStyleSection: View {
+    let library: ProjectLibrary
+    let projectID: UUID
+    let slideID: UUID
+    let session: LayerSession
+    @State private var isConfirming = false
+
+    var body: some View {
+        if let project = library.project(projectID), let slide = project.slides.first(where: { $0.id == slideID }) {
+            // As shown, so a color the picker left unsaved can be given too.
+            let style = session.stylingSlideID == slideID ? session.slideStyle : slide.style
+            if !project.slides(besides: slideID, allHave: style) {
+                Section {
+                    Button {
+                        isConfirming = true
+                    } label: {
+                        Label("Apply Style to All Slides", systemImage: "square.on.square")
+                    }
+                    .accessibilityHint("Gives every slide this slide's spacing, border and background")
+                    // From the button, so on iPad it points there.
+                    .confirmationDialog("Apply Style to All Slides?", isPresented: $isConfirming, titleVisibility: .visible) {
+                        Button("Apply to All Slides", action: apply)
+                    } message: {
+                        Text("Every slide takes this slide's spacing, border and background.")
+                    }
+                    // Primary, the row's and the dialog's action alike, since the accent washes out
+                    // on the glass.
+                    .tint(Color.primary)
+                }
+            }
+        }
+    }
+
+    /// Saves the style being edited first, which VoiceOver or the color picker may have left.
+    private func apply() {
+        session.endStyling(to: library, projectID: projectID)
+        withAnimation {
+            library.applyStyle(of: slideID, toAllIn: projectID)
+        }
     }
 }
 

@@ -4,6 +4,7 @@
 //
 
 import CoreGraphics
+import Foundation
 import Testing
 @testable import Swipeset
 
@@ -94,5 +95,13 @@ struct SlideTests {
     ])
     func fitsAPanoramaToItsPhoto(_ fit: Fit) {
         #expect(Slide.panoramaSpan(fitting: CGSize(width: fit.width, height: fit.height), in: fit.aspectRatio) == fit.span)
+    }
+
+    /// Version 1 to 3 slides have no style of their own, which `ProjectFile` gives them from
+    /// their project's.
+    @Test func readsAMissingStyleAsTheStandardOne() throws {
+        let json = #"{"id": "6A1F2B3C-0000-4000-8000-000000000002", "layout": "single", "cells": [{}]}"#
+        let slide = try JSONDecoder().decode(Slide.self, from: Data(json.utf8))
+        #expect(slide.style == .standard)
     }
 }

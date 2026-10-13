@@ -20,6 +20,8 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
     /// How blurred the cells' photos are, as a fraction of one slide's width, so the same blur
     /// shows on screen and in an export.
     var blur: Double
+    /// The space between and around its cells, and the color showing through it.
+    var style: SlideStyle
 
     /// Two is the least that reads as one photo swiped across, and ten, half of Instagram's
     /// twenty, keeps a panorama's export within 10,800 pixels and leaves room for other slides.
@@ -39,7 +41,8 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
         span: Int? = nil,
         cells: [Cell]? = nil,
         layers: [Layer] = [],
-        blur: Double = 0
+        blur: Double = 0,
+        style: SlideStyle = .standard
     ) {
         self.id = id
         self.layout = layout
@@ -48,11 +51,14 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
         self.cells = cells ?? Array(repeating: Cell(), count: layout.grid.cells.count)
         self.layers = layers.map { $0.clamped(span: span) }
         self.blur = blur
+        self.style = style
     }
 
-    /// Reads a missing `span` as 1, since version 1 files predate panoramas, and missing layers
-    /// and blur as none, since version 2 files predate them. A span its layout can't have is
-    /// left for `ProjectFile` to refuse, rather than clamped into another shape.
+    /// Reads a missing `span` as 1, since version 1 files predate panoramas, missing layers and
+    /// blur as none, since version 2 files predate them, and a missing style as the standard one,
+    /// since version 1 to 3 files keep it on the project, which `ProjectFile` moves onto each
+    /// slide. A span its layout can't have is left for `ProjectFile` to refuse, rather than
+    /// clamped into another shape.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -61,10 +67,11 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
         cells = try container.decode([Cell].self, forKey: .cells)
         layers = try container.decodeIfPresent([Layer].self, forKey: .layers) ?? []
         blur = try container.decodeIfPresent(Double.self, forKey: .blur) ?? 0
+        style = try container.decodeIfPresent(SlideStyle.self, forKey: .style) ?? .standard
     }
 
     /// Leaves out layers and blur a slide doesn't have, so a slide without them saves as it did
-    /// before they existed.
+    /// before they existed. Always writes the style, which version 4 files need on every slide.
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -77,6 +84,7 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
         if blur != 0 {
             try container.encode(blur, forKey: .blur)
         }
+        try container.encode(style, forKey: .style)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -86,6 +94,7 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
         case cells
         case layers
         case blur
+        case style
     }
 
     /// Every image the slide holds, in its cells and its layers.

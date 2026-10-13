@@ -6,13 +6,15 @@
 import Foundation
 
 extension ProjectLibrary {
-    /// Appends a slide in `layout` to project `projectID`, returning the new slide's ID.
+    /// Appends a slide in `layout` to project `projectID`, returning the new slide's ID. It takes
+    /// the last slide's style, so a carousel stays alike until a slide is styled apart, and a
+    /// project's first takes the standard one.
     @discardableResult
     func addSlide(_ layout: SlideLayout, to projectID: UUID) -> UUID? {
-        guard project(projectID) != nil else {
+        guard let project = project(projectID) else {
             return nil
         }
-        let slide = Slide(layout: layout)
+        let slide = Slide(layout: layout, style: project.slides.last?.style ?? .standard)
         update(projectID) { $0.slides.append(slide) }
         return slide.id
     }
@@ -42,7 +44,8 @@ extension ProjectLibrary {
     /// Gives slide `slideID` a new layout, carrying its photos over in order and deleting any
     /// the new layout has no cell for. A panorama spans as many slides as its photo fills, which
     /// shows all of it once its framing is reset, since a zoom set for one slide's shape crops
-    /// a panorama to a strip. Its layers and blur carry over, the layers kept on the new span.
+    /// a panorama to a strip. Its layers, blur and style carry over, the layers kept on the new
+    /// span.
     func changeLayout(of slideID: UUID, in projectID: UUID, to layout: SlideLayout) {
         guard let project = project(projectID),
               let slide = project.slides.first(where: { $0.id == slideID }),
@@ -56,7 +59,7 @@ extension ProjectLibrary {
             cells[0].image?.crop = ImageCrop()
             span = Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio)
         }
-        let changed = Slide(id: slideID, layout: layout, span: span, cells: cells, layers: slide.layers, blur: slide.blur)
+        let changed = Slide(id: slideID, layout: layout, span: span, cells: cells, layers: slide.layers, blur: slide.blur, style: slide.style)
         update(projectID, deletingImages: dropped) { project in
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return
@@ -82,25 +85,36 @@ extension ProjectLibrary {
         }
     }
 
-    /// Blurs slide `slideID`'s photos by `blur`, kept within `Slide.maximumBlur`, if it changed.
-    func setBlur(_ blur: Double, of slideID: UUID, in projectID: UUID) {
+    /// Gives slide `slideID` `style` and blurs its photos by `blur`, each kept in range, in one
+    /// save if either changed.
+    func setStyle(_ style: SlideStyle, blur: Double, of slideID: UUID, in projectID: UUID) {
+        let style = style.clamped()
         let blur = min(max(blur, 0), Slide.maximumBlur)
-        guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }), slide.blur != blur else {
+        guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }),
+              slide.style != style || slide.blur != blur else {
             return
         }
         update(projectID) { project in
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return
             }
+            project.slides[index].style = style
             project.slides[index].blur = blur
         }
     }
 
-    func setStyle(_ style: SlideStyle, of projectID: UUID) {
-        guard let project = project(projectID), project.style != style else {
+    /// Gives every slide the style of slide `slideID`, leaving each its own blur, if any differs.
+    func applyStyle(of slideID: UUID, toAllIn projectID: UUID) {
+        guard let project = project(projectID),
+              let style = project.slides.first(where: { $0.id == slideID })?.style,
+              !project.slides(besides: slideID, allHave: style) else {
             return
         }
-        update(projectID) { $0.style = style }
+        update(projectID) { project in
+            for index in project.slides.indices {
+                project.slides[index].style = style
+            }
+        }
     }
 
     /// How many of `slide`'s photos `layout` has no cell for.

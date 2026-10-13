@@ -22,8 +22,6 @@ struct ProjectScreen: View {
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var session: CropSession
     @State private var layerSession: LayerSession
-    /// The style being edited, which the slides draw while the style sheet is open.
-    @State private var styleDraft: SlideStyle?
     /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
     @State private var quietRestores: Set<UUID> = []
     @Environment(\.photoLibrary) private var photoLibrary
@@ -55,8 +53,7 @@ struct ProjectScreen: View {
     }
 
     private func content(_ project: Project) -> some View {
-        let shown = shown(project)
-        let screen = strip(shown)
+        let screen = strip(project)
             .modifier(SelectionBarOverlay(
                 library: library,
                 session: session,
@@ -79,14 +76,14 @@ struct ProjectScreen: View {
                 onDone: { select(nil) }
             ))
             .modifier(LayerBarOverlay(
-                project: shown,
+                project: project,
                 session: layerSession,
                 actions: layerActions,
                 onCommitSize: saveLivePlacement,
                 onDone: { selectLayer(nil) }
             ))
             .background {
-                SlideBackdrop(slide: frontSlide(of: shown), projectID: projectID, style: shown.style, aspectRatio: shown.aspectRatio)
+                SlideBackdrop(slide: frontSlide(of: project), projectID: projectID, aspectRatio: project.aspectRatio)
             }
             .navigationTitle(nameBinding)
             .navigationBarTitleDisplayMode(.inline)
@@ -97,12 +94,6 @@ struct ProjectScreen: View {
             .toolbar {
                 toolbar(project)
             }
-            .onChange(of: presenter.current == .style) { _, isStyling in
-                if !isStyling {
-                    saveStyleDraft()
-                    styleDraft = nil
-                }
-            }
         return presentations(over: screen, project: project)
     }
 
@@ -110,21 +101,11 @@ struct ProjectScreen: View {
         ProjectToolbar(
             project: project,
             exporter: SlideExporter(paths: library.store.paths),
-            isStyling: isPresenting(.style),
             isExporting: isPresenting(.export),
-            style: styleDraftBinding(project),
-            onStyle: {
-                // Not again while it's open, which would drop the unsaved draft.
-                if presenter.current != .style {
-                    styleDraft = project.style
-                }
-                presenter.present(.style)
-            },
             onShare: {
                 select(nil)
                 presenter.present(.export)
             },
-            onCommitStyle: saveStyleDraft,
             onPopoverGone: { presenter.presentPending() }
         )
     }
@@ -165,15 +146,6 @@ struct ProjectScreen: View {
                 await openDebugSheet()
             }
             #endif
-    }
-
-    /// `project` as the strip draws it, in the style being edited.
-    private func shown(_ project: Project) -> Project {
-        var project = project
-        if let styleDraft {
-            project.style = styleDraft
-        }
-        return project
     }
 
     /// The slide in the middle of the strip, which lights the backdrop.
@@ -220,20 +192,6 @@ struct ProjectScreen: View {
             if target == nil {
                 presenter.dismiss { if case .camera = $0 { true } else { false } }
             }
-        }
-    }
-
-    private func styleDraftBinding(_ project: Project) -> Binding<SlideStyle> {
-        Binding {
-            styleDraft ?? project.style
-        } set: { style in
-            styleDraft = style
-        }
-    }
-
-    private func saveStyleDraft() {
-        if let styleDraft {
-            library.setStyle(styleDraft, of: projectID)
         }
     }
 

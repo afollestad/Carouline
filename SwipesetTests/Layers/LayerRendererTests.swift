@@ -81,15 +81,13 @@ struct LayerRendererTests {
         return Layer(content: .image(ImageLayer(image: image, borderWidth: border, borderColor: .black, blur: blur)), placement: placement)
     }
 
-    /// The slides exported from a project of `slides` in `style`, decoded, on square 1080-pixel
-    /// slides.
+    /// The slides exported from a project of `slides`, decoded, on square 1080-pixel slides.
     private func export(
         _ slides: [Slide],
-        style: SlideStyle = .standard,
         missing: Set<UUID> = [],
         drawn: [UUID: CGImage] = [:]
     ) async throws -> (images: [CGImage], result: ExportResult) {
-        let project = Project(name: "Layers", aspectRatio: .square, style: style, slides: slides)
+        let project = Project(name: "Layers", aspectRatio: .square, slides: slides)
         let result = try await exporter(missing: missing, drawn: drawn).export(project)
         return (try result.files.map { try #require(TestImages.decode($0)) }, result)
     }
@@ -150,9 +148,9 @@ struct LayerRendererTests {
     /// slide's border stay sharp, as on screen.
     @Test func blursACellInsideItsEdges() async throws {
         let photo = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400)
-        let slide = Slide(layout: .single, cells: [Cell(image: photo)], blur: 0.02)
         let style = SlideStyle(spacing: 0, border: 0.05, background: .white)
-        let image = try await export([slide], style: style, drawn: [photo.id: Self.redAndBlue()]).images[0]
+        let slide = Slide(layout: .single, cells: [Cell(image: photo)], blur: 0.02, style: style)
+        let image = try await export([slide], drawn: [photo.id: Self.redAndBlue()]).images[0]
 
         // Red then blue, split at 540, inside a 54-pixel border.
         let middle = try pixel(image, 540, 540)
@@ -165,9 +163,9 @@ struct LayerRendererTests {
     @Test func blursAPhotoWhereItsFramed() async throws {
         // A tall photo, red over blue, framed a little above its middle.
         let photo = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 800, crop: ImageCrop(centerY: 0.4))
-        let slide = Slide(layout: .single, cells: [Cell(image: photo)], blur: 0.02)
         let style = SlideStyle(spacing: 0, border: 0.05, background: .white)
-        let image = try await export([slide], style: style, drawn: [photo.id: Self.redAndBlue(height: 800, stacked: true)]).images[0]
+        let slide = Slide(layout: .single, cells: [Cell(image: photo)], blur: 0.02, style: style)
+        let image = try await export([slide], drawn: [photo.id: Self.redAndBlue(height: 800, stacked: true)]).images[0]
 
         // Drawn 972 by 1944 across a 972-pixel cell, so its middle falls 194 below the cell's, at 734.
         #expect(isRed(try pixel(image, 540, 600)))
@@ -177,9 +175,9 @@ struct LayerRendererTests {
     /// A blurred panorama's photo blurs as one, so its pieces meet without a seam.
     @Test func blursAPanoramaAcrossItsCuts() async throws {
         let photo = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400)
-        let slide = Slide(layout: .panorama, span: 2, cells: [Cell(image: photo)], blur: 0.02)
         let style = SlideStyle(spacing: 0, border: 0, background: .white)
-        let images = try await export([slide], style: style, drawn: [photo.id: Self.redAndBlue()]).images
+        let slide = Slide(layout: .panorama, span: 2, cells: [Cell(image: photo)], blur: 0.02, style: style)
+        let images = try await export([slide], drawn: [photo.id: Self.redAndBlue()]).images
 
         // Red then blue, split at the cut, which a sharp photo would meet at in full red and blue.
         let left = try pixel(images[0], 1079, 540)

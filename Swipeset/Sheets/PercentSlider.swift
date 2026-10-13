@@ -14,30 +14,76 @@ struct PercentSlider: View {
     var fractionLength = 1
     /// Whether the title shows before the slider, for a row with no section title to name it.
     var showsTitle = false
+    /// The titles of the sliders stacked with this one, whose widest its title takes the width
+    /// of, so their tracks line up.
+    var alignedTitles: [String] = []
     /// Runs once the slider is let go, for a sheet that saves then.
     var onCommit: () -> Void = {}
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: 12) {
-            if showsTitle {
-                Text(title)
-                    .accessibilityHidden(true)
-            }
-            Slider(value: $value, in: 0...maximum) {
-                Text(title)
-            } onEditingChanged: { isEditing in
-                if !isEditing {
-                    onCommit()
+        // Above the track at the largest sizes, since beside it they'd squeeze it to nothing.
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    if showsTitle {
+                        Text(title)
+                            .accessibilityHidden(true)
+                    }
+                    Spacer(minLength: 0)
+                    share
                 }
+                slider
             }
-            // The share itself, as shown, rather than how far along the slider it is.
-            .accessibilityValue(Text(value, format: .percent.precision(.fractionLength(fractionLength))))
-            Text(value, format: .percent.precision(.fractionLength(fractionLength)))
-                .monospacedDigit()
-                .foregroundStyle(Color.primary)
-                .frame(minWidth: 48, alignment: .trailing)
-                .accessibilityHidden(true)
+        } else {
+            HStack(spacing: 12) {
+                if showsTitle {
+                    alignedTitle
+                }
+                slider
+                share
+            }
         }
+    }
+
+    private var alignedTitle: some View {
+        ZStack(alignment: .leading) {
+            ForEach(alignedTitles, id: \.self) { title in
+                Text(title)
+                    .hidden()
+            }
+            Text(title)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var slider: some View {
+        Slider(value: $value, in: 0...maximum) {
+            Text(title)
+        } onEditingChanged: { isEditing in
+            if !isEditing {
+                onCommit()
+            }
+        }
+        // The share itself, as shown, rather than how far along the slider it is.
+        .accessibilityValue(Text(value, format: format))
+    }
+
+    /// As wide as the most reads, so it doesn't widen and narrow the track as the slider nears it.
+    private var share: some View {
+        ZStack(alignment: .trailing) {
+            Text(maximum, format: format)
+                .hidden()
+            Text(value, format: format)
+        }
+        .monospacedDigit()
+        .foregroundStyle(Color.primary)
+        .frame(minWidth: 48, alignment: .trailing)
+        .accessibilityHidden(true)
+    }
+
+    private var format: FloatingPointFormatStyle<Double>.Percent {
+        .percent.precision(.fractionLength(fractionLength))
     }
 }
 

@@ -5,7 +5,7 @@
 
 import UIKit
 
-/// The space between and around a project's cells, and the color showing through it.
+/// The space between and around a slide's cells, and the color showing through it.
 nonisolated struct SlideStyle: Codable, Hashable, Sendable {
     /// The gap between cells, as a fraction of one slide's width even in a panorama, so it looks
     /// the same on screen and in a 1080-pixel export, and the same across and down a tall slide.
@@ -21,6 +21,14 @@ nonisolated struct SlideStyle: Codable, Hashable, Sendable {
     /// Wider than this, a three-column slide's cells turn into slivers.
     static let maximumSpacing = 0.06
     static let maximumBorder = 0.06
+
+    /// Spacing and border kept within their range, which the sliders read as a share of.
+    func clamped() -> SlideStyle {
+        var style = self
+        style.spacing = min(max(spacing, 0), Self.maximumSpacing)
+        style.border = min(max(border, 0), Self.maximumBorder)
+        return style
+    }
 }
 
 /// An opaque color in gamma-encoded sRGB, as color pickers and image renderers use it.

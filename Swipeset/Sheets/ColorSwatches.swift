@@ -9,7 +9,9 @@ import SwiftUI
 struct ColorSwatches: View {
     let title: String
     @Binding var color: RGBColor
-    /// Runs once a color is picked, for a sheet that saves then.
+    /// Runs once a swatch is picked, for a sheet that saves then. The system picker's colors come
+    /// a stream at a time as it's dragged across, with no sign of the last, so they're left for
+    /// the sheet to save as its edit ends.
     var onCommit: () -> Void = {}
 
     /// White and black, which most carousels use, and the icon's lavender and mint.
@@ -37,7 +39,6 @@ struct ColorSwatches: View {
             color.color
         } set: { picked in
             color = RGBColor(UIColor(picked))
-            onCommit()
         }
     }
 }

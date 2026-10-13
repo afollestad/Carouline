@@ -291,7 +291,7 @@ private struct ProjectThumbnail: View {
             if let slide = project.slides.first {
                 GeometryReader { proxy in
                     let canvas = CGSize(width: proxy.size.width * CGFloat(slide.span), height: proxy.size.height)
-                    SlideView(slide: slide, style: project.style) { index in
+                    SlideView(slide: slide, style: slide.style) { index in
                         if let image = slide.cells[index].image {
                             CellPhoto(
                                 image: image,
@@ -301,11 +301,11 @@ private struct ProjectThumbnail: View {
                             ) { absence in
                                 // A missing photo leaves the slide's background, as the export does.
                                 if absence == .loading {
-                                    PlaceholderCell(background: project.style.background, isLoading: true)
+                                    PlaceholderCell(background: slide.style.background, isLoading: true)
                                 }
                             }
                         } else {
-                            PlaceholderCell(background: project.style.background)
+                            PlaceholderCell(background: slide.style.background)
                         }
                     }
                     .frame(width: canvas.width, height: canvas.height)
@@ -315,7 +315,7 @@ private struct ProjectThumbnail: View {
                             projectID: project.id,
                             slideID: slide.id,
                             span: slide.span,
-                            background: project.style.background,
+                            background: slide.style.background,
                             size: canvas
                         )
                     }

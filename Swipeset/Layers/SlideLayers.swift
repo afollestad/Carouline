@@ -393,14 +393,14 @@ private struct TextLayerView: View {
 #Preview {
     let project = SampleProjects.all[0]
     let slide = project.slides[2]
-    SlideView(slide: slide, style: project.style)
+    SlideView(slide: slide, style: slide.style)
         .overlay {
             SlideLayers(
                 layers: slide.layers,
                 projectID: project.id,
                 slideID: slide.id,
                 span: slide.span,
-                background: project.style.background,
+                background: slide.style.background,
                 size: CGSize(width: 320, height: 400),
                 interaction: LayerInteraction(
                     session: LayerSession(selection: LayerAddress(projectID: project.id, slideID: slide.id, layerID: slide.layers[0].id)),

@@ -24,7 +24,6 @@ nonisolated enum SlideRenderer {
     /// nil when its copy is missing. Counts each missing image once however many pieces it crosses.
     static func render(
         _ slide: Slide,
-        style: SlideStyle,
         size: CGSize,
         image: (PlacedImage, CGSize) -> CGImage?,
         piece: (UIImage) throws -> Void
@@ -32,7 +31,7 @@ nonisolated enum SlideRenderer {
         let canvas = CGSize(width: size.width * CGFloat(slide.span), height: size.height)
         var missing = MissingImages()
         // Decoded once for every piece, rather than again for each piece a panorama crosses.
-        let photos = decodedPhotos(of: slide, style: style, canvas: canvas, missing: &missing.photos, image: image)
+        let photos = decodedPhotos(of: slide, canvas: canvas, missing: &missing.photos, image: image)
         let pictures = decodedPictures(of: slide, canvas: canvas, missing: &missing.layerImages, image: image)
 
         let format = UIGraphicsImageRendererFormat()
@@ -46,7 +45,7 @@ nonisolated enum SlideRenderer {
             try autoreleasepool {
                 let rendered = renderer.image { context in
                     context.cgContext.interpolationQuality = .high
-                    style.background.uiColor.setFill()
+                    slide.style.background.uiColor.setFill()
                     context.fill(CGRect(origin: .zero, size: size))
                     context.cgContext.translateBy(x: -CGFloat(index) * size.width, y: 0)
                     let shown = CGRect(origin: CGPoint(x: CGFloat(index) * size.width, y: 0), size: size)
@@ -97,12 +96,11 @@ nonisolated enum SlideRenderer {
     /// Each cell's photo decoded at the size its crop draws it, counting those missing.
     private static func decodedPhotos(
         of slide: Slide,
-        style: SlideStyle,
         canvas: CGSize,
         missing: inout Int,
         image: (PlacedImage, CGSize) -> CGImage?
     ) -> [DrawnPhoto] {
-        let cells = SlideGeometry.cellFrames(for: slide.layout, in: canvas, style: style, span: slide.span, pixelScale: 1)
+        let cells = SlideGeometry.cellFrames(for: slide.layout, in: canvas, style: slide.style, span: slide.span, pixelScale: 1)
         let sigma = LayerGeometry.blurRadius(slide.blur, slideWidth: LayerGeometry.slideWidth(canvas: canvas, span: slide.span))
         return zip(slide.cells, cells).compactMap { cell, rect in
             guard let placed = cell.image else {

@@ -63,6 +63,12 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: layersSheet(layeredGridFirst))
     }
 
+    /// A styled slide's sliders and its background's swatch, with the way to give its style to
+    /// the slides unlike it.
+    @Test func styledLayersList() async {
+        await assertScreenSnapshot(of: layersSheet(styledProject))
+    }
+
     @Test func layersListEmpty() async {
         await assertScreenSnapshot(of: layersSheet(landscapeProject))
     }

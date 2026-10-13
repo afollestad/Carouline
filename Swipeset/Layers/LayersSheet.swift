@@ -34,8 +34,8 @@ struct LayersSheet: View {
         let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(size))
         return 90 + UIFontMetrics(forTextStyle: .title3).scaledValue(for: 60, compatibleWith: traits)
     }
-    /// An iPad popover's size: the Style popover's width, and tall enough for the text editor's
-    /// field, typefaces and colors without scrolling.
+    /// An iPad popover's size: tall enough for the text editor's field, typefaces and colors
+    /// without scrolling.
     static let popoverSize = CGSize(width: 380, height: 480)
 
     var body: some View {
@@ -96,6 +96,9 @@ struct LayersSheet: View {
             }
         }
         .presentationDetents([typingDetent, .medium, .large], selection: $detent)
+        // A swipe scrolls down to the slide's style, below its layers, rather than growing the sheet
+        // over the slide it changes. Cut down to the text field, the sheet still grows back.
+        .presentationContentInteraction(detent == typingDetent ? .resizes : .scrolls)
         // The slides stay in view and in reach above the sheet, so each change shows on them.
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         .foregroundStyle(Color.primary)
@@ -110,14 +113,14 @@ struct LayersSheet: View {
             session.typingLayerID = nil
             session.keyboardRoom = 0
             session.saveDraft(to: library, projectID: projectID)
-            session.endSlideBlur(to: library, projectID: projectID)
+            session.endStyling(to: library, projectID: projectID)
             onGone()
         }
-        // Typing and a slide's blur survive the app being closed from the background.
+        // Typing and a slide's blur and style survive the app being closed from the background.
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 session.saveDraft(to: library, projectID: projectID, endingEdit: false)
-                session.endSlideBlur(to: library, projectID: projectID)
+                session.endStyling(to: library, projectID: projectID)
             }
         }
     }
@@ -132,15 +135,17 @@ struct LayersSheet: View {
 
     /// Adds a layer of `kind`: new text starts as a draft in the middle of the slide, or of a
     /// panorama's middle slide, since its own middle can fall on a cut, and opens in its editor.
-    /// A picture is picked first, and lands there once it's copied.
+    /// A picture is picked first, and lands there once it's copied. A color the picker left
+    /// unsaved is saved first, so new text reads on it.
     private func add(_ kind: LayerKind) {
+        session.endStyling(to: library, projectID: projectID)
         guard let project = library.project(projectID), let slide = project.slides.first(where: { $0.id == slideID }) else {
             return
         }
         switch kind {
         case .text:
             let layer = Layer(
-                content: .text(TextLayer(on: project.style.background)),
+                content: .text(TextLayer(on: slide.style.background)),
                 placement: .middle(ofSpan: slide.span)
             )
             session.saveDraft(to: library, projectID: projectID)

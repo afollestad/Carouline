@@ -11,7 +11,6 @@ import SwiftUI
 struct SlideBackdrop: View {
     let slide: Slide?
     let projectID: UUID
-    let style: SlideStyle
     let aspectRatio: AspectRatio
     @Environment(\.colorScheme) private var colorScheme
 
@@ -57,7 +56,7 @@ struct SlideBackdrop: View {
         let small = CGSize(width: Self.renderWidth * CGFloat(slide.span), height: Self.renderWidth / aspectRatio.widthOverHeight)
         // Half again past filling, so the blur's fade at the photos' edges falls off the screen.
         let scale = max(size.width / small.width, size.height / small.height) * 1.5
-        return SlideCells(layout: slide.layout, style: style, span: slide.span) {
+        return SlideCells(layout: slide.layout, style: slide.style, span: slide.span) {
             ForEach(slide.cells.indices, id: \.self) { index in
                 if let image = slide.cells[index].image {
                     CellPhoto(image: image, projectID: projectID)
@@ -82,5 +81,5 @@ struct SlideBackdrop: View {
 
 #Preview {
     let project = SampleProjects.all[0]
-    SlideBackdrop(slide: project.slides.first, projectID: project.id, style: project.style, aspectRatio: project.aspectRatio)
+    SlideBackdrop(slide: project.slides.first, projectID: project.id, aspectRatio: project.aspectRatio)
 }

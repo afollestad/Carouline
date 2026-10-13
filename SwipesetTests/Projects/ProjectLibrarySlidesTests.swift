@@ -145,17 +145,58 @@ struct ProjectLibrarySlidesTests {
         await library.flush()
     }
 
-    @Test func savesANewStyleAndIgnoresTheSameOne() async throws {
+    /// A slide's style saves on it alone, and the same style and blur don't save at all.
+    @Test func savesASlidesStyleAndIgnoresTheSameOne() async throws {
         let (library, projectID) = await makeLibrary()
+        let first = try #require(library.addSlide(.single, to: projectID))
+        let second = try #require(library.addSlide(.grid, to: projectID))
         let modified = library.project(projectID)?.modifiedAt
         let style = SlideStyle(spacing: 0.02, border: 0.03, background: .black)
 
-        library.setStyle(.standard, of: projectID)
+        library.setStyle(.standard, blur: 0, of: second, in: projectID)
         #expect(library.project(projectID)?.modifiedAt == modified)
-        library.setStyle(style, of: projectID)
+        library.setStyle(style, blur: 0, of: second, in: projectID)
         await library.flush()
 
-        #expect(await ProjectStore(paths: paths).loadAll().projects.first?.style == style)
+        let saved = await ProjectStore(paths: paths).loadAll().projects.first?.slides ?? []
+        #expect(saved.map(\.id) == [first, second])
+        #expect(saved.map(\.style) == [.standard, style])
+    }
+
+    /// A new slide takes the last one's style, and a project's first the standard one.
+    @Test func givesANewSlideTheLastOnesStyle() async throws {
+        let (library, projectID) = await makeLibrary()
+        let first = try #require(library.addSlide(.single, to: projectID))
+        #expect(slides(library, projectID).map(\.style) == [.standard])
+        let style = SlideStyle(spacing: 0, border: 0.04, background: .black)
+        library.setStyle(style, blur: 0, of: first, in: projectID)
+
+        library.addSlide(.grid, to: projectID)
+
+        #expect(slides(library, projectID).map(\.style) == [style, style])
+    }
+
+    /// Every slide takes the style and keeps its own blur, and slides already alike don't save.
+    @Test func appliesASlidesStyleToEverySlide() async throws {
+        let (library, projectID) = await makeLibrary()
+        let first = try #require(library.addSlide(.single, to: projectID))
+        let second = try #require(library.addSlide(.panorama, to: projectID))
+        let style = SlideStyle(spacing: 0.03, border: 0.02, background: .black)
+        library.setStyle(.standard, blur: 0.02, of: first, in: projectID)
+        library.setStyle(style, blur: 0.01, of: second, in: projectID)
+        #expect(library.project(projectID)?.slides(besides: second, allHave: style) == false)
+
+        library.applyStyle(of: second, toAllIn: projectID)
+
+        let project = try #require(library.project(projectID))
+        #expect(project.slides.map(\.style) == [style, style])
+        #expect(project.slides.map(\.blur) == [0.02, 0.01])
+        #expect(project.slides(besides: second, allHave: style))
+        let modified = project.modifiedAt
+        library.applyStyle(of: first, toAllIn: projectID)
+        #expect(library.project(projectID)?.modifiedAt == modified)
+        await library.flush()
+        #expect(await ProjectStore(paths: paths).loadAll().projects.first?.slides.map(\.style) == [style, style])
     }
 
     // MARK: Helpers

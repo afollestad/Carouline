@@ -103,7 +103,6 @@ struct SlideStrip: View {
                         count: project.carouselSlideCount,
                         canMoveLeft: index > 0,
                         canMoveRight: index < project.slides.count - 1,
-                        style: project.style,
                         size: cardSize(span: slide.span),
                         importingCells: importingCells,
                         isImportingLayer: importingLayers[slide.id] != nil,

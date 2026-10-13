@@ -5,12 +5,11 @@
 
 import Foundation
 
-/// A carousel: slides of one shape and style, saved and exported together.
+/// A carousel: slides of one shape, saved and exported together.
 nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
     let id: UUID
     var name: String
     var aspectRatio: AspectRatio
-    var style: SlideStyle
     /// In carousel order. A panorama is one item that posts as `span` slides, so count and
     /// number the carousel with `carouselSlideCount` and `slideNumbers`.
     var slides: [Slide]
@@ -21,7 +20,6 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
         id: UUID = UUID(),
         name: String,
         aspectRatio: AspectRatio,
-        style: SlideStyle = .standard,
         slides: [Slide] = [],
         createdAt: Date = .now,
         modifiedAt: Date? = nil
@@ -29,7 +27,6 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
         self.id = id
         self.name = name
         self.aspectRatio = aspectRatio
-        self.style = style
         self.slides = slides
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt ?? createdAt
@@ -48,6 +45,12 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
             defer { next += slide.span }
             return next...(next + slide.span - 1)
         }
+    }
+
+    /// Whether every slide but `slideID` has `style` already, so giving them all that slide's
+    /// style would change nothing.
+    func slides(besides slideID: UUID, allHave style: SlideStyle) -> Bool {
+        slides.allSatisfy { $0.id == slideID || $0.style == style }
     }
 
     /// Every image the project's cells and layers hold, which are the only files its folder

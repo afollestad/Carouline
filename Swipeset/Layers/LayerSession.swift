@@ -30,11 +30,14 @@ final class LayerSession {
     /// The layer whose text is being typed, which drops the sheet to just its field. An editor
     /// clears only its own, since SwiftUI doesn't order one editor's going and the next's coming.
     var typingLayerID: UUID?
-    /// The slide whose blur the layers sheet's slider is dragging. It changes only as the drag
-    /// starts and ends, so every slide can read it while only that one reads `slideBlur`.
-    private(set) var blurringSlideID: UUID?
+    /// The slide whose blur and style the layers sheet's controls are editing. It changes only as
+    /// the edit starts and ends, so every slide can read it while only that one reads `slideBlur`
+    /// and `slideStyle`.
+    private(set) var stylingSlideID: UUID?
     /// The blur that slide is being dragged to, before it's saved.
     var slideBlur: Double = 0
+    /// The style that slide is being given, before it's saved.
+    var slideStyle = SlideStyle.standard
     /// The edits of the layer editor on screen: a layer's content, or a new text layer entire,
     /// which its slide draws as they're made, and `saveDraft(to:projectID:)` saves once.
     var draft: Layer?
@@ -149,19 +152,20 @@ final class LayerSession {
         }
     }
 
-    /// Starts dragging slide `slideID`'s blur from `blur`.
-    func beginSlideBlur(_ blur: Double, on slideID: UUID) {
-        slideBlur = blur
-        blurringSlideID = slideID
+    /// Starts editing `slide`'s blur and style from what it has.
+    func beginStyling(_ slide: Slide) {
+        slideBlur = slide.blur
+        slideStyle = slide.style
+        stylingSlideID = slide.id
     }
 
-    /// Ends dragging a slide's blur, saving where it was left once.
-    func endSlideBlur(to library: ProjectLibrary, projectID: UUID) {
-        guard let slideID = blurringSlideID else {
+    /// Ends editing a slide's blur and style, saving what they were left at once.
+    func endStyling(to library: ProjectLibrary, projectID: UUID) {
+        guard let slideID = stylingSlideID else {
             return
         }
-        library.setBlur(slideBlur, of: slideID, in: projectID)
-        blurringSlideID = nil
+        library.setStyle(slideStyle, blur: slideBlur, of: slideID, in: projectID)
+        stylingSlideID = nil
     }
 
     /// Saves a gesture's or the size slider's `placement` for the layer at `address`: into a new

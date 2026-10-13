@@ -8,7 +8,6 @@ import SwiftUI
 /// The layer bar along the bottom of the project screen while a layer is selected, and what
 /// keeps the selection to a layer that's still there.
 struct LayerBarOverlay: ViewModifier {
-    /// The project as the strip draws it.
     let project: Project
     let session: LayerSession
     let actions: LayerActions
