@@ -9,7 +9,7 @@ These rules cover `SwipesetTests/Snapshots/`: `SnapshotTests`, `WideSnapshotTest
 - A passing `verify` doesn't prove a baseline is current. `0.99` precision allows 1% of pixels, and a label or button covers far less, so after an intended change `record` and open the new PNGs.
 - Failed comparisons write the new image to `.build/snapshot-failures/`. Compare it with the baseline to see what moved.
 - `record` rewrites every baseline it runs, with encoder noise even when nothing moved, so pass the identifiers of the ones meant to change.
-- A test with no baseline yet makes `xcsift` report an unrelated test as "did not complete (possible crash)". The raw log has the real outcome; create new baselines with `record`.
+- A failing or missing baseline can make `xcsift` report an unrelated test as "did not complete (possible crash)". Read the real outcome from the run's result bundle under `.build/xcode/Logs/Test` with `xcrun xcresulttool get test-results summary --path`, and create missing baselines with `record`.
 - Baselines hold only on their suite's device, full screen in portrait, in `en_US`, on the current simulator runtime: `SnapshotTests` on iPhone 18 Pro, and `WideSnapshotTests` on iPad mini (A17 Pro). When an Xcode or runtime update fails them with no code change, re-record and review the diffs.
 
 ### Writing
