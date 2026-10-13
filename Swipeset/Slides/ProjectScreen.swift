@@ -355,9 +355,19 @@ struct ProjectScreen: View {
         } onChoose: { layout in
             if let slide {
                 library.changeLayout(of: slide.id, in: projectID, to: layout)
-            } else if let slideID = library.addSlide(layout, to: projectID) {
-                withAnimation {
-                    stripPosition = .slide(slideID)
+            } else {
+                let isFirst = library.project(projectID)?.slides.isEmpty ?? false
+                guard let slideID = library.addSlide(layout, to: projectID) else {
+                    return
+                }
+                if isFirst {
+                    // The strip appears with its first slide in the middle already, and a scroll
+                    // as it appears would push the slides down until the next scroll.
+                    stripPosition = nil
+                } else {
+                    withAnimation {
+                        stripPosition = .slide(slideID)
+                    }
                 }
             }
         }
