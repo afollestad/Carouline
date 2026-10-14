@@ -29,11 +29,14 @@ struct SelectionBarOverlay: ViewModifier {
                 selection != nil
             }
             // A selected photo deleted with its slide, or dropped by a new layout, leaves nothing
-            // to frame, and nothing to bring the strip's scrolling back.
-            .onChange(of: selectedPhotoID) { _, photoID in
+            // to frame, and nothing to bring the strip's scrolling back. One replaced by another,
+            // as a pick or a capture landing does, keeps the selection but not its unsaved crop.
+            .onChange(of: selectedPhotoID) { oldID, photoID in
                 if photoID == nil, session.selection != nil {
-                    session.liveCrop = nil
+                    session.discardFraming()
                     session.selection = nil
+                } else if oldID != nil, photoID != nil {
+                    session.discardFraming()
                 }
             }
     }

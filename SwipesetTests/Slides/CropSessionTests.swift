@@ -57,6 +57,20 @@ struct CropSessionTests {
         #expect(session.liveCrop == panned(next.crop, by: -50))
     }
 
+    /// A photo replacing the selected one starts from its own crop, whatever the last one was
+    /// left at mid-gesture or by the zoom slider.
+    @Test func discardingFramingStartsTheNextPhotoFromItsOwnCrop() {
+        let session = session()
+        session.frame(image, translation: CGSize(width: -100, height: 0), magnification: nil, anchor: .zero)
+        let replacement = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 100, crop: ImageCrop(scale: 2))
+
+        session.discardFraming()
+
+        #expect(session.endFraming() == nil)
+        session.frame(replacement, translation: CGSize(width: -50, height: 0), magnification: nil, anchor: .zero)
+        #expect(session.liveCrop == panned(replacement.crop, by: -50))
+    }
+
     @Test func leavesTheCropAloneUntilTheCellHasMeasuredItself() {
         let session = CropSession()
 

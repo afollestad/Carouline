@@ -52,6 +52,13 @@ final class CropSession {
         liveCrop = crop
     }
 
+    /// Drops the gesture and the crop it or the zoom slider left, unsaved, as when another photo
+    /// replaces the one they framed, which they mustn't carry over to.
+    func discardFraming() {
+        liveCrop = nil
+        gestureStart = nil
+    }
+
     /// Ends the gesture, returning the crop it left for saving.
     func endFraming() -> ImageCrop? {
         defer {
