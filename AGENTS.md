@@ -20,7 +20,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Set Info.plist keys, usage descriptions included, as `INFOPLIST_KEY_*` build settings; there is no Info.plist file.
 - First-time setup: `./scripts/setup.sh` installs `swiftlint`, `xcsift` and `axe` and a pre-commit hook that lints.
 - Build, run, test, lint and snapshot through `scripts/`, not raw `xcodebuild`, `simctl launch` or `swiftlint`. They pin the simulator, test locale and DerivedData path (`.build/xcode`) that results and baselines depend on.
-- Build: `./scripts/build.sh`. Run in the simulator: `./scripts/run.sh -b` builds first, while bare `run.sh` relaunches the last build (set `SIMULATOR` to pick another device).
+- Build: `./scripts/build.sh`. Run: `./scripts/run.sh -b` builds first, while bare `run.sh` relaunches the last build; it prefers a reachable iPhone or iPad, so pass `-s` (or set `SIMULATOR` to pick another device) for the simulator, or `-d <name or UDID>` for any device.
 - Tests use Swift Testing: `./scripts/test.sh`, or pass identifiers such as `CaroulineTests/CaroulineAppTests`. It runs `SnapshotTests` on iPhone 18 Pro, `WideSnapshotTests` on iPad mini (A17 Pro), and everything else on `SIMULATOR`'s.
 - Snapshots: `./scripts/snapshots.sh verify`, or `record` to rewrite baselines and then verify them. `CaroulineTests/Snapshots/AGENTS.md` covers both.
 - Lint: `./scripts/lint.sh` from the repo root. SwiftLint runs in strict mode and Swift warnings are errors, so both fail on any warning.
@@ -28,13 +28,13 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 
 ## Verifying UI
 
-- Every visible change is checked in the simulator, not just compiled: launch it with `./scripts/run.sh -b` and capture with `xcrun simctl io <udid> screenshot`.
+- Every visible change is checked in the simulator, not just compiled: launch it with `./scripts/run.sh -b -s` and capture with `xcrun simctl io <udid> screenshot`.
 - Every visible change also runs `./scripts/snapshots.sh verify`. When the change is intended, `record` the affected baselines and look at the new images.
-- Reach other states with debug launch arguments after `--`, e.g. `./scripts/run.sh -b -- -DebugSampleProjects YES -DebugSheet newProject`. `DebugSettings` documents each one; open sheets through `-DebugSheet`, since a presentation on the first frame doesn't render.
+- Reach other states with debug launch arguments after `--`, e.g. `./scripts/run.sh -b -s -- -DebugSampleProjects YES -DebugSheet newProject`. `DebugSettings` documents each one; open sheets through `-DebugSheet`, since a presentation on the first frame doesn't render.
 - `simctl` cannot tap or drag, so use `axe tap`, `axe drag` and `axe describe-ui` with `--udid`, which reach the simulator without the host's cursor. Never post host mouse events, which take over the user's.
 - Tap with `axe tap --tap-style physical`, since the default style can miss buttons in sheets.
 - Long-press with an `axe drag` that moves a point over `--duration 1.5`, since `axe touch` can fail with "could not establish simulator input". Move the zoom slider by dragging its thumb with `axe drag` too, since `axe slider` can't.
-- If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh` boots it again.
+- If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh -s` boots it again.
 - The simulator has no camera, so its cells go straight to the photo picker, whose library already holds sample photos; add more with `xcrun simctl addmedia <udid> <files>`.
 - Judge launch and loading speed with the app opened from a device's Home Screen, or run with the scheme's "Debug executable" off. Xcode's debugger pauses the app for each of the 2,000-odd libraries it loads, adding seconds at launch and on first use of image decoding, haptics and the camera.
 - Restore every temporary patch before finishing. Keep a backup copy and confirm with `git diff`.

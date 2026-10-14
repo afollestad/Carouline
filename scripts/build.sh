@@ -38,10 +38,22 @@ run_and_format() {
   fi
 }
 
+# `--device <udid>` builds for that iPhone or iPad, and lets automatic signing register it and
+# renew its profile.
+destination='generic/platform=iOS Simulator'
+signing_args=()
+if [ "${1:-}" = "--device" ]; then
+  destination="id=${2:?--device needs a device UDID}"
+  signing_args=(-allowProvisioningUpdates)
+  shift 2
+fi
+
+# macOS ships bash 3.2, where `set -u` treats an empty array as unbound, so expand it only when set.
 run_and_format xcodebuild \
   -project Carouline.xcodeproj \
   -scheme Carouline \
-  -destination 'generic/platform=iOS Simulator' \
+  -destination "$destination" \
   -derivedDataPath .build/xcode \
+  ${signing_args[@]+"${signing_args[@]}"} \
   build \
   "$@"
