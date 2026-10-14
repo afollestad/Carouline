@@ -8,16 +8,16 @@ usage() {
   cat <<'USAGE'
 Usage: ./scripts/snapshots.sh [--no-xcsift] <verify|record> [test_identifier ...]
 
-Each suite runs on its own device: `SwipesetTests/SnapshotTests` on iPhone 18 Pro, and
-`SwipesetTests/WideSnapshotTests` on iPad mini (A17 Pro). Defaults to both suites when no
+Each suite runs on its own device: `CaroulineTests/SnapshotTests` on iPhone 18 Pro, and
+`CaroulineTests/WideSnapshotTests` on iPad mini (A17 Pro). Defaults to both suites when no
 test identifiers are provided.
 Failed comparisons write the new image to `.build/snapshot-failures` (override with SNAPSHOT_ARTIFACTS).
 
 Examples:
   ./scripts/snapshots.sh verify
-  ./scripts/snapshots.sh verify 'SwipesetTests/SnapshotTests/emptyProjects()'
+  ./scripts/snapshots.sh verify 'CaroulineTests/SnapshotTests/emptyProjects()'
   ./scripts/snapshots.sh record
-  ./scripts/snapshots.sh record 'SwipesetTests/WideSnapshotTests/emptyProjects()'
+  ./scripts/snapshots.sh record 'CaroulineTests/WideSnapshotTests/emptyProjects()'
 USAGE
 }
 
@@ -66,7 +66,7 @@ for test_name in "$@"; do
       wide_tests+=("-only-testing:$test_name")
       ;;
     *)
-      echo "error: $test_name isn't in SwipesetTests/SnapshotTests or SwipesetTests/WideSnapshotTests." >&2
+      echo "error: $test_name isn't in CaroulineTests/SnapshotTests or CaroulineTests/WideSnapshotTests." >&2
       exit 1
       ;;
   esac
@@ -74,7 +74,7 @@ done
 
 prepare_snapshot_artifacts
 
-raw_log=$(mktemp -t swipeset-snapshots.XXXXXX)
+raw_log=$(mktemp -t carouline-snapshots.XXXXXX)
 trap 'rm -f "$raw_log"' EXIT
 
 # Keeps the raw log alongside the xcsift summary, since only the raw log names each test's
@@ -97,8 +97,8 @@ run_snapshot_tests() {
   local device=$1
   shift
   run_and_format xcodebuild \
-    -project Swipeset.xcodeproj \
-    -scheme Swipeset \
+    -project Carouline.xcodeproj \
+    -scheme Carouline \
     -destination "platform=iOS Simulator,name=$device" \
     -derivedDataPath .build/xcode \
     -testLanguage en \

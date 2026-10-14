@@ -1,4 +1,4 @@
-Swipeset — photo carousels for social posts
+Carouline — photo carousels for social posts
 Copyright (C) 2026 Aidan Follestad
 
 This program is free software: you can redistribute it and/or modify

@@ -9,8 +9,8 @@ cd "$repo_root"
 
 run_and_format() {
   if command -v xcsift >/dev/null 2>&1; then
-    raw_log=$(mktemp -t swipeset-xcodebuild.XXXXXX)
-    filtered_log=$(mktemp -t swipeset-xcsift.XXXXXX)
+    raw_log=$(mktemp -t carouline-xcodebuild.XXXXXX)
+    filtered_log=$(mktemp -t carouline-xcsift.XXXXXX)
     trap 'rm -f "$raw_log" "$filtered_log"' EXIT
     set +e
     "$@" 2>&1 | tee "$raw_log" | xcsift -f toon -w | tee "$filtered_log"
@@ -39,8 +39,8 @@ run_and_format() {
 }
 
 run_and_format xcodebuild \
-  -project Swipeset.xcodeproj \
-  -scheme Swipeset \
+  -project Carouline.xcodeproj \
+  -scheme Carouline \
   -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath .build/xcode \
   build \

@@ -16,13 +16,13 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 ## Build and test
 
 - Xcode 27 project with an iOS 26 deployment target, so gate iOS 27 APIs with `#available`. Use iOS 26 APIs such as Liquid Glass, scroll edge effects, and `navigationSubtitle` freely.
-- Don't register new files under `Swipeset/` or `SwipesetTests/` in `project.pbxproj`, since source folders are synchronized groups that add them to their targets.
+- Don't register new files under `Carouline/` or `CaroulineTests/` in `project.pbxproj`, since source folders are synchronized groups that add them to their targets.
 - Set Info.plist keys, usage descriptions included, as `INFOPLIST_KEY_*` build settings; there is no Info.plist file.
 - First-time setup: `./scripts/setup.sh` installs `swiftlint`, `xcsift` and `axe` and a pre-commit hook that lints.
 - Build, run, test, lint and snapshot through `scripts/`, not raw `xcodebuild`, `simctl launch` or `swiftlint`. They pin the simulator, test locale and DerivedData path (`.build/xcode`) that results and baselines depend on.
 - Build: `./scripts/build.sh`. Run in the simulator: `./scripts/run.sh -b` builds first, while bare `run.sh` relaunches the last build (set `SIMULATOR` to pick another device).
-- Tests use Swift Testing: `./scripts/test.sh`, or pass identifiers such as `SwipesetTests/SwipesetAppTests`. It runs `SnapshotTests` on iPhone 18 Pro, `WideSnapshotTests` on iPad mini (A17 Pro), and everything else on `SIMULATOR`'s.
-- Snapshots: `./scripts/snapshots.sh verify`, or `record` to rewrite baselines and then verify them. `SwipesetTests/Snapshots/AGENTS.md` covers both.
+- Tests use Swift Testing: `./scripts/test.sh`, or pass identifiers such as `CaroulineTests/CaroulineAppTests`. It runs `SnapshotTests` on iPhone 18 Pro, `WideSnapshotTests` on iPad mini (A17 Pro), and everything else on `SIMULATOR`'s.
+- Snapshots: `./scripts/snapshots.sh verify`, or `record` to rewrite baselines and then verify them. `CaroulineTests/Snapshots/AGENTS.md` covers both.
 - Lint: `./scripts/lint.sh` from the repo root. SwiftLint runs in strict mode and Swift warnings are errors, so both fail on any warning.
 - Keep `-parallel-testing-enabled NO` and `-collect-test-diagnostics never` in the test scripts. Parallel testing runs on clones that shut the original simulator down, and failure diagnostics take a sysdiagnose that stalls every failing run for about ten minutes.
 
@@ -54,7 +54,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 
 ## Code conventions
 
-- Group files by theme in folders under `Swipeset/`, mirrored in `SwipesetTests/`. Put a new file in the theme it serves, or start a theme when none fits.
+- Group files by theme in folders under `Carouline/`, mirrored in `CaroulineTests/`. Put a new file in the theme it serves, or start a theme when none fits.
 - Keep each view file to one screen or overlay.
 - Every view has a `#Preview`. Use `@Previewable @State` for bindings.
 - Doc comments explain why a constant has its value, not what the code does.

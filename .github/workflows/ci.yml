@@ -44,7 +44,7 @@ jobs:
             ~/.swiftpm/cache
             ~/Library/Caches/org.swift.swiftpm
             .build/xcode/SourcePackages
-          key: ${{ runner.os }}-xcode-27.0-swiftpm-${{ hashFiles('Swipeset.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ runner.os }}-xcode-27.0-swiftpm-${{ hashFiles('Carouline.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-27.0-swiftpm-
 

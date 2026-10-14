@@ -26,8 +26,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-bundle_id="com.afollestad.Swipeset"
-app_path="$repo_root/.build/xcode/Build/Products/Debug-iphonesimulator/Swipeset.app"
+bundle_id="com.afollestad.Carouline"
+app_path="$repo_root/.build/xcode/Build/Products/Debug-iphonesimulator/Carouline.app"
 simulator_name=${SIMULATOR:-"iPhone 18 Pro"}
 
 udid=$(xcrun simctl list devices available | grep -F "    $simulator_name (" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/' || true)

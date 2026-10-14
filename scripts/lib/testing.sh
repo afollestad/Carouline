@@ -5,15 +5,15 @@
 # each suite runs only on its own device. Matches `SnapshotDevice`.
 snapshot_phone_device="iPhone 18 Pro"
 snapshot_wide_device="iPad mini (A17 Pro)"
-snapshot_suites=(SwipesetTests/SnapshotTests SwipesetTests/WideSnapshotTests)
+snapshot_suites=(CaroulineTests/SnapshotTests CaroulineTests/WideSnapshotTests)
 
 # Prints the device a snapshot test identifier runs on, or nothing for any other identifier.
 snapshot_device() {
   case "$1" in
-    SwipesetTests/SnapshotTests|SwipesetTests/SnapshotTests/*)
+    CaroulineTests/SnapshotTests|CaroulineTests/SnapshotTests/*)
       echo "$snapshot_phone_device"
       ;;
-    SwipesetTests/WideSnapshotTests|SwipesetTests/WideSnapshotTests/*)
+    CaroulineTests/WideSnapshotTests|CaroulineTests/WideSnapshotTests/*)
       echo "$snapshot_wide_device"
       ;;
   esac

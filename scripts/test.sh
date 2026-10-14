@@ -13,7 +13,7 @@ prepare_snapshot_artifacts
 
 simulator_name=${SIMULATOR:-$snapshot_phone_device}
 
-raw_log=$(mktemp -t swipeset-test.XXXXXX)
+raw_log=$(mktemp -t carouline-test.XXXXXX)
 trap 'rm -f "$raw_log"' EXIT
 
 # Keeps the raw log alongside the xcsift summary, since only the raw log names each test's outcome.
@@ -26,7 +26,7 @@ run_and_format() {
 }
 
 if [ "$#" -eq 0 ]; then
-  set -- SwipesetTests
+  set -- CaroulineTests
 fi
 
 # Snapshot tests run on their suite's device and everything else on SIMULATOR's, one pass per
@@ -45,7 +45,7 @@ phone_tests=()
 wide_tests=()
 for test_name in "$@"; do
   targets=("$test_name")
-  if [ "$test_name" = SwipesetTests ]; then
+  if [ "$test_name" = CaroulineTests ]; then
     targets+=(${elsewhere_suites[@]+"${elsewhere_suites[@]}"})
   fi
   for target in "${targets[@]}"; do
@@ -67,8 +67,8 @@ run_tests() {
   shift
   echo "Testing on $device..."
   run_and_format xcodebuild \
-    -project Swipeset.xcodeproj \
-    -scheme Swipeset \
+    -project Carouline.xcodeproj \
+    -scheme Carouline \
     -destination "platform=iOS Simulator,name=$device" \
     -derivedDataPath .build/xcode \
     -testLanguage en \

@@ -1,7 +1,7 @@
 strict: true
 included:
-  - Swipeset
-  - SwipesetTests
+  - Carouline
+  - CaroulineTests
 excluded:
   - .build
 line_length:

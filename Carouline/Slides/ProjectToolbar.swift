@@ -1,0 +1,50 @@
+//
+//  ProjectToolbar.swift
+//  Carouline
+//
+
+import SwiftUI
+
+/// The project screen's Share button, with the popover it opens on a wide screen. A phone's export
+/// sheet comes from the screen, as a sheet that keeps the height it's dragged to.
+struct ProjectToolbar: ToolbarContent {
+    let project: Project
+    let exporter: SlideExporter
+    @Binding var isExporting: Bool
+    let onShare: () -> Void
+    /// Runs as the popover's content goes, once it no longer covers the screen.
+    let onPopoverGone: () -> Void
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            shareButton
+        }
+    }
+
+    private var shareButton: some View {
+        Button("Share Slides", systemImage: "square.and.arrow.up", action: onShare)
+            .disabled(project.slides.isEmpty)
+            .accessibilityHint("Saves the slides to Photos or shares them to another app")
+            .popover(isPresented: $isExporting) {
+                ExportSheet(project: project, exporter: exporter)
+                    .frame(idealWidth: 420, idealHeight: 480)
+                    .onDisappear(perform: onPopoverGone)
+            }
+    }
+}
+
+#Preview {
+    @Previewable @State var isExporting = false
+    NavigationStack {
+        Color.clear
+            .toolbar {
+                ProjectToolbar(
+                    project: SampleProjects.all[0],
+                    exporter: SlideExporter(paths: ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)),
+                    isExporting: $isExporting,
+                    onShare: { isExporting = true },
+                    onPopoverGone: {}
+                )
+            }
+    }
+}
