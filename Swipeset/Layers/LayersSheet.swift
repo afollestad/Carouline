@@ -83,6 +83,7 @@ struct LayersSheet: View {
                 }
             }
         }
+        .environment(\.isLayersSheetFull, height == .large)
         // Measured on screen rather than taken from the detent, so the room includes any gap below
         // a sheet that floats over the bottom safe area.
         .onGeometryChange(for: CGFloat.self) { proxy in
