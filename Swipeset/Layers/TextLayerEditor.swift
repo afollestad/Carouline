@@ -26,22 +26,24 @@ struct TextLayerEditor: View {
                     .lineLimit(1...6)
                     .focused($isTyping)
             }
-            Section("Font") {
-                fonts
-            }
-            Section("Color") {
-                ColorSwatches(title: "Color", color: binding(\.color))
-            }
-            Section("Style") {
-                Picker("Alignment", selection: binding(\.alignment)) {
-                    Label("Leading", systemImage: "text.alignleft").tag(TextLayerAlignment.leading)
-                    Label("Center", systemImage: "text.aligncenter").tag(TextLayerAlignment.center)
-                    Label("Trailing", systemImage: "text.alignright").tag(TextLayerAlignment.trailing)
+            StyleSections(style: style) { style in
+                Section("Font") {
+                    fonts(selected: style.font)
                 }
-                .pickerStyle(.segmented)
-                .labelStyle(.iconOnly)
-                Toggle("Shadow", isOn: binding(\.hasShadow))
-                Toggle("Highlight", isOn: binding(\.isHighlighted))
+                Section("Color") {
+                    ColorSwatches(title: "Color", color: binding(\.color, shown: style))
+                }
+                Section("Style") {
+                    Picker("Alignment", selection: binding(\.alignment, shown: style)) {
+                        Label("Leading", systemImage: "text.alignleft").tag(TextLayerAlignment.leading)
+                        Label("Center", systemImage: "text.aligncenter").tag(TextLayerAlignment.center)
+                        Label("Trailing", systemImage: "text.alignright").tag(TextLayerAlignment.trailing)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelStyle(.iconOnly)
+                    Toggle("Shadow", isOn: binding(\.hasShadow, shown: style))
+                    Toggle("Highlight", isOn: binding(\.isHighlighted, shown: style))
+                }
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -99,9 +101,18 @@ struct TextLayerEditor: View {
         return TextLayer()
     }
 
-    private func binding<Value>(_ keyPath: WritableKeyPath<TextLayer, Value>) -> Binding<Value> {
+    /// The text layer's style, its words left out, which changes only as the style does.
+    private var style: TextLayer {
+        var style = text
+        style.text = ""
+        return style
+    }
+
+    /// The draft's `keyPath`, read from `shown` when it's given rather than from the draft, which
+    /// changes with each keystroke and would redraw whatever reads it.
+    private func binding<Value>(_ keyPath: WritableKeyPath<TextLayer, Value>, shown: TextLayer? = nil) -> Binding<Value> {
         Binding {
-            text[keyPath: keyPath]
+            (shown ?? text)[keyPath: keyPath]
         } set: { value in
             guard session.draftLayerID == layerID, case .text = session.draft?.content else {
                 return
@@ -119,11 +130,11 @@ struct TextLayerEditor: View {
     }
 
     /// Each typeface on offer, drawn in itself.
-    private var fonts: some View {
+    private func fonts(selected: LayerFont) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 ForEach(LayerFont.allCases, id: \.self) { font in
-                    FontTile(font: font, isSelected: text.font == font) {
+                    FontTile(font: font, isSelected: selected == font) {
                         binding(\.font).wrappedValue = font
                     }
                 }
@@ -134,6 +145,24 @@ struct TextLayerEditor: View {
         }
         .scrollIndicators(.hidden)
         .listRowInsets(EdgeInsets())
+    }
+}
+
+/// The editor's sections for the text's style, drawn from `style` alone, so they redraw as the
+/// style changes rather than with each keystroke. SwiftUI compares it by `==`, as it does a view
+/// holding a closure, without `.equatable()`, whose wrapper hides its sections from the form. The
+/// setters they're drawn with only write the session's draft, so those kept from an earlier style
+/// write it as well.
+private struct StyleSections<Content: View>: View, Equatable {
+    let style: TextLayer
+    @ViewBuilder let content: (TextLayer) -> Content
+
+    var body: some View {
+        content(style)
+    }
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.style == rhs.style
     }
 }
 
