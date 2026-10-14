@@ -43,6 +43,9 @@ struct ProjectsScreen: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button("New Project", systemImage: "plus", action: onNewProject)
                         .accessibilityHint("Choose the shape of the new project's slides")
+                        // A project made before the load lands would be replaced by what's on
+                        // disk, and named without seeing the names already there.
+                        .disabled(!library.isLoaded)
                 }
             }
     }
