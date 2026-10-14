@@ -6,3 +6,4 @@
 - Offer only the typing detent while a text layer is typed, as `LayersSheet.detents` does. The keyboard grows a sheet to the largest detent it offers, whichever is selected, covering the slide being typed on.
 - Never switch a view's structure on state its own subtree reports up, such as `CellPhoto`'s `isMissing`, since rebuilding the subtree resets the state that reported it. Vary only modifier values with it, or overlay what it shows, as `PictureLayerView` does.
 - Make room for a phone's layers sheet only once it rests at the selected height, measured on screen, as `LayersSheet.settle(at:)` does. A floating sheet covers a little less than its detent, and a drag paused partway rests at none.
+- Keep one view per layer in `SlideLayers`, whatever's selected or drafted, as `LayerSlot` does, and read the draft and the live placement inside it. Switching its structure rebuilds the layers, resetting each picture's state and running its tasks again.

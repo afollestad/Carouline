@@ -55,7 +55,8 @@ final class LayerSession {
     /// which its slide draws as they're made, and `saveDraft(to:projectID:)` saves once.
     var draft: Layer?
     /// `draft`'s layer and slide. They change only as editing starts and stops, so every slide
-    /// can read them while only the edited slide reads `draft`, which changes with each keystroke.
+    /// can read them while only the edited layer's view reads `draft`, which changes with each
+    /// keystroke.
     private(set) var draftLayerID: UUID?
     private(set) var draftSlideID: UUID?
     /// Whether `draft` is a layer the library doesn't have yet.

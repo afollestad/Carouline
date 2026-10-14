@@ -59,7 +59,8 @@ struct LayerInteraction {
     /// Whether a photo or a layer is selected anywhere on the strip, while which a finger held down
     /// may start a drag on the selection or a pinch anywhere, rather than a menu.
     let isAnythingSelected: Bool
-    /// Whether the session's draft is on this slide, which then draws it in place of its layer.
+    /// Whether the session's draft is on this slide, which then draws it in place of its layer, or
+    /// on top as a new one.
     let isDrafting: Bool
     /// How many of the slide's points a point on screen covers, which a fingertip's target grows by
     /// while the slides are scaled down.
@@ -80,11 +81,15 @@ struct SlideLayers: View {
     var interaction: LayerInteraction?
 
     var body: some View {
+        // Read as a draft starts and ends, never `draft`, which changes with each keystroke.
+        let hasNewDraft = interaction.map { $0.isDrafting && $0.session.isDraftNew } ?? false
+        let count = layers.count + (hasNewDraft ? 1 : 0)
         ZStack(alignment: .topLeading) {
-            if let interaction, interaction.isDrafting {
-                DraftedLayers(slide: self, interaction: interaction)
-            } else {
-                stack(layers)
+            ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
+                LayerSlot(layer: layer, position: LayerPosition(index: index, count: count), slide: self, interaction: interaction)
+            }
+            if hasNewDraft, let interaction {
+                NewDraftLayer(position: LayerPosition(index: layers.count, count: count), slide: self, interaction: interaction)
             }
             if let interaction, interaction.selectedLayerID != nil {
                 SnapGuides(session: interaction.session, canvas: LayerCanvas(size: size, span: span))
@@ -95,18 +100,6 @@ struct SlideLayers: View {
         // Even over a selected photo, so a tap on a layer selects it; a drag that starts there
         // still pans the photo, through the strip's selection gesture.
         .allowsHitTesting(interaction != nil)
-    }
-
-    /// `layers`, bottom to top, the selected one at its live placement.
-    func stack(_ layers: [Layer]) -> some View {
-        ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
-            let position = LayerPosition(index: index, count: layers.count)
-            if let interaction, interaction.selectedLayerID == layer.id {
-                LiveLayer(layer: layer, position: position, slide: self, interaction: interaction)
-            } else {
-                PlacedLayer(layer: layer, placement: layer.placement, position: position, slide: self, interaction: interaction)
-            }
-        }
     }
 
     func address(of layer: Layer) -> LayerAddress {
@@ -123,43 +116,51 @@ private struct LayerPosition {
     var isBottom: Bool { index == 0 }
 }
 
-/// The slide's layers with the session's draft in place of its layer, or on top as a new one.
-/// Only this view reads the draft, which changes with each keystroke, so typing redraws just the
-/// edited slide. A picture keeps the library's copy, as its draft saves, so a restore made while
-/// its editor is open shows.
-private struct DraftedLayers: View {
+/// One of the slide's layers, drawn by the same view however it's edited or selected, so a
+/// picture keeps its state, rather than loading again, as its slide's editor opens and closes and
+/// as it's selected. Only the edited layer reads the draft, which changes with each keystroke, and
+/// only the selected one the live placement, which changes with each step of a gesture, so each
+/// redraws that layer alone. A picture keeps the library's copy, as its draft saves, so a restore
+/// made while its editor is open shows.
+private struct LayerSlot: View {
+    let layer: Layer
+    let position: LayerPosition
     let slide: SlideLayers
-    let interaction: LayerInteraction
+    let interaction: LayerInteraction?
 
     var body: some View {
-        var layers = slide.layers
-        if let draft = interaction.session.draft {
-            if let index = layers.firstIndex(where: { $0.id == draft.id }) {
-                layers[index].content = layers[index].content.editing(draft.content) ?? layers[index].content
-            } else if interaction.session.isDraftNew {
-                layers.append(draft)
-            }
+        PlacedLayer(layer: shown, placement: placement, position: position, slide: slide, interaction: interaction)
+    }
+
+    private var shown: Layer {
+        guard let interaction, interaction.isDrafting, let draft = interaction.session.draftLayer(layer.id) else {
+            return layer
         }
-        return slide.stack(layers)
+        var shown = layer
+        shown.content = layer.content.editing(draft.content) ?? layer.content
+        return shown
+    }
+
+    private var placement: LayerPlacement {
+        guard let interaction, interaction.selectedLayerID == layer.id else {
+            return layer.placement
+        }
+        return interaction.session.livePlacement ?? layer.placement
     }
 }
 
-/// The selected layer, at the placement a gesture is moving it to. Only this view reads the
-/// session's live placement, so a gesture redraws it alone.
-private struct LiveLayer: View {
-    let layer: Layer
+/// A new layer's draft, on top of its slide's layers, since the library doesn't have it yet.
+/// Nothing once the draft is dropped, while the session still holds that it's new until the sheet
+/// goes.
+private struct NewDraftLayer: View {
     let position: LayerPosition
     let slide: SlideLayers
     let interaction: LayerInteraction
 
     var body: some View {
-        PlacedLayer(
-            layer: layer,
-            placement: interaction.session.livePlacement ?? layer.placement,
-            position: position,
-            slide: slide,
-            interaction: interaction
-        )
+        if let draft = interaction.session.draft {
+            LayerSlot(layer: draft, position: position, slide: slide, interaction: interaction)
+        }
     }
 }
 
