@@ -168,6 +168,24 @@ struct ProjectStoreTests {
         #expect(stored.unreadable.map(\.reason) == [.damaged])
     }
 
+    /// A library counts before its first frame, so counting lists folders without reading or
+    /// sweeping them.
+    @Test func countsProjectsWithoutReadingThem() async throws {
+        let store = ProjectStore(paths: paths)
+        #expect(store.storedProjectCount == 0)
+
+        try await store.save(Project(name: "First", aspectRatio: .portrait))
+        try await store.save(Project(name: "Second", aspectRatio: .square))
+        let damagedID = UUID()
+        try FileManager.default.createDirectory(at: paths.folder(for: damagedID), withIntermediateDirectories: true)
+        try Data("{".utf8).write(to: paths.file(for: damagedID))
+        let leftover = paths.folder(for: UUID())
+        try FileManager.default.createDirectory(at: leftover, withIntermediateDirectories: true)
+
+        #expect(store.storedProjectCount == 4)
+        #expect(exists(leftover))
+    }
+
     // MARK: Helpers
 
     /// A file standing in for an image copy that finished importing.

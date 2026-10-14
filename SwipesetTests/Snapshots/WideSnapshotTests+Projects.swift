@@ -13,7 +13,8 @@ extension WideSnapshotTests {
     }
 
     @Test func loadingProjects() async {
-        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: ProjectLibrary(store: MockProjectStore())) {} }, on: .wide)
+        let library = ProjectLibrary(store: MockProjectStore(projects: projects))
+        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }, on: .wide)
     }
 
     @Test func projectList() async {

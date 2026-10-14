@@ -115,6 +115,15 @@ struct ProjectLibraryTests {
         #expect(library.isLoaded)
     }
 
+    /// Placeholders stand in for the projects on disk until the library loads them.
+    @Test func expectsTheProjectsOnDisk() async throws {
+        let store = ProjectStore(paths: paths)
+        try await store.save(Project(name: "First", aspectRatio: .portrait))
+        try await store.save(Project(name: "Second", aspectRatio: .square))
+
+        #expect(ProjectLibrary(store: ProjectStore(paths: paths)).expectedCount == 2)
+    }
+
     @Test func reportsAWriteThatFails() async {
         let library = ProjectLibrary(store: FailingStore(), projects: [])
         _ = library.createProject(aspectRatio: .portrait)
@@ -129,6 +138,7 @@ private actor FailingStore: ProjectStoring {
     struct Failure: Error {}
 
     nonisolated let paths = ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)
+    nonisolated let storedProjectCount = 0
 
     func loadAll() -> StoredProjects {
         StoredProjects()

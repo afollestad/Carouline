@@ -22,6 +22,9 @@ final class ProjectLibrary {
     var failure: LibraryFailure?
 
     @ObservationIgnored let store: any ProjectStoring
+    /// How many projects the store held when the library was made, for placeholders to stand in
+    /// for until it loads.
+    @ObservationIgnored let expectedCount: Int
     /// The newest write. Each one waits for the last, so a slow save can't land after, and
     /// overwrite, a newer one, and a file is only deleted once the JSON that dropped it is saved.
     @ObservationIgnored private var lastWrite: Task<Void, Never>?
@@ -37,6 +40,8 @@ final class ProjectLibrary {
         self.projects = projects ?? []
         self.unreadable = unreadable
         isLoaded = projects != nil
+        // From the parameters, since `isLoaded` can't be read until every property is set.
+        expectedCount = projects == nil ? store.storedProjectCount : 0
     }
 
     /// Loads the store's projects once, however many windows ask. A second load would sweep

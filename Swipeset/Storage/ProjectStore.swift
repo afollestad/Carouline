@@ -8,6 +8,10 @@ import Foundation
 /// Reads and writes projects and their image copies.
 nonisolated protocol ProjectStoring: Sendable {
     var paths: ProjectPaths { get }
+    /// How many projects `loadAll()` will find, readable or not, counted from their folders
+    /// without reading or sweeping any, so it's cheap enough to ask before the first frame. A
+    /// folder a crash left without its JSON counts, though `loadAll()` sweeps it away.
+    var storedProjectCount: Int { get }
 
     /// Every project on disk, after sweeping away files nothing refers to. Call it once, before
     /// anything can change a project, since it deletes images no saved project refers to yet.
@@ -47,6 +51,10 @@ actor ProjectStore: ProjectStoring {
 
     init(paths: ProjectPaths = .live) {
         self.paths = paths
+    }
+
+    nonisolated var storedProjectCount: Int {
+        directories(in: paths.projects).count
     }
 
     func loadAll() -> StoredProjects {
@@ -138,7 +146,7 @@ actor ProjectStore: ProjectStoring {
         }
     }
 
-    private func directories(in folder: URL) -> [URL] {
+    private nonisolated func directories(in folder: URL) -> [URL] {
         let contents = (try? FileManager.default.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -151,11 +159,15 @@ actor ProjectStore: ProjectStoring {
 /// Holds projects in memory, for previews and screens that never touch the disk.
 actor MockProjectStore: ProjectStoring {
     nonisolated let paths: ProjectPaths
+    /// The projects it started with, without its saves since, which is all a library asks for
+    /// before it loads.
+    nonisolated let storedProjectCount: Int
     private var projects: [UUID: Project]
 
     init(projects: [Project] = [], paths: ProjectPaths = ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)) {
         self.projects = Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0) })
         self.paths = paths
+        storedProjectCount = projects.count
     }
 
     func loadAll() -> StoredProjects {

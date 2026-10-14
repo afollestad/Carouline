@@ -16,9 +16,6 @@ struct ProjectsScreen: View {
     /// and leave each name room that a third would cut short.
     private static let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     private static let unreadableNote = "Swipeset leaves these as they are until you delete them."
-    /// Enough rows to read as a list while the library loads, and few enough that a short list
-    /// arriving in their place doesn't look like most of it went missing.
-    private static let loadingRowCount = 3
     /// On top of the rows' own 5-point spacing, which alone left the first row tight under the
     /// navigation bar.
     private static let topMargin: CGFloat = 8
@@ -53,7 +50,8 @@ struct ProjectsScreen: View {
     @ViewBuilder
     private var content: some View {
         if !library.isLoaded {
-            // Rather than an empty state, which loading would flash through, or a blank screen.
+            // A placeholder for each project on disk, rather than an empty state that loading would
+            // flash through. With none on disk it stays blank until the empty state fades in.
             loading
         } else if library.projects.isEmpty, library.unreadable.isEmpty {
             ContentUnavailableView {
@@ -144,7 +142,7 @@ struct ProjectsScreen: View {
             if usesGrid {
                 ScrollView {
                     LazyVGrid(columns: Self.gridColumns, spacing: 10) {
-                        ForEach(0..<Self.loadingRowCount, id: \.self) { _ in
+                        ForEach(0..<library.expectedCount, id: \.self) { _ in
                             LoadingRow()
                         }
                     }
@@ -154,7 +152,7 @@ struct ProjectsScreen: View {
             } else {
                 List {
                     Section {
-                        ForEach(0..<Self.loadingRowCount, id: \.self) { _ in
+                        ForEach(0..<library.expectedCount, id: \.self) { _ in
                             LoadingRow()
                                 .glassRow()
                         }
@@ -441,7 +439,7 @@ private struct UnreadableRow: View {
 
 #Preview("Loading") {
     NavigationStack {
-        ProjectsScreen(library: ProjectLibrary(store: MockProjectStore())) {}
+        ProjectsScreen(library: ProjectLibrary(store: MockProjectStore(projects: SampleProjects.all))) {}
     }
 }
 

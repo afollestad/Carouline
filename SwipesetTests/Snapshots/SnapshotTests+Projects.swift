@@ -12,9 +12,10 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library([])) {} })
     }
 
-    /// Placeholder rows stand in for the projects until the library loads.
+    /// A placeholder row stands in for each project on disk until the library loads.
     @Test func loadingProjects() async {
-        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: ProjectLibrary(store: MockProjectStore())) {} })
+        let library = ProjectLibrary(store: MockProjectStore(projects: projects))
+        await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} })
     }
 
     @Test func projectList() async {

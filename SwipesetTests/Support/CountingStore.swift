@@ -9,6 +9,7 @@ import Foundation
 /// A store that counts its loads and saves and keeps nothing.
 actor CountingStore: ProjectStoring {
     nonisolated let paths = ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)
+    nonisolated let storedProjectCount = 0
     private(set) var loads = 0
     private(set) var saves = 0
 
