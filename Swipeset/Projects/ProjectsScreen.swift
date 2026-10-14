@@ -24,6 +24,9 @@ struct ProjectsScreen: View {
         content
             // The rows fade in over the placeholders that stood in for them.
             .animation(.easeOut(duration: 0.25), value: library.isLoaded)
+            // Fades the projects that scroll under the title, which the default cuts off at a
+            // solid band with a hairline.
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .onGeometryChange(for: CGSize.self) { proxy in
                 proxy.size
             } action: { size in
