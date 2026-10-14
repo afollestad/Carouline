@@ -106,6 +106,19 @@ struct LayerSessionTests {
         #expect(session.snapsTaken == 1)
     }
 
+    /// A twist that joins a drag partway holds the layer upright where it began, as one there from
+    /// the start does, so it counts no snap taking hold.
+    @Test func aTwistJoiningADragCountsNoSnapOnAnUprightLayer() {
+        let session = session()
+
+        session.move(layer, by: LayerGesture(drag: drag(40, 0)), on: canvas)
+        session.move(layer, by: LayerGesture(drag: drag(40, 0), rotation: 0.02), on: canvas)
+
+        #expect(session.livePlacement?.rotation == 0)
+        #expect(session.snap.quarterTurn == 0)
+        #expect(session.snapsTaken == 0)
+    }
+
     /// A pinch or twist that isn't finite leaves the layer where the last update left it.
     @Test func aPinchOrTwistThatIsNotFiniteMovesNothing() {
         let session = session()

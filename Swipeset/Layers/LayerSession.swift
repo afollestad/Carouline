@@ -19,6 +19,7 @@ final class LayerSession {
             if selection != oldValue {
                 gestureStart = nil
                 dragStartsOnLayer = nil
+                isTurning = false
             }
         }
     }
@@ -76,6 +77,9 @@ final class LayerSession {
     /// drag, so a drag moves the layer only from on it, and keeps moving it once the layer has
     /// left the finger's start.
     @ObservationIgnored private var dragStartsOnLayer: Bool?
+    /// Whether the current gesture has turned the layer yet, which a twist may begin only partway
+    /// through.
+    @ObservationIgnored private var isTurning = false
 
     /// `snap` shows a guide from the start, as snapshots need.
     init(selection: LayerAddress? = nil, snap: LayerSnap = LayerSnap()) {
@@ -124,7 +128,13 @@ final class LayerSession {
         }
         let moves = translation != nil
         let turns = gesture.rotation != nil
-        let held = isStarting ? LayerSnapping.snapped(start, on: canvas, previous: LayerSnap(), moves: moves, turns: turns).snap : snap
+        var held = isStarting ? LayerSnapping.snapped(start, on: canvas, previous: LayerSnap(), moves: moves, turns: turns).snap : snap
+        // A twist joining the gesture holds the quarter turn the layer began at, as one there from
+        // the start does, so a layer that was upright already counts no snap taking hold.
+        if turns, !isTurning {
+            held.quarterTurn = LayerSnapping.snapped(start, on: canvas, previous: LayerSnap(), moves: false, turns: true).snap.quarterTurn
+            isTurning = true
+        }
         var placed = layer
         placed.placement = placement
         let snapped = LayerSnapping.snapped(placed.clamped(span: canvas.span).placement, on: canvas, previous: held, moves: moves, turns: turns)
@@ -234,6 +244,7 @@ final class LayerSession {
             gestureStart = nil
             gestureLayerID = nil
             dragStartsOnLayer = nil
+            isTurning = false
             snap = LayerSnap()
         }
         guard gestureLayerID == nil || gestureLayerID == selection?.layerID else {
