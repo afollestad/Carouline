@@ -46,6 +46,9 @@ final class SelectionGestureTracker {
     /// Whether the gesture's `claim` is under way, which outlasts the last finger for a moment,
     /// and alone carries a trackpad's pinch.
     var isClaiming = false
+    /// Whether a finger scrolled the strip during the gesture, which then leaves the selection
+    /// alone, so a second finger landing doesn't pinch it as the strip slides by.
+    var scrolledStrip = false
 }
 
 /// Where a point on a slide falls in one of its cells.
@@ -71,8 +74,9 @@ nonisolated enum SelectionHit {
 /// Drags, pinches and twists that move the selected photo or layer. The strip's one gesture,
 /// over everything on it, since one on a cell or a layer would claim the first finger, and a
 /// pinch with the other off it would do nothing. A drag moves the selection only if it starts
-/// within it, even where another layer covers it; two fingers move, size and turn it from
-/// anywhere, and whichever fingers stay down carry it on as others lift or land.
+/// within it, even where another layer covers it, and holds the strip still meanwhile; one off it
+/// scrolls the strip. Two fingers move, size and turn it from anywhere, unless the strip is
+/// scrolling, and whichever fingers stay down carry it on as others lift or land.
 struct SelectionGesture: ViewModifier {
     let project: Project
     let session: CropSession
@@ -82,6 +86,11 @@ struct SelectionGesture: ViewModifier {
     let frames: SlideFrames
     /// While anything is selected. Turning off ends a gesture under way, which SwiftUI may not.
     let isEnabled: Bool
+    /// Whether the strip holds still for the gesture, which a finger landing on the selection, or
+    /// a second finger anywhere, asks it to.
+    @Binding var holdsStrip: Bool
+    /// Whether a finger is scrolling the strip, or it's still coasting from one.
+    let isStripScrolling: Bool
     @State private var tracker = SelectionGestureTracker()
     /// Whether `claim` is under way, which SwiftUI resets however it ends, as when the system
     /// cancels it without `onEnded`. A finger lifting ends it early, while others carry on.
@@ -93,12 +102,11 @@ struct SelectionGesture: ViewModifier {
 
     func body(content: Content) -> some View {
         // The space on the very view the gesture is on, since pinches and twists report where
-        // they began only in that view's own. Ahead of the slides' own gestures, so a short drag
-        // over a photo or a layer doesn't end as a tap that selects it.
+        // they began only in that view's own.
         content
             .coordinateSpace(.named(Self.space))
             .highPriorityGesture(claim, isEnabled: isEnabled)
-            .gesture(TouchTracking(space: Self.space, isEnabled: isEnabled, onTouches: track))
+            .gesture(TouchTracking(space: Self.space, isEnabled: isEnabled, onTouches: track, claims: claimsTouches))
             .onChange(of: isClaiming) { _, isClaiming in
                 tracker.isClaiming = isClaiming
                 if !isClaiming, tracker.touches.isEmpty {
@@ -110,21 +118,25 @@ struct SelectionGesture: ViewModifier {
                     end()
                 }
             }
+            .onChange(of: isStripScrolling) { _, isScrolling in
+                if isScrolling, !tracker.touches.isEmpty {
+                    tracker.scrolledStrip = true
+                }
+            }
     }
 
-    /// Claims a drag, a pinch or a twist ahead of the slides' taps, keeping its drag's least
-    /// distance, so taps still reach the layers, the cells and the space between the slides. The
-    /// fingers' moves come from `TouchTracking`, since these end or reset as a finger lifts or
-    /// lands; its values only start the move, and carry a trackpad's pinch, which reports no
-    /// fingers.
+    /// Claims a pinch or a twist ahead of the slides' taps. The fingers' moves come from
+    /// `TouchTracking`, since these end or reset as a finger lifts or lands; its values only start
+    /// the move, and carry a trackpad's pinch, which reports no fingers. No drag, which, given
+    /// priority, would hold the strip's scrolling back even for a drag off the selection.
     private var claim: some Gesture {
-        SimultaneousGesture(SimultaneousGesture(DragGesture(), MagnifyGesture()), RotateGesture())
+        SimultaneousGesture(MagnifyGesture(), RotateGesture())
             .updating($isClaiming) { _, isClaiming, _ in
                 isClaiming = true
             }
             .onChanged { value in
                 tracker.isClaiming = true
-                let magnify = value.first?.second
+                let magnify = value.first
                 let rotate = value.second
                 if let anchor = magnify?.startLocation ?? rotate?.startLocation, tracker.touches.takesIndirect {
                     tracker.touches.updateIndirect(magnification: magnify?.magnification, rotation: rotate?.rotation.radians, at: anchor)
@@ -145,14 +157,32 @@ struct SelectionGesture: ViewModifier {
         }
         let isNew = tracker.touches.isEmpty
         tracker.touches.update(touches)
-        // A gesture that never ended may have left one.
         if isNew {
+            // A gesture that never ended may have left one.
             finish()
+            if isStripScrolling {
+                // A finger landing on the coasting strip only stops it, as on any scroll view;
+                // holding the strip there would leave it between two slides.
+                tracker.scrolledStrip = true
+            } else if let landing = touches.first(where: \.isDown)?.location, isOnSelection(landing) {
+                holdsStrip = true
+            }
+        }
+        // A second finger from anywhere holds the strip too, as it lands, so the fingers pinch
+        // rather than scroll, unless the strip has started scrolling.
+        if tracker.touches.fingerCount > 1, !holdsStrip, !tracker.scrolledStrip {
+            holdsStrip = true
         }
         update()
         if tracker.touches.isEmpty, !tracker.isClaiming {
             end()
         }
+    }
+
+    /// Whether the fingers are moving the selection, which `TouchTracking` then claims from the
+    /// slides' taps, so a short drag doesn't end as a tap on whatever it crossed.
+    private func claimsTouches() -> Bool {
+        holdsStrip && tracker.touches.isMoving && !tracker.scrolledStrip
     }
 
     /// The photo or layer selected now: a cell's address and its copy, or a layer's address.
@@ -161,6 +191,29 @@ struct SelectionGesture: ViewModifier {
             return .photo(address, imageID: image.id)
         }
         return layerSession.selection.map { .layer($0) }
+    }
+
+    /// Whether `point`, in the gesture's space, is on the selection as it's drawn now: within a
+    /// layer's hit box, or a photo's cell grown to a fingertip's reach.
+    private func isOnSelection(_ point: CGPoint) -> Bool {
+        guard let target = currentTarget,
+              let frame = frames.frames[target.slideID],
+              frame.frame.width > 0, frame.size.width > 0,
+              let slide = project.slides.first(where: { $0.id == target.slideID }) else {
+            return false
+        }
+        let canvas = canvas(of: slide, in: frame)
+        let point = canvasPoint(point, in: frame)
+        switch target {
+        case .layer(let address):
+            guard var layer = layer(at: address, on: slide) else {
+                return false
+            }
+            layer.placement = layerSession.livePlacement ?? layer.placement
+            return LayerGeometry.contains(point, layer: layer, on: canvas)
+        case .photo(let address, _):
+            return SelectionHit.cellPoint(point, cell: address.index, of: slide, style: style(of: slide), on: canvas) != nil
+        }
     }
 
     private func begin() {
@@ -183,7 +236,7 @@ struct SelectionGesture: ViewModifier {
     /// fingers down now.
     private func update() {
         let touches = tracker.touches
-        guard touches.isMoving, let start = touches.start else {
+        guard touches.isMoving, let start = touches.start, !tracker.scrolledStrip else {
             return
         }
         if tracker.needsBegin {
@@ -194,8 +247,8 @@ struct SelectionGesture: ViewModifier {
               let slide = project.slides.first(where: { $0.id == target.slideID }) else {
             return
         }
-        let screenPoint = frame.size.width / frame.frame.width
-        let canvas = LayerCanvas(size: frame.size, span: slide.span, screenPoint: screenPoint)
+        let canvas = canvas(of: slide, in: frame)
+        let screenPoint = canvas.screenPoint
         let scaled = { (size: CGSize) in CGSize(width: size.width * screenPoint, height: size.height * screenPoint) }
         let pinch = touches.pinch
         switch target {
@@ -242,7 +295,7 @@ struct SelectionGesture: ViewModifier {
         guard slide.cells.indices.contains(address.index), let image = slide.cells[address.index].image else {
             return
         }
-        let style = layerSession.stylingSlideID == slide.id ? layerSession.slideStyle : slide.style
+        let style = style(of: slide)
         let reaches = { (point: CGPoint) in
             SelectionHit.cellPoint(point, cell: address.index, of: slide, style: style, on: canvas)
         }
@@ -257,10 +310,14 @@ struct SelectionGesture: ViewModifier {
         session.frame(image, translation: translation, magnification: pinch?.magnification, anchor: anchor)
     }
 
-    /// Ends the gesture and forgets its fingers, however it ended.
+    /// Ends the gesture and forgets its fingers, however it ended, letting the strip scroll again.
     private func end() {
         finish()
         tracker.touches = SelectionTouches()
+        tracker.scrolledStrip = false
+        if holdsStrip {
+            holdsStrip = false
+        }
     }
 
     /// Ends the move once and saves what it moved, while that's still selected; a new selection
@@ -308,6 +365,17 @@ struct SelectionGesture: ViewModifier {
             layer.content = layer.content.editing(draft.content) ?? layer.content
         }
         return layer
+    }
+
+    /// The slide at `frame` as layers measure it, with how many of its points a point on screen
+    /// covers there.
+    private func canvas(of slide: Slide, in frame: SlideFrame) -> LayerCanvas {
+        LayerCanvas(size: frame.size, span: slide.span, screenPoint: frame.size.width / frame.frame.width)
+    }
+
+    /// The style `slide` draws with now: the one its editor is trying out, or its own.
+    private func style(of slide: Slide) -> SlideStyle {
+        layerSession.stylingSlideID == slide.id ? layerSession.slideStyle : slide.style
     }
 
     /// `point`, in the gesture's space, in the coordinates of the slide at `frame`.

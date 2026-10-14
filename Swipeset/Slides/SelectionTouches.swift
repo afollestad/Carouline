@@ -107,6 +107,10 @@ nonisolated struct SelectionTouches {
         fingers.isEmpty
     }
 
+    var fingerCount: Int {
+        fingers.count
+    }
+
     /// Whether a trackpad's pinch or twist can move the selection: while no finger is down, unless
     /// fingers have moved it already.
     var takesIndirect: Bool {

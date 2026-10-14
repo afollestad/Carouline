@@ -38,6 +38,12 @@ struct SlideStrip: View {
     @State private var fullSize: CGSize = .zero
     /// Where the slides holding a selection are, which the selection's gesture moves it on.
     @State private var slideFrames = SlideFrames()
+    /// Whether the strip holds still for a gesture moving the selection, which starts on it or
+    /// pinches it.
+    @State private var holdsStill = false
+    /// Whether a finger is scrolling the strip, or it's still coasting from one, which the fingers
+    /// down meanwhile leave the selection alone for.
+    @State private var isScrolling = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -99,7 +105,9 @@ struct SlideStrip: View {
             cellActions: cellActions,
             layerActions: layerActions,
             frames: slideFrames,
-            isEnabled: isAnythingSelected
+            isEnabled: isAnythingSelected,
+            holdsStrip: $holdsStill,
+            isStripScrolling: isScrolling
         ))
         .animation(.smooth(duration: 0.25), value: bottomRoom)
         .animation(.smooth(duration: 0.25), value: roomScale)
@@ -189,9 +197,12 @@ struct SlideStrip: View {
             .contentShape(.rect)
         }
         .scrollTargetBehavior(snapping)
-        // Held while anything's selected, so a drag on the selection moves it, and one off it
-        // scrolls nothing out from under it.
-        .scrollDisabled(isAnythingSelected || layersSlideID != nil)
+        // Held while a gesture moves the selection, so a drag on it moves it rather than the strip,
+        // while one off it scrolls the strip as usual.
+        .scrollDisabled(holdsStill || layersSlideID != nil)
+        .onScrollPhaseChange { _, phase in
+            isScrolling = phase == .interacting || phase == .decelerating
+        }
         .sensoryFeedback(.alignment, trigger: layerSession.snapsTaken)
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)

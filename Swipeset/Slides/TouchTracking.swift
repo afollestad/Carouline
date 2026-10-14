@@ -7,14 +7,17 @@ import SwiftUI
 import UIKit.UIGestureRecognizerSubclass
 
 /// Every finger on the view it's on, from the moment it lands until it lifts, in the coordinate
-/// space named `space`. It claims no touch, so the slides' taps, menus and other gestures work as
-/// they would without it. A UIKit recognizer rather than `SpatialEventGesture`, under which a tap
-/// on a caption's menu also reaches the strip's background tap, ending the selection.
+/// space named `space`. It claims the touches only once `claims` says so, as a scroll view does
+/// once it scrolls, so until then the slides' taps, menus and scrolling work as they would without
+/// it. A UIKit recognizer rather than `SpatialEventGesture`, under which a tap on a caption's menu
+/// also reaches the strip's background tap, ending the selection.
 struct TouchTracking: UIGestureRecognizerRepresentable {
     let space: String
     let isEnabled: Bool
     /// The fingers that landed, moved or lifted since the last call.
     let onTouches: ([SelectionTouches.Touch]) -> Void
+    /// Whether to claim the touches now, after `onTouches` has taken them.
+    let claims: () -> Bool
 
     /// Keeps the converter SwiftUI hands it, which places touches long after any one update.
     final class Coordinator {
@@ -41,12 +44,15 @@ struct TouchTracking: UIGestureRecognizerRepresentable {
                 SelectionTouches.Touch(id: $0.id, location: converter.convert(globalPoint: $0.location, to: .named(space)), isDown: $0.isDown)
             })
         }
+        recognizer.claims = claims
     }
 }
 
-/// Reports each touch as it lands, moves and lifts, straight from UIKit's touch handling. It never
-/// recognizes, so it cancels no touch and fails no other gesture, and none can stop it; it fails
-/// once every finger is up, so it starts afresh with the next.
+/// Reports each touch as it lands, moves and lifts, straight from UIKit's touch handling, and none
+/// can stop it. Until `claims` says so it doesn't recognize, so it cancels no touch and fails no
+/// other gesture; once it does, it cancels the slides' taps under the fingers, so a short drag
+/// doesn't end as one. It ends, or fails, once every finger is up, so it starts afresh with the
+/// next.
 final class TouchTrackingRecognizer: UIGestureRecognizer {
     struct Change {
         let id: ObjectIdentifier
@@ -56,11 +62,11 @@ final class TouchTrackingRecognizer: UIGestureRecognizer {
     }
 
     var onChanges: ([Change]) -> Void = { _ in }
+    var claims: () -> Bool = { false }
     private var down: Set<ObjectIdentifier> = []
 
     override init(target: Any?, action: Selector?) {
         super.init(target: target, action: action)
-        cancelsTouchesInView = false
         delaysTouchesEnded = false
     }
 
@@ -78,10 +84,6 @@ final class TouchTrackingRecognizer: UIGestureRecognizer {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
         report(touches, isDown: false)
-    }
-
-    override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool {
-        false
     }
 
     override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -104,7 +106,9 @@ final class TouchTrackingRecognizer: UIGestureRecognizer {
         }
         onChanges(changes)
         if down.isEmpty {
-            state = .failed
+            state = state == .possible ? .failed : .ended
+        } else if claims() {
+            state = state == .possible ? .began : .changed
         }
     }
 }
