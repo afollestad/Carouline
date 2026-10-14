@@ -54,8 +54,6 @@ struct LayerInteraction {
     /// Whether a photo or a layer is selected anywhere on the strip, while which a finger held down
     /// may start a drag on the selection or a pinch anywhere, rather than a menu.
     let isAnythingSelected: Bool
-    /// Whether a photo is selected, which drags beneath the layers rather than them taking touches.
-    let isPhotoSelected: Bool
     /// Whether the session's draft is on this slide, which then draws it in place of its layer.
     let isDrafting: Bool
     /// How many of the slide's points a point on screen covers, which a fingertip's target grows by
@@ -89,7 +87,9 @@ struct SlideLayers: View {
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .clipped()
-        .allowsHitTesting(interaction.map { !$0.isPhotoSelected } ?? false)
+        // Even over a selected photo, so a tap on a layer selects it; a drag that starts there
+        // still pans the photo, through the strip's selection gesture.
+        .allowsHitTesting(interaction != nil)
     }
 
     /// `layers`, bottom to top, the selected one at its live placement.
@@ -401,7 +401,6 @@ private struct TextLayerView: View {
                     actions: .preview,
                     selectedLayerID: slide.layers[0].id,
                     isAnythingSelected: true,
-                    isPhotoSelected: false,
                     isDrafting: false
                 )
             )

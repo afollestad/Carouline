@@ -69,7 +69,6 @@ struct SlideCard: View {
                         actions: layerActions,
                         selectedLayerID: layerSession.selection?.slideID == slide.id ? layerSession.selection?.layerID : nil,
                         isAnythingSelected: isAnythingSelected,
-                        isPhotoSelected: session.selection != nil,
                         isDrafting: layerSession.draftSlideID == slide.id,
                         screenPoint: screenPoint
                     )
