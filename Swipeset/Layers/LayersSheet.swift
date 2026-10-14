@@ -14,8 +14,8 @@ struct LayersSheet: View {
     let slideID: UUID
     @Bindable var session: LayerSession
     let actions: LayerActions
-    /// The screen's text size. The strip caps its own, which the sheet, presented from a slide,
-    /// would otherwise take, and sheets stay uncapped.
+    /// The screen's text size. The strip caps its own, which an iPad's popover, presented from a
+    /// slide, would otherwise take, and sheets stay uncapped.
     let dynamicTypeSize: DynamicTypeSize
     /// Runs as the sheet's content goes, once it no longer covers the screen.
     let onGone: () -> Void
@@ -83,9 +83,8 @@ struct LayersSheet: View {
                 }
             }
         }
-        // Measured rather than read from the detent, which a popover shown as a sheet never reports
-        // when it's dragged to another, and on screen, so the room includes any gap below a sheet
-        // that floats over the bottom safe area.
+        // Measured on screen rather than taken from the detent, so the room includes any gap below
+        // a sheet that floats over the bottom safe area.
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.frame(in: .global).minY
         } action: { top in
@@ -123,6 +122,12 @@ struct LayersSheet: View {
             withAnimation {
                 height = isTyping ? .typing : .resting
             }
+            // Room for where it's headed, so slides typed on from another height go straight
+            // there, rather than to full size until it settles. Not as it goes, which ends the
+            // typing too and leaves no room.
+            if !isTyping, !settling.isStopped, let restingHeight {
+                session.sheetRoom = restingHeight
+            }
         }
         .onAppear {
             settling.start()
@@ -156,7 +161,7 @@ struct LayersSheet: View {
     }
 
     private var restingHeight: CGFloat? {
-        SheetHeight.restingHeight(stripHeight: session.stripFrame.height, typingHeight: Self.typingHeight(at: dynamicTypeSize))
+        SheetHeight.restingHeight(stripHeight: session.stripHeight, typingHeight: Self.typingHeight(at: dynamicTypeSize))
     }
 
     /// Just the text field's height while it's typed in, since the keyboard grows a sheet to the
@@ -167,9 +172,9 @@ struct LayersSheet: View {
     }
 
     /// `height` as a detent, always one of `detents`, which the selection must be: the typing
-    /// height while text is typed, even before `height` follows. A detent read back maps to its
-    /// height, a resting height no taller than the typing one, or one left from a strip of another
-    /// size, to resting.
+    /// height while text is typed, even before `height` follows. A detent read back from a drag
+    /// maps to its height, a resting height no taller than the typing one, or one left from a strip
+    /// of another size, to resting.
     private var detent: Binding<PresentationDetent> {
         Binding {
             if isTyping {
@@ -199,27 +204,23 @@ struct LayersSheet: View {
         dismiss()
     }
 
-    /// Makes room for the sheet where it came to rest, and takes the height it was dragged to as
-    /// the selected one, in the same update. Otherwise the strip redrawing for the room redraws
-    /// the slide that presents the sheet, which sends it back to the height last selected. Not
-    /// between heights, where a drag paused partway would be sent to one under the finger, nor
-    /// riding the keyboard, whose room the strip takes from the keyboard's own.
+    /// Makes room for the sheet where it came to rest, once that's the height selected, which a
+    /// drag writes back as it lets go. Not partway, where a finger held still mid-drag leaves it,
+    /// nor riding the keyboard, whose room the strip takes from the keyboard's own.
     private func settle(at top: CGFloat) {
-        let room = SheetHeight.room(stripBottom: session.stripFrame.maxY, sheetTop: top)
-        guard let restingHeight, let settled = SheetHeight.settled(
+        let room = SheetHeight.room(stripBottom: session.stripBottom, sheetTop: top)
+        guard !isTyping, let restingHeight, SheetHeight.rests(
+            at: height,
             room: room,
             typingHeight: Self.typingHeight(at: dynamicTypeSize),
             restingHeight: restingHeight,
-            stripHeight: session.stripFrame.height
+            stripHeight: session.stripHeight
         ) else {
             return
         }
-        if !isTyping {
-            height = settled
-        }
         // None at large, which covers the slides however small they'd be, so they're whole again
         // as it's dragged back down.
-        session.sheetRoom = settled == .large ? 0 : room
+        session.sheetRoom = height == .large ? 0 : room
     }
 
     /// Adds a layer of `kind`: new text starts as a draft in the middle of the slide, or of a
@@ -251,7 +252,8 @@ struct LayersSheet: View {
 /// for good, as a sheet's geometry still changes while it goes.
 private final class Settling {
     private var task: Task<Void, Never>?
-    private var isStopped = false
+    /// Whether it's stopped for good, as it is once the sheet starts going.
+    private(set) var isStopped = false
 
     func run(after delay: Duration, _ action: @escaping @MainActor () -> Void) {
         task?.cancel()

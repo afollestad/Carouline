@@ -11,6 +11,8 @@ struct ProjectLayerActions {
     let projectID: UUID
     let session: LayerSession
     @Binding var presenter: PresentationQueue<ProjectPresentation>
+    /// Whether slides present their layers sheets as popovers, rather than the screen as a sheet.
+    let showsPopovers: Bool
     /// The text size outside the strip, which caps its own, for the layers sheet.
     let dynamicTypeSize: DynamicTypeSize
     /// Selects a layer, or none, as the screen does, saving what was selected.
@@ -73,6 +75,7 @@ struct ProjectLayerActions {
                     }
                 }
             },
+            showsPopover: showsPopovers,
             sheet: sheet
         )
     }
@@ -127,7 +130,8 @@ struct ProjectLayerActions {
             actions: actions,
             dynamicTypeSize: dynamicTypeSize
         ) {
-            // However it went: one whose slide was deleted under it never sets `isShowingSheet`.
+            // However it went: one whose slide was deleted under it closes without its binding
+            // being set.
             presenter.dismiss(.layers(slideID))
             presenter.presentPending()
         }

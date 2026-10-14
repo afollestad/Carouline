@@ -323,6 +323,7 @@ struct ProjectLibraryLayerImagesTests {
             projectID: fixture.projectID,
             session: session,
             presenter: presenter,
+            showsPopovers: false,
             dynamicTypeSize: .large,
             select: { session.selection = $0 },
             photoSelection: { nil },

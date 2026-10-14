@@ -41,6 +41,7 @@ struct LayerDraftTests {
             projectID: projectID,
             session: session,
             presenter: presenter ?? .constant(PresentationQueue()),
+            showsPopovers: false,
             dynamicTypeSize: .large,
             select: { session.selection = $0 },
             photoSelection: { nil },

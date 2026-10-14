@@ -25,8 +25,12 @@ struct LayerActions {
     let restoreImage: (LayerAddress, UUID) -> Void
     /// Tries that once for each missing copy, as it's shown, without asking for access.
     let restoreImageQuietly: (LayerAddress, UUID) -> Void
-    /// Whether a slide's layers sheet is open, which the slide presents it by.
+    /// Whether a slide's layers sheet is open, which its caption's menu waits out, and an iPad's
+    /// slide presents its popover by.
     let isShowingSheet: (UUID) -> Binding<Bool>
+    /// Whether a slide presents its layers sheet as a popover pointing at it, as on a wide screen.
+    /// On a compact width the screen presents it as a sheet instead.
+    let showsPopover: Bool
     /// A slide's layers sheet.
     let sheet: (UUID) -> LayersSheet?
 
@@ -41,6 +45,7 @@ struct LayerActions {
         restoreImage: { _, _ in },
         restoreImageQuietly: { _, _ in },
         isShowingSheet: { _ in .constant(false) },
+        showsPopover: false,
         sheet: { _ in nil }
     )
 }

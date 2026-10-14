@@ -115,15 +115,16 @@ struct SlideCard: View {
                 .foregroundStyle(Color.primary)
             }
             .buttonStyle(.glass)
-            // Not while the slide's layers sheet is open, which this card presents: the delete
-            // confirmation can't show from it then, and moving or resizing the slide would close it.
+            // Not while the slide's layers sheet is open: the delete confirmation can't show while
+            // it's up, and moving or resizing the slide would close an iPad's popover, which this
+            // card presents.
             .disabled(layerActions.isShowingSheet(slide.id).wrappedValue)
             .accessibilityLabel("\(spokenNumbers) Options")
             .frame(height: 44)
         }
-        // From the card, not its caption's glass button, whose style the sheet would take on. A
-        // sheet on iPhone, and on iPad a popover pointing at its slide.
-        .popover(isPresented: layerActions.isShowingSheet(slide.id)) {
+        // A wide screen's popover pointing at its slide, from the card, not its caption's glass
+        // button, whose style the popover would take on. A phone's sheet comes from the screen.
+        .popover(isPresented: layerActions.showsPopover ? layerActions.isShowingSheet(slide.id) : .constant(false)) {
             layerActions.sheet(slide.id)
                 .frame(idealWidth: LayersSheet.popoverSize.width, idealHeight: LayersSheet.popoverSize.height)
         }
@@ -219,7 +220,7 @@ struct SlideCard: View {
 
 /// A slide's cells, each with its photo or the way to add one. The only part of the card that
 /// reads a blur or style the layers sheet is editing, so each step redraws the photos alone,
-/// rather than the card, which hosts the sheet's popover.
+/// rather than the card, which on a wide screen hosts the sheet's popover.
 private struct CardPhotos: View {
     let slide: Slide
     let projectID: UUID

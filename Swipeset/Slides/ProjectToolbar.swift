@@ -5,7 +5,8 @@
 
 import SwiftUI
 
-/// The project screen's Share button, with the popover it opens.
+/// The project screen's Share button, with the popover it opens on a wide screen. A phone's export
+/// sheet comes from the screen, as a sheet that keeps the height it's dragged to.
 struct ProjectToolbar: ToolbarContent {
     let project: Project
     let exporter: SlideExporter

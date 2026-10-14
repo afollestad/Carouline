@@ -23,22 +23,19 @@ nonisolated enum SheetHeight: Hashable, Sendable {
         return max(stripHeight / 2, typingHeight)
     }
 
-    /// How far a settled sheet's room may be from its height, as one floating over the bottom
-    /// safe area covers a little less than it.
+    /// How far the room of a sheet resting at a height may be from that height, as one floating
+    /// over the bottom safe area covers a little less than it.
     static let settlingSlack: CGFloat = 24
 
-    /// The height a sheet covering `room` above a strip `stripHeight` tall is at: typing or
-    /// resting within `settlingSlack` of its own height, or large once it covers nearly all the
-    /// strip. Nil anywhere between, as a drag paused partway leaves it, or riding the keyboard.
-    static func settled(room: CGFloat, typingHeight: CGFloat, restingHeight: CGFloat, stripHeight: CGFloat) -> SheetHeight? {
-        if abs(room - typingHeight) <= settlingSlack {
-            .typing
-        } else if abs(room - restingHeight) <= settlingSlack {
-            .resting
-        } else if room >= stripHeight - settlingSlack {
-            .large
-        } else {
-            nil
+    /// Whether a sheet covering `room` above a strip `stripHeight` tall rests at `height`: within
+    /// `settlingSlack` of the typing or resting height's own, or, at large, covering nearly all the
+    /// strip. Not partway between, as a finger held still mid-drag leaves it. Asked of the height
+    /// selected, so a resting height within reach of the typing one still rests.
+    static func rests(at height: SheetHeight, room: CGFloat, typingHeight: CGFloat, restingHeight: CGFloat, stripHeight: CGFloat) -> Bool {
+        switch height {
+        case .typing: abs(room - typingHeight) <= settlingSlack
+        case .resting: abs(room - restingHeight) <= settlingSlack
+        case .large: room >= stripHeight - settlingSlack
         }
     }
 

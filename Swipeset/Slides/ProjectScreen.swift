@@ -13,6 +13,10 @@ struct ProjectScreen: View {
     /// What's open over the screen. Asks go through it, since one made while another is up
     /// never shows.
     @State private var presenter = PresentationQueue<ProjectPresentation>()
+    /// Whether what's open opened on a compact width, which keeps it a sheet, or a popover
+    /// pointing at what opened it, until it closes. Turning a phone or resizing a window would
+    /// otherwise ask for one while the other is still leaving, which never shows.
+    @State private var openedWidth = OpenedWidth()
     @State private var stripPosition: StripItem?
     /// The cell the photo picker fills, and the slide's other empty cells when it picks several.
     /// Kept apart from `presenter`, which the picker clears as it closes, possibly before it
@@ -27,6 +31,7 @@ struct ProjectScreen: View {
     @Environment(\.photoLibrary) private var photoLibrary
     /// The text size outside the strip, which caps its own, for the layers sheet it presents.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #if DEBUG
     @Environment(DebugSettings.self) private var debug: DebugSettings?
     #endif
@@ -100,22 +105,37 @@ struct ProjectScreen: View {
     private func toolbar(_ project: Project) -> ProjectToolbar {
         ProjectToolbar(
             project: project,
-            exporter: SlideExporter(paths: library.store.paths),
-            isExporting: isPresenting(.export),
+            exporter: exporter,
+            // On a compact width it comes from the screen's sheet.
+            isExporting: presentsAsSheets ? .constant(false) : isPresenting(.export),
             onShare: {
                 select(nil)
                 presenter.present(.export)
             },
-            onPopoverGone: { presenter.presentPending() }
+            onPopoverGone: exportGone
         )
     }
 
-    /// The layout sheet, the photo picker and the camera, which open over the screen.
+    private var exporter: SlideExporter {
+        SlideExporter(paths: library.store.paths)
+    }
+
+    /// Closes the export however it went, then opens what's waiting, so one that never shows can't
+    /// stay asked for, which would keep anything else from opening.
+    private func exportGone() {
+        presenter.dismiss(.export)
+        presenter.presentPending()
+    }
+
+    /// The screen's sheet, which shows the layout sheet and a phone's export and layers sheets,
+    /// and the photo picker and the camera, which open over the screen.
     private func presentations(over screen: some View, project: Project) -> some View {
         screen
-            .sheet(item: layoutPurpose) { purpose in
-                layoutSheet(for: purpose, in: project)
-                    .onDisappear { presenter.presentPending() }
+            .sheet(item: sheetItem) { item in
+                sheetContent(for: item, in: project)
+            }
+            .onChange(of: presenter.current) { _, current in
+                openedWidth.isCompact = current.map { _ in horizontalSizeClass == .compact }
             }
             // The only presentation with no content to call `presentPending()` as it goes, which
             // it needn't, since it covers the screen and nothing can be asked for behind it.
@@ -169,16 +189,51 @@ struct ProjectScreen: View {
         }
     }
 
-    private var layoutPurpose: Binding<LayoutPurpose?> {
-        Binding {
-            guard case .layout(let purpose) = presenter.current else {
-                return nil
+    /// Whether the export and layers sheets show as sheets, as on a compact width, or as popovers
+    /// pointing at what opened them, held to how what's open opened.
+    private var presentsAsSheets: Bool {
+        openedWidth.isCompact ?? (horizontalSizeClass == .compact)
+    }
+
+    /// `shownSheet`, as the screen's sheet reads and dismisses it. A dismissal closes the item
+    /// shown only while it's still open, never one opened since.
+    private var sheetItem: Binding<ProjectPresentation?> {
+        let shown = shownSheet
+        return Binding {
+            shownSheet
+        } set: { item in
+            if item == nil, let shown {
+                presenter.dismiss(shown)
             }
-            return purpose
-        } set: { purpose in
-            if purpose == nil {
-                presenter.dismiss { if case .layout = $0 { true } else { false } }
-            }
+        }
+    }
+
+    /// What's open, when it opens as the screen's sheet. A layers sheet goes with its slide, should
+    /// another window delete it, as the slide's own popover would.
+    private var shownSheet: ProjectPresentation? {
+        guard let current = presenter.current, current.opensAsSheet(isCompact: presentsAsSheets) else {
+            return nil
+        }
+        if case .layers(let slideID) = current, library.project(projectID)?.slides.contains(where: { $0.id == slideID }) != true {
+            return nil
+        }
+        return current
+    }
+
+    @ViewBuilder
+    private func sheetContent(for item: ProjectPresentation, in project: Project) -> some View {
+        switch item {
+        case .layout(let purpose):
+            layoutSheet(for: purpose, in: project)
+                .onDisappear { presenter.presentPending() }
+        case .export:
+            ExportSheet(project: project, exporter: exporter)
+                .onDisappear(perform: exportGone)
+        case .layers(let slideID):
+            // Its `onGone` closes it and opens what's waiting.
+            layerActions.sheet(slideID)
+        case .photoPicker, .camera:
+            EmptyView()
         }
     }
 
@@ -329,6 +384,7 @@ struct ProjectScreen: View {
             projectID: projectID,
             session: layerSession,
             presenter: $presenter,
+            showsPopovers: !presentsAsSheets,
             dynamicTypeSize: dynamicTypeSize,
             select: selectLayer,
             photoSelection: { session.selection },
@@ -422,6 +478,12 @@ struct ProjectScreen: View {
         }
     }
     #endif
+}
+
+/// The width what's open opened at. Not observed, since it's set to the width the screen already
+/// has, so a write redraws nothing.
+private final class OpenedWidth {
+    var isCompact: Bool?
 }
 
 #Preview {

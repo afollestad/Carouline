@@ -22,8 +22,8 @@ struct SlideStrip: View {
     let session: CropSession
     let layerSession: LayerSession
     let layerActions: LayerActions
-    /// The slide whose layers sheet is open, which the strip holds still for, so the slide the
-    /// sheet points at stays put.
+    /// The slide whose layers sheet is open, which the strip holds still for, so the slide being
+    /// edited stays put.
     let layersSlideID: UUID?
     /// Taps between the slides, or in the margins beside them while they're scaled down, which
     /// finish framing a photo or moving a layer.
@@ -76,12 +76,17 @@ struct SlideStrip: View {
             fullSize = size
         }
         .scaleEffect(roomScale, anchor: .top)
-        // Past the scale, which would otherwise shrink the frame the sheet makes room in, and the
+        // Past the scale, which would otherwise shrink the strip the sheet makes room in, and the
         // sheet's resting height with it, over and over.
-        .onGeometryChange(for: CGRect.self) { proxy in
-            proxy.frame(in: .global)
-        } action: { frame in
-            layerSession.stripFrame = frame
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { height in
+            layerSession.stripHeight = height
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.frame(in: .global).maxY
+        } action: { bottom in
+            layerSession.stripBottom = bottom
         }
         // Past the scale, so taps in the margins it leaves beside the slides still finish, and
         // pinches there still reach the selection.
@@ -125,8 +130,8 @@ struct SlideStrip: View {
     /// stays in view and in reach above the sheet, or above the keyboard and the short sheet over
     /// it while a text layer is typed: the room above the selection bar's, fitted into the room
     /// they leave. Scaled rather than laid out smaller, since the lazy stack drops the slide while
-    /// laying out its new size, and the slide's layers sheet with it. Not in landscape, where the
-    /// sheet is always full height and covers the slides however small they are.
+    /// laying out its new size, and rebuilds it. Not in landscape, where the sheet is always full
+    /// height and covers the slides however small they are.
     private var roomScale: CGFloat {
         let sheetRoom = verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
         let room = max(layerSession.keyboardRoom, sheetRoom)
