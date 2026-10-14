@@ -49,6 +49,7 @@ struct ExportSheet: View {
                     )
                 }
             }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .navigationTitle("Export")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

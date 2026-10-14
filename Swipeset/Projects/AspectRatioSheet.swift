@@ -27,6 +27,7 @@ struct AspectRatioSheet: View {
                 }
                 .padding()
             }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .navigationTitle("New Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -34,6 +34,7 @@ struct LayoutSheet: View {
                 }
                 .padding()
             }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .navigationTitle(current == nil ? "New Slide" : "Change Layout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
