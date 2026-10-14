@@ -21,9 +21,10 @@ struct LayerSessionTests {
         LayerSession(selection: LayerAddress(projectID: UUID(), slideID: UUID(), layerID: (layer ?? self.layer).id))
     }
 
-    /// A drag across `x` and `y` points from `start`, by default the test layer's center.
-    private func drag(_ x: CGFloat, _ y: CGFloat, from start: CGPoint = CGPoint(x: 100, y: 100)) -> LayerDrag {
-        LayerDrag(start: start, translation: CGSize(width: x, height: y))
+    /// A drag across `x` and `y` points from `start`, by default the test layer's center, `pinched`
+    /// of them since a second finger joined it.
+    private func drag(_ x: CGFloat, _ y: CGFloat, from start: CGPoint = CGPoint(x: 100, y: 100), pinched: CGSize? = nil) -> LayerDrag {
+        LayerDrag(start: start, translation: CGSize(width: x, height: y), pinchTranslation: pinched)
     }
 
     /// A gesture reports how far it has moved in all, so each update builds on the placement it
@@ -157,6 +158,25 @@ struct LayerSessionTests {
         #expect(session.livePlacement == nil)
     }
 
+    /// Once a second finger joins a drag that began off the layer, the fingers move it, as far as
+    /// they've moved since.
+    @Test func aDragOffTheLayerMovesItOnceASecondFingerJoins() {
+        let session = session()
+
+        session.move(layer, by: LayerGesture(drag: drag(99, 0, from: CGPoint(x: 300, y: 300), pinched: CGSize(width: 40, height: 0))), on: canvas)
+
+        #expect(session.livePlacement?.centerX == 0.35)
+    }
+
+    /// A drag that began on the layer keeps moving it the whole way through a pinch.
+    @Test func aDragOnTheLayerCarriesOnThroughAPinch() {
+        let session = session()
+
+        session.move(layer, by: LayerGesture(drag: drag(40, 0, pinched: CGSize(width: 10, height: 0)), magnification: 1), on: canvas)
+
+        #expect(session.livePlacement?.centerX == 0.35)
+    }
+
     /// A drag that begins off the layer moves it nowhere, and leaves nothing to redraw.
     @Test func aDragStartingOffTheLayerMovesNothing() {
         let session = session()
@@ -210,24 +230,24 @@ struct LayerSessionTests {
         #expect(session.livePlacement?.centerX == 0.35)
     }
 
-    /// A pinch moves on with a drag that began off the layer, sizing it without moving or
-    /// snapping its center.
+    /// A pinch after a drag that began off the layer moves it only as far as the fingers have
+    /// moved since, so one whose fingers' middle holds still sizes it in place.
     @Test func aPinchWithADragOffTheLayerSizesItInPlace() {
         let session = session()
 
-        session.move(layer, by: LayerGesture(drag: drag(99, 0, from: CGPoint(x: 300, y: 300)), magnification: 2), on: canvas)
+        session.move(layer, by: LayerGesture(drag: drag(99, 0, from: CGPoint(x: 300, y: 300), pinched: .zero), magnification: 2), on: canvas)
 
         #expect(session.livePlacement?.scale == 2)
         #expect(session.livePlacement?.centerX == 0.25)
         #expect(session.snap.guideX == nil)
     }
 
-    /// A drag that moved nothing doesn't count as the gesture's start, so a twist after it still
-    /// finds the layer upright already, and counts no snap taking hold.
+    /// A twist after a drag off the layer holds the quarter turn the layer began at, so one that
+    /// was upright already counts no snap taking hold.
     @Test func aTwistAfterADragOffTheLayerCountsNoSnap() {
         let centered = Layer(content: .text(TextLayer(text: "Hi")))
         let session = session(selecting: centered)
-        let offLayer = drag(40, 0, from: CGPoint(x: 350, y: 350))
+        let offLayer = drag(40, 0, from: CGPoint(x: 350, y: 350), pinched: .zero)
 
         session.move(centered, by: LayerGesture(drag: offLayer), on: canvas)
         session.move(centered, by: LayerGesture(drag: offLayer, rotation: 0.01), on: canvas)

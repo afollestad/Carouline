@@ -52,6 +52,12 @@ final class CropSession {
         liveCrop = crop
     }
 
+    /// Carries the gesture on from the crop it's at, as the fingers change, so its next values
+    /// build on that rather than the crop it began from, and zoom about where the fingers are now.
+    func rebase() {
+        gestureStart = nil
+    }
+
     /// Drops the gesture and the crop it or the zoom slider left, unsaved, as when another photo
     /// replaces the one they framed, which they mustn't carry over to.
     func discardFraming() {

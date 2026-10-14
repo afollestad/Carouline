@@ -74,8 +74,8 @@ final class LayerSession {
     /// never moves that one.
     @ObservationIgnored private var gestureLayerID: UUID?
     /// Whether the current gesture's drag began on its layer, decided at its first update with a
-    /// drag, so a drag moves the layer only from on it, and keeps moving it once the layer has
-    /// left the finger's start.
+    /// drag, so a drag moves the layer only from on it, or once a second finger joins, and keeps
+    /// moving it once the layer has left the finger's start.
     @ObservationIgnored private var dragStartsOnLayer: Bool?
     /// Whether the current gesture has turned the layer yet, which a twist may begin only partway
     /// through.
@@ -89,9 +89,9 @@ final class LayerSession {
 
     /// Moves, sizes and turns `layer` by a gesture's values on `canvas`, each building on the
     /// placement the gesture began from, so the layer tracks the fingers exactly, then snaps it.
-    /// A drag that began off the layer moves nothing, and an update with nothing else to apply,
-    /// or a pinch or twist that isn't finite, changes nothing, not even where the gesture begins
-    /// from.
+    /// A drag that began off the layer moves it only as far as the fingers have moved since a
+    /// second joined, and an update with nothing else to apply, or a pinch or twist that isn't
+    /// finite, changes nothing, not even where the gesture begins from.
     func move(_ layer: Layer, by gesture: LayerGesture, on canvas: LayerCanvas) {
         // Until the slide has measured itself there's nothing to move the layer across.
         guard canvas.size.width > 0, canvas.size.height > 0, selection?.layerID == layer.id else {
@@ -146,7 +146,8 @@ final class LayerSession {
     }
 
     /// `drag`'s translation when the drag began on `layer` at the placement `start` the gesture
-    /// began from, which is where the finger first touched it, or nil.
+    /// began from, which is where the finger first touched it, or else how far it has moved since
+    /// a second finger joined it, or nil.
     private func acceptedTranslation(of drag: LayerDrag?, on layer: Layer, at start: LayerPlacement, canvas: LayerCanvas) -> CGSize? {
         guard let drag else {
             return nil
@@ -156,7 +157,7 @@ final class LayerSession {
             started.placement = start
             dragStartsOnLayer = LayerGeometry.contains(drag.start, layer: started, on: canvas)
         }
-        return dragStartsOnLayer == true ? drag.translation : nil
+        return dragStartsOnLayer == true ? drag.translation : drag.pinchTranslation
     }
 
     /// Starts editing `layer` on slide `slideID`, unless it's already the draft. A new layer
@@ -267,6 +268,9 @@ struct LayerGesture {
 struct LayerDrag {
     let start: CGPoint
     let translation: CGSize
+    /// How far it has moved since a second finger joined it, which moves the layer wherever the
+    /// drag began, or nil before one has.
+    let pinchTranslation: CGSize?
 }
 
 /// A page of the layers sheet past its list.

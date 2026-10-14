@@ -71,6 +71,18 @@ struct CropSessionTests {
         #expect(session.liveCrop == panned(replacement.crop, by: -50))
     }
 
+    /// As the fingers change, the gesture carries on from the crop it's at, even where the
+    /// photo's edge stopped it, rather than the one it began from.
+    @Test func rebasingCarriesOnFromTheCropItsAt() {
+        let session = session()
+        session.frame(image, translation: CGSize(width: 200, height: 0), magnification: nil, anchor: .zero)
+
+        session.rebase()
+        session.frame(image, translation: CGSize(width: -50, height: 0), magnification: nil, anchor: .zero)
+
+        #expect(session.liveCrop == panned(panned(image.crop, by: 200), by: -50))
+    }
+
     @Test func leavesTheCropAloneUntilTheCellHasMeasuredItself() {
         let session = CropSession()
 
