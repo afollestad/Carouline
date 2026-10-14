@@ -120,6 +120,14 @@ struct LayerSessionTests {
         #expect(session.livePlacement?.rotation == 0.5)
     }
 
+    @Test func aPinchStopsWhereTheLayerGoesNoSmaller() {
+        let session = session()
+
+        session.move(layer, by: LayerGesture(magnification: 0.01), on: canvas)
+
+        #expect(session.livePlacement?.scale == LayerGeometry.scales(of: layer).lowerBound)
+    }
+
     @Test func movesNothingUntilTheSlideHasMeasuredItself() {
         let session = session()
 

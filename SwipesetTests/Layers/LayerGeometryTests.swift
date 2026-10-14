@@ -28,6 +28,24 @@ struct LayerGeometryTests {
         #expect(abs(large.height - small.height * ratio) < 0.001)
     }
 
+    /// Text stops shrinking once a line is `minimumSide` of a slide, however narrow its
+    /// characters, and a picture once its shorter side is, border aside, unless it's wide enough
+    /// that it stops at the usual smallest scale first, or so narrow that only the largest
+    /// reaches it.
+    @Test func keepsALayerFromShrinkingToNothing() {
+        let dot = TextLayer(text: ".")
+        let line = Double(TextLayerLayout.make(for: dot).lineHeight / LayerGeometry.referenceSlideWidth)
+        let smallest = LayerGeometry.scales(of: Layer(content: .text(dot))).lowerBound
+
+        #expect(abs(smallest * line - Double(LayerGeometry.minimumSide)) < 1e-9)
+        #expect(LayerGeometry.scales(of: Layer(content: .text(TextLayer(text: "Day one by the river")))).lowerBound == smallest)
+        #expect(LayerGeometry.scales(of: picture(width: 400, height: 300)) == LayerPlacement.scales)
+        let strip = LayerGeometry.scales(of: picture(width: 1000, height: 100))
+        #expect(abs(strip.lowerBound - 0.8) < 1e-9)
+        #expect(LayerGeometry.scales(of: picture(width: 1000, height: 100, border: 0.08)) == strip)
+        #expect(LayerGeometry.scales(of: picture(width: 6000, height: 100)) == 4...4)
+    }
+
     /// A panorama measures layers from one of its slides, so a layer is as big on a panorama as on
     /// a slide, and its center counts slide widths from the left.
     @Test func measuresAPanoramaFromOneSlide() {

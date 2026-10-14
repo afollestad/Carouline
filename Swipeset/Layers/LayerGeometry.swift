@@ -23,6 +23,10 @@ nonisolated enum LayerGeometry {
     /// A fingertip's target on screen, which text in small type or a small picture takes touches
     /// across.
     static let minimumTarget: CGFloat = 44
+    /// How small a line of text or a picture's shorter side goes, as a fraction of a slide's
+    /// width: a twenty-fifth, which leaves type of about 11 to 15 points, as small as a phone's
+    /// footnotes, on a slide shown as wide as the phone, and a narrow picture a strip that shows.
+    static let minimumSide: CGFloat = 0.04
     /// A picture's shadow, as shares of its longer side: its blur, as a Gaussian's sigma like a
     /// picture's blur, and how far down it falls. Soft and close, as text's is, so it lifts the
     /// picture off a busy slide without reading as a dark band along its edge.
@@ -70,6 +74,25 @@ nonisolated enum LayerGeometry {
         CGAffineTransform(translationX: box.midX, y: box.midY)
             .rotated(by: rotation)
             .translatedBy(x: -box.midX, y: -box.midY)
+    }
+
+    /// The scales `layer` can take: `LayerPlacement.scales`, starting where a line of its text, or
+    /// a picture's shorter side, is `minimumSide` if that's later, so a pinch never shrinks it to
+    /// nothing. Text measures a line rather than its box, and a picture leaves out its border, so
+    /// a lone narrow character shrinks as far as a word, and editing a layer's text, highlight or
+    /// border never resizes it. A picture too narrow to reach it by the largest scale can take
+    /// only that.
+    static func scales(of layer: Layer) -> ClosedRange<Double> {
+        let scales = LayerPlacement.scales
+        let side: CGFloat
+        switch layer.content {
+        case .text(let text):
+            side = TextLayerLayout.make(for: text).lineHeight / referenceSlideWidth
+        case .image(let picture):
+            let size = pictureSize(of: picture.image, scale: 1, slideWidth: 1)
+            side = min(size.width, size.height)
+        }
+        return min(max(scales.lowerBound, Double(minimumSide / side)), scales.upperBound)...scales.upperBound
     }
 
     /// The layer's unturned size on slides `slideWidth` wide, its border or highlight included.

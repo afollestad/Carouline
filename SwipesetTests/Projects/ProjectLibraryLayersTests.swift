@@ -174,6 +174,20 @@ struct ProjectLibraryLayersTests {
         #expect(await store.saves == saves + 1)
     }
 
+    /// A placement smaller than the layer goes, as VoiceOver's Make Smaller can set, stops there.
+    @Test func keepsAPlacementFromShrinkingTheLayerToNothing() async throws {
+        let library = ProjectLibrary(store: CountingStore(), projects: [])
+        let projectID = library.createProject(aspectRatio: .portrait).id
+        let slideID = try #require(library.addSlide(.single, to: projectID))
+        let layer = text()
+        library.saveLayer(layer, in: slideID, of: projectID)
+
+        library.setPlacement(LayerPlacement(scale: 0.01), at: address(layer, projectID, slideID))
+        await library.flush()
+
+        #expect(layers(library, projectID, slideID).first?.placement.scale == LayerGeometry.scales(of: layer).lowerBound)
+    }
+
     @Test func movesLayersWithinTheStack() async throws {
         let fixture = try await makeLibrary()
         let library = fixture.library

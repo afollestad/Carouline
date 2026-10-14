@@ -125,7 +125,9 @@ final class LayerSession {
         let moves = translation != nil
         let turns = gesture.rotation != nil
         let held = isStarting ? LayerSnapping.snapped(start, on: canvas, previous: LayerSnap(), moves: moves, turns: turns).snap : snap
-        let snapped = LayerSnapping.snapped(placement.clamped(span: canvas.span), on: canvas, previous: held, moves: moves, turns: turns)
+        var placed = layer
+        placed.placement = placement
+        let snapped = LayerSnapping.snapped(placed.clamped(span: canvas.span).placement, on: canvas, previous: held, moves: moves, turns: turns)
         if snapped.snap.takesHold(after: held) {
             snapsTaken += 1
         }
@@ -217,7 +219,8 @@ final class LayerSession {
     func commitPlacement(_ placement: LayerPlacement, at address: LayerAddress, to library: ProjectLibrary) {
         if isDraftNew, draftLayerID == address.layerID {
             let span = library.project(address.projectID)?.slides.first { $0.id == address.slideID }?.span ?? 1
-            draft?.placement = placement.clamped(span: span)
+            draft?.placement = placement
+            draft = draft?.clamped(span: span)
         } else {
             library.setPlacement(placement, at: address)
         }

@@ -27,10 +27,12 @@ nonisolated struct Layer: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The layer kept within range on a slide `span` slides wide.
+    /// The layer kept within range on a slide `span` slides wide, its scale within its own
+    /// `LayerGeometry.scales(of:)`, so it never shrinks to nothing. Keep a placement in range only
+    /// through here, which knows the layer's size.
     func clamped(span: Int) -> Layer {
         var layer = self
-        layer.placement = placement.clamped(span: span)
+        layer.placement = placement.clamped(span: span, scales: LayerGeometry.scales(of: self))
         if case .image(let image) = content {
             layer.content = .image(image.clamped())
         }
@@ -64,8 +66,9 @@ nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
         LayerPlacement(centerX: Double(max(1, span) / 2) + 0.5)
     }
 
-    /// A fifth of its natural size is about as small as a layer's text stays readable in an
-    /// export, and four times makes a natural-size image two slides wide, past filling one.
+    /// A fifth of its natural size takes a picture down to a tenth of a slide across, and four
+    /// times makes a natural-size image two slides wide, past filling one. A layer's own
+    /// `LayerGeometry.scales(of:)` start higher for text and narrow pictures.
     static let scales = 0.2...4.0
 
     /// The placement kept on a slide `span` slides wide: its center on the slide, its scale in
@@ -73,7 +76,7 @@ nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
     /// end moves onto the last slide at the same place within its own, rather than piling up
     /// against the edge. A value that isn't finite takes a new layer's instead, since JSON can't
     /// hold one and the project would stop saving.
-    func clamped(span: Int) -> LayerPlacement {
+    func clamped(span: Int, scales: ClosedRange<Double> = LayerPlacement.scales) -> LayerPlacement {
         let width = Double(max(1, span))
         let middle = Self.middle(ofSpan: span)
         var placement = self
@@ -86,7 +89,7 @@ nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
         }
         placement.centerX = min(max(placement.centerX, 0), width)
         placement.centerY = min(max(placement.centerY, 0), 1)
-        placement.scale = min(max(placement.scale, Self.scales.lowerBound), Self.scales.upperBound)
+        placement.scale = min(max(placement.scale, scales.lowerBound), scales.upperBound)
         placement.rotation = remainder(placement.rotation, 2 * .pi)
         return placement
     }

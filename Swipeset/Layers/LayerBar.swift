@@ -64,7 +64,7 @@ struct LayerBar: View {
     /// Slides along the scale's logarithm, so halving and doubling take the same distance and
     /// small sizes get as much of the track as large ones.
     private var sizeSlider: some View {
-        let scales = LayerPlacement.scales
+        let scales = LayerGeometry.scales(of: layer)
         return Slider(value: size, in: log2(scales.lowerBound)...log2(scales.upperBound)) {
             Text("Size")
         } onEditingChanged: { isEditing in

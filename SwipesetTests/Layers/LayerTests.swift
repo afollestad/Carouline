@@ -73,6 +73,13 @@ struct LayerTests {
         #expect(placement.clamped(span: 3) == LayerPlacement.middle(ofSpan: 3))
     }
 
+    /// A layer saved or loaded smaller than it goes, as before it had a smallest size, grows to it.
+    @Test func clampsALayerToItsSmallestSize() {
+        let layer = Layer(content: .text(TextLayer(text: "Hi")), placement: LayerPlacement(scale: 0.2))
+
+        #expect(layer.clamped(span: 1).placement.scale == LayerGeometry.scales(of: layer).lowerBound)
+    }
+
     /// A panorama cut down to fewer slides keeps each layer where it sat on its own slide, on
     /// the last one, rather than piling them against the edge.
     @Test func movesLayersPastANarrowerSpanOntoItsLastSlide() {

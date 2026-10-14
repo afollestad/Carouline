@@ -146,7 +146,9 @@ extension ProjectLibrary {
               let layer = slide.layers.first(where: { $0.id == address.layerID }) else {
             return
         }
-        let placement = placement.clamped(span: slide.span)
+        var moved = layer
+        moved.placement = placement
+        let placement = moved.clamped(span: slide.span).placement
         guard layer.placement != placement else {
             return
         }
