@@ -66,6 +66,13 @@ struct LayerTests {
         #expect(LayerPlacement(scale: 0).clamped(span: 1).scale == LayerPlacement.scales.lowerBound)
     }
 
+    /// JSON can't hold a value that isn't finite, so one would stop the project saving.
+    @Test func resetsValuesThatAreNotFinite() {
+        let placement = LayerPlacement(centerX: .infinity, centerY: .nan, scale: .nan, rotation: .infinity)
+
+        #expect(placement.clamped(span: 3) == LayerPlacement.middle(ofSpan: 3))
+    }
+
     /// A panorama cut down to fewer slides keeps each layer where it sat on its own slide, on
     /// the last one, rather than piling them against the edge.
     @Test func movesLayersPastANarrowerSpanOntoItsLastSlide() {

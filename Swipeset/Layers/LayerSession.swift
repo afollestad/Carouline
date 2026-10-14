@@ -85,11 +85,17 @@ final class LayerSession {
 
     /// Moves, sizes and turns `layer` by a gesture's values on `canvas`, each building on the
     /// placement the gesture began from, so the layer tracks the fingers exactly, then snaps it.
-    /// A drag that began off the layer moves nothing, and an update with nothing else to apply
-    /// changes nothing, not even where the gesture begins from.
+    /// A drag that began off the layer moves nothing, and an update with nothing else to apply,
+    /// or a pinch or twist that isn't finite, changes nothing, not even where the gesture begins
+    /// from.
     func move(_ layer: Layer, by gesture: LayerGesture, on canvas: LayerCanvas) {
         // Until the slide has measured itself there's nothing to move the layer across.
         guard canvas.size.width > 0, canvas.size.height > 0, selection?.layerID == layer.id else {
+            return
+        }
+        // A pinch or twist can report a value that isn't finite, which would draw the layer
+        // nowhere; it holds where the last update left it.
+        guard gesture.magnification?.isFinite != false, gesture.rotation?.isFinite != false else {
             return
         }
         if gestureLayerID == nil {

@@ -71,17 +71,23 @@ nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
     /// The placement kept on a slide `span` slides wide: its center on the slide, its scale in
     /// `scales`, and its rotation within half a turn either way. A center past a narrower span's
     /// end moves onto the last slide at the same place within its own, rather than piling up
-    /// against the edge.
+    /// against the edge. A value that isn't finite takes a new layer's instead, since JSON can't
+    /// hold one and the project would stop saving.
     func clamped(span: Int) -> LayerPlacement {
         let width = Double(max(1, span))
+        let middle = Self.middle(ofSpan: span)
         var placement = self
-        if centerX > width {
-            placement.centerX = centerX - (centerX - width).rounded(.up)
+        placement.centerX = centerX.isFinite ? centerX : middle.centerX
+        placement.centerY = centerY.isFinite ? centerY : middle.centerY
+        placement.scale = scale.isFinite ? scale : middle.scale
+        placement.rotation = rotation.isFinite ? rotation : middle.rotation
+        if placement.centerX > width {
+            placement.centerX -= (placement.centerX - width).rounded(.up)
         }
         placement.centerX = min(max(placement.centerX, 0), width)
-        placement.centerY = min(max(centerY, 0), 1)
-        placement.scale = min(max(scale, Self.scales.lowerBound), Self.scales.upperBound)
-        placement.rotation = remainder(rotation, 2 * .pi)
+        placement.centerY = min(max(placement.centerY, 0), 1)
+        placement.scale = min(max(placement.scale, Self.scales.lowerBound), Self.scales.upperBound)
+        placement.rotation = remainder(placement.rotation, 2 * .pi)
         return placement
     }
 }

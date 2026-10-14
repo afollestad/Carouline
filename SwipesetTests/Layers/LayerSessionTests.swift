@@ -106,6 +106,20 @@ struct LayerSessionTests {
         #expect(session.snapsTaken == 1)
     }
 
+    /// A pinch or twist that isn't finite leaves the layer where the last update left it.
+    @Test func aPinchOrTwistThatIsNotFiniteMovesNothing() {
+        let session = session()
+
+        session.move(layer, by: LayerGesture(magnification: .nan), on: canvas)
+        #expect(session.livePlacement == nil)
+        session.move(layer, by: LayerGesture(magnification: 0.5, rotation: 0.5), on: canvas)
+        session.move(layer, by: LayerGesture(magnification: .nan, rotation: 0.6), on: canvas)
+        session.move(layer, by: LayerGesture(magnification: 0.4, rotation: .infinity), on: canvas)
+
+        #expect(session.livePlacement?.scale == 0.5)
+        #expect(session.livePlacement?.rotation == 0.5)
+    }
+
     @Test func movesNothingUntilTheSlideHasMeasuredItself() {
         let session = session()
 
