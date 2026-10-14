@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1254 1254">
+<defs>
+    <linearGradient id="violet" x1="310" y1="220" x2="825" y2="1050" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#885BF5"/>
+      <stop offset="0.4" stop-color="#7550DE"/>
+      <stop offset="0.72" stop-color="#6940D5"/>
+      <stop offset="1" stop-color="#8252F0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="455" cy="1020" r="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8957F9" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#8957F9" stop-opacity="0"/>
+    </radialGradient>
+    <path id="piece" d="M 276 268 L 527 207 C 594 190 649 216 670 274 L 851 866 C 869 925 844 971 787 986 L 451 1063 C 383 1083 330 1054 312 995 L 185 414 C 167 345 197 289 276 268 Z"/>
+  </defs>
+  <use href="#piece" fill="url(#violet)"/>
+  <use href="#piece" fill="url(#glow)"/>
+</svg>

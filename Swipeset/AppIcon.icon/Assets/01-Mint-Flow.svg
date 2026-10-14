@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1254 1254">
+<defs>
+    <linearGradient id="mint" x1="560" y1="445" x2="770" y2="850" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DFFFF0"/>
+      <stop offset="0.48" stop-color="#D8FDE9"/>
+      <stop offset="1" stop-color="#D0F9E3"/>
+    </linearGradient>
+  </defs>
+  <path d="M 201 491 C 314 383 482 497 630 586 C 759 678 867 671 972 613 C 1035 580 1075 530 1075 474 L 1126 660 C 1145 730 1070 798 981 832 C 850 887 750 835 659 786 C 527 717 409 603 297 666 C 268 679 251 692 248 705 Z" fill="url(#mint)"/>
+</svg>

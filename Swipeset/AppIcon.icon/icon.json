@@ -10,148 +10,23 @@
   ],
   "groups": [
     {
-      "name": "01 Left image panel",
+      "name": "01 Flowing mint ribbon",
       "layers": [
         {
-          "image-name": "01-Left-Flow.svg",
-          "name": "Left continuous image",
-          "glass": true,
-          "fill-specializations": [
-            {
-              "value": {
-                "solid": "extended-srgb:0.82353,1.00000,0.89412,1.00000"
-              }
-            },
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "extended-srgb:0.77255,0.96078,0.86275,1.00000"
-              }
-            }
-          ]
-        },
-        {
-          "image-name": "01-Left-Panel.svg",
-          "name": "Left panel",
-          "glass": true,
-          "fill-specializations": [
-            {
-              "value": {
-                "solid": "extended-srgb:0.62745,0.47059,0.93333,1.00000"
-              }
-            },
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "extended-srgb:0.55294,0.40000,0.86667,1.00000"
-              }
-            }
-          ]
-        }
-      ],
-      "translucency": {
-        "enabled": true,
-        "value": 0.12
-      },
-      "refractivity-specializations": [
-        {
-          "value": {
-            "enabled": true,
-            "strength": 0.42,
-            "depth": 0.32
-          }
-        },
-        {
-          "appearance": "dark",
-          "value": {
-            "enabled": false,
-            "strength": 0.5,
-            "depth": 0
-          }
-        }
-      ],
-      "shadow-specializations": [
-        {
-          "value": {
-            "kind": "neutral",
-            "opacity": 0.42
-          }
-        },
-        {
-          "appearance": "dark",
-          "value": {
-            "kind": "neutral",
-            "opacity": 0.24
-          }
-        }
-      ],
-      "specular-specializations": [
-        {
-          "value": "inside"
-        },
-        {
-          "appearance": "dark",
-          "value": "automatic"
-        }
-      ]
-    },
-    {
-      "name": "02 Center image panel",
-      "layers": [
-        {
-          "image-name": "02-Center-Flow.svg",
-          "name": "Center continuous image",
-          "glass": true,
-          "fill-specializations": [
-            {
-              "value": {
-                "solid": "extended-srgb:0.82353,1.00000,0.89412,1.00000"
-              }
-            },
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "extended-srgb:0.77255,0.96078,0.86275,1.00000"
-              }
-            }
-          ]
-        },
-        {
-          "image-name": "02-Center-Panel.svg",
-          "name": "Center panel",
-          "glass": true,
-          "fill-specializations": [
-            {
-              "value": {
-                "solid": "extended-srgb:0.47451,0.34118,0.90588,1.00000"
-              }
-            },
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "extended-srgb:0.45882,0.33725,0.85098,1.00000"
-              }
-            }
-          ]
+          "image-name": "01-Mint-Flow.svg",
+          "name": "01 Flowing mint ribbon",
+          "glass": false
         }
       ],
       "translucency": {
         "enabled": false,
-        "value": 0.12
+        "value": 0
       },
       "refractivity-specializations": [
         {
           "value": {
-            "enabled": true,
-            "strength": 0.42,
-            "depth": 0.32
-          }
-        },
-        {
-          "appearance": "dark",
-          "value": {
             "enabled": false,
-            "strength": 0.5,
+            "strength": 0,
             "depth": 0
           }
         }
@@ -160,84 +35,36 @@
         {
           "value": {
             "kind": "neutral",
-            "opacity": 0.42
+            "opacity": 0
           }
         },
         {
           "appearance": "dark",
           "value": {
             "kind": "neutral",
-            "opacity": 0.24
+            "opacity": 0.0
           }
-        }
-      ],
-      "specular-specializations": [
-        {
-          "value": "inside"
-        },
-        {
-          "appearance": "dark",
-          "value": "automatic"
         }
       ]
     },
     {
-      "name": "03 Right image panel",
+      "name": "02 Violet collage piece",
       "layers": [
         {
-          "image-name": "03-Right-Flow.svg",
-          "name": "Right continuous image",
-          "glass": true,
-          "fill-specializations": [
-            {
-              "value": {
-                "solid": "extended-srgb:0.82353,1.00000,0.89412,1.00000"
-              }
-            },
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "extended-srgb:0.77255,0.96078,0.86275,1.00000"
-              }
-            }
-          ]
-        },
-        {
-          "image-name": "03-Right-Panel.svg",
-          "name": "Right panel",
-          "glass": true,
-          "fill-specializations": [
-            {
-              "value": {
-                "solid": "extended-srgb:0.36078,0.27059,0.83137,1.00000"
-              }
-            },
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "extended-srgb:0.38431,0.30588,0.78431,1.00000"
-              }
-            }
-          ]
+          "image-name": "02-Violet-Piece.svg",
+          "name": "02 Violet collage piece",
+          "glass": false
         }
       ],
       "translucency": {
-        "enabled": true,
-        "value": 0.12
+        "enabled": false,
+        "value": 0
       },
       "refractivity-specializations": [
         {
           "value": {
-            "enabled": true,
-            "strength": 0.42,
-            "depth": 0.32
-          }
-        },
-        {
-          "appearance": "dark",
-          "value": {
             "enabled": false,
-            "strength": 0.5,
+            "strength": 0,
             "depth": 0
           }
         }
@@ -246,24 +73,53 @@
         {
           "value": {
             "kind": "neutral",
-            "opacity": 0.42
+            "opacity": 0.14
           }
         },
         {
           "appearance": "dark",
           "value": {
             "kind": "neutral",
-            "opacity": 0.24
+            "opacity": 0.084
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Lavender collage piece",
+      "layers": [
+        {
+          "image-name": "03-Lavender-Piece.svg",
+          "name": "03 Lavender collage piece",
+          "glass": false
+        }
+      ],
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "refractivity-specializations": [
+        {
+          "value": {
+            "enabled": false,
+            "strength": 0,
+            "depth": 0
           }
         }
       ],
-      "specular-specializations": [
+      "shadow-specializations": [
         {
-          "value": "inside"
+          "value": {
+            "kind": "neutral",
+            "opacity": 0.1
+          }
         },
         {
           "appearance": "dark",
-          "value": "automatic"
+          "value": {
+            "kind": "neutral",
+            "opacity": 0.06
+          }
         }
       ]
     }
