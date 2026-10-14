@@ -49,11 +49,14 @@ struct TextLayerEditor: View {
         .scrollDismissesKeyboard(.interactively)
         .layerPage("Text", close: close)
         .toolbar {
-            // The return key adds a line, so this is how typing ends.
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    isTyping = false
+            // The return key adds a line, so this is how typing ends. In the title bar, as the
+            // list's Done is: a keyboard toolbar covers the bottom of the typing height, so the
+            // field scrolls up under the title to clear it.
+            if isTyping {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", systemImage: "checkmark", role: .confirm) {
+                        isTyping = false
+                    }
                 }
             }
         }
