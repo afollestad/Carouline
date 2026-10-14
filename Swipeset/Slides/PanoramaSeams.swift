@@ -22,7 +22,7 @@ struct SeamLines: Shape {
 
 /// A panorama's cuts dashed over it, white edged in black, so they show on a bright sky, a dark
 /// sea, or a background of either. Decorative, since the caption names the slides, and passed
-/// through to the photo, which drags and pinches beneath them.
+/// through to the photo and layers beneath them.
 struct PanoramaSeams: View {
     let span: Int
 

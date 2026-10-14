@@ -36,6 +36,8 @@ struct SlideStrip: View {
     @State private var size: CGSize = .zero
     /// The strip's size before `bottomRoom` is taken from it.
     @State private var fullSize: CGSize = .zero
+    /// Where the slides holding a selection are, which the selection's gesture moves it on.
+    @State private var slideFrames = SlideFrames()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -81,9 +83,19 @@ struct SlideStrip: View {
         } action: { frame in
             layerSession.stripFrame = frame
         }
-        // Past the scale, so taps in the margins it leaves beside the slides still finish.
+        // Past the scale, so taps in the margins it leaves beside the slides still finish, and
+        // pinches there still reach the selection.
         .contentShape(.rect)
         .onTapGesture(perform: onBackgroundTap)
+        .modifier(SelectionGesture(
+            project: project,
+            session: session,
+            layerSession: layerSession,
+            cellActions: cellActions,
+            layerActions: layerActions,
+            frames: slideFrames,
+            isEnabled: isAnythingSelected
+        ))
         .animation(.smooth(duration: 0.25), value: bottomRoom)
         .animation(.smooth(duration: 0.25), value: roomScale)
         // On a phone, the keyboard a text layer is typed with would lay the slides out smaller,
@@ -139,6 +151,7 @@ struct SlideStrip: View {
                         canMoveRight: index < project.slides.count - 1,
                         size: cardSize(span: slide.span),
                         screenPoint: 1 / roomScale,
+                        frames: slideFrames,
                         importingCells: importingCells,
                         isImportingLayer: importingLayers[slide.id] != nil,
                         cellActions: cellActions,
@@ -169,10 +182,10 @@ struct SlideStrip: View {
             .padding(.bottom, SelectionBar.reservedHeight)
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
-            .gesture(selectionGesture, isEnabled: isAnythingSelected)
         }
         .scrollTargetBehavior(snapping)
-        // A drag on the selected photo or layer moves it rather than scrolling past it.
+        // Held while anything's selected, so a drag on the selection moves it, and one off it
+        // scrolls nothing out from under it.
         .scrollDisabled(isAnythingSelected || layersSlideID != nil)
         .sensoryFeedback(.alignment, trigger: layerSession.snapsTaken)
         .scrollPosition(id: $position, anchor: .center)
@@ -182,63 +195,6 @@ struct SlideStrip: View {
 
     private var isAnythingSelected: Bool {
         session.selection != nil || layerSession.selection != nil
-    }
-
-    /// Drags, pinches and twists anywhere on the strip move the selected photo or layer, as
-    /// scrolling is locked while one is, so a thin panorama, a small cell or a small layer needn't
-    /// be hit exactly. A selected photo's own gesture takes those on it, and a pinch away from it
-    /// zooms about its middle, as the zoom slider does. A photo ignores twists. The drag keeps its
-    /// least distance, so taps still reach the layers and the space between the slides.
-    private var selectionGesture: some Gesture {
-        SimultaneousGesture(SimultaneousGesture(DragGesture(), MagnifyGesture()), RotateGesture())
-            .onChanged { value in
-                let translation = value.first?.first?.translation
-                let magnification = value.first?.second?.magnification
-                if let image = selectedPhoto {
-                    session.frame(
-                        image,
-                        translation: translation,
-                        magnification: magnification,
-                        anchor: CGPoint(x: session.cellSize.width / 2, y: session.cellSize.height / 2)
-                    )
-                } else if let (layer, canvas) = selectedLayer {
-                    let gesture = LayerGesture(translation: translation, magnification: magnification, rotation: value.second?.rotation.radians)
-                    layerSession.move(layer, by: gesture, on: canvas)
-                }
-            }
-            .onEnded { _ in
-                if session.selection != nil {
-                    let crop = session.endFraming()
-                    if let selection = session.selection, let crop {
-                        cellActions.setCrop(crop, selection)
-                    }
-                } else {
-                    let placement = layerSession.endMoving()
-                    if let selection = layerSession.selection, let placement {
-                        layerActions.setPlacement(placement, selection)
-                    }
-                }
-            }
-    }
-
-    /// The selected layer, a new one's draft included, and the slide it moves on at the size the
-    /// strip draws it.
-    private var selectedLayer: (Layer, LayerCanvas)? {
-        guard let selection = layerSession.selection,
-              let slide = project.slides.first(where: { $0.id == selection.slideID }),
-              let layer = slide.layers.first(where: { $0.id == selection.layerID }) ?? layerSession.draftLayer(selection.layerID) else {
-            return nil
-        }
-        return (layer, LayerCanvas(size: cardSize(span: slide.span), span: slide.span, screenPoint: 1 / roomScale))
-    }
-
-    private var selectedPhoto: PlacedImage? {
-        guard let selection = session.selection,
-              let slide = project.slides.first(where: { $0.id == selection.slideID }),
-              slide.cells.indices.contains(selection.index) else {
-            return nil
-        }
-        return slide.cells[selection.index].image
     }
 
     /// Rests the strip with a slide, or the add button, in the middle of the screen. View-aligned

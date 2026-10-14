@@ -42,6 +42,50 @@ struct LayerGeometryTests {
         #expect(panorama.midX == 2160)
     }
 
+    /// A layer takes a touch across its box turned with it: a quarter turn stands a wide picture
+    /// on end.
+    @Test func containsAPointInItsTurnedBox() {
+        var layer = picture(width: 400, height: 200)
+        layer.placement = LayerPlacement(centerX: 0.5, centerY: 0.5, rotation: .pi / 2)
+        let canvas = LayerCanvas(size: CGSize(width: 400, height: 400), span: 1)
+
+        // Upright it's 200 across and 100 down about the middle; turned, 100 across and 200 down.
+        #expect(LayerGeometry.contains(CGPoint(x: 200, y: 280), layer: layer, on: canvas))
+        #expect(!LayerGeometry.contains(CGPoint(x: 280, y: 200), layer: layer, on: canvas))
+    }
+
+    /// Small type takes a touch across a fingertip, which grows with the canvas's points on screen
+    /// while the slides are scaled down.
+    @Test func containsAFingertipAroundASmallLayer() {
+        let layer = Layer(content: .text(TextLayer(text: "Hi")), placement: LayerPlacement(scale: 0.25))
+        let canvas = LayerCanvas(size: CGSize(width: 400, height: 400), span: 1)
+        let scaled = LayerCanvas(size: canvas.size, span: 1, screenPoint: 2)
+
+        #expect(LayerGeometry.contains(CGPoint(x: 220, y: 200), layer: layer, on: canvas))
+        #expect(!LayerGeometry.contains(CGPoint(x: 230, y: 200), layer: layer, on: canvas))
+        #expect(LayerGeometry.contains(CGPoint(x: 240, y: 200), layer: layer, on: scaled))
+        #expect(!LayerGeometry.contains(CGPoint(x: 250, y: 200), layer: layer, on: scaled))
+    }
+
+    /// A layer past the slide's edge still takes a drag there, which a thin panorama needs, where
+    /// a fingertip's reach is taller than the slide.
+    @Test func containsAPointPastTheSlidesEdge() {
+        var layer = picture(width: 400, height: 200)
+        layer.placement.centerX = 0.95
+        let canvas = LayerCanvas(size: CGSize(width: 400, height: 400), span: 1)
+
+        #expect(LayerGeometry.contains(CGPoint(x: 450, y: 200), layer: layer, on: canvas))
+    }
+
+    @Test func containsAPointOnAPanoramasLaterSlide() {
+        var layer = picture(width: 400, height: 200)
+        layer.placement.centerX = 2
+        let panorama = LayerCanvas(size: CGSize(width: 1200, height: 400), span: 3)
+
+        #expect(LayerGeometry.contains(CGPoint(x: 800, y: 200), layer: layer, on: panorama))
+        #expect(!LayerGeometry.contains(CGPoint(x: 200, y: 200), layer: layer, on: panorama))
+    }
+
     /// A tall picture is as big as a wide one: its longer side is half a slide, whichever it is.
     @Test func sizesAPictureByItsLongerSide() {
         let wide = LayerGeometry.size(of: picture(width: 400, height: 100), slideWidth: 1000)

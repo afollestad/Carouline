@@ -50,6 +50,28 @@ nonisolated enum LayerGeometry {
         return CGRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height)
     }
 
+    /// The layer's unturned frame on `canvas`, grown to a fingertip's target on screen, which is
+    /// where it takes touches.
+    static func hitBox(of layer: Layer, on canvas: LayerCanvas) -> CGRect {
+        let frame = frame(of: layer, canvas: canvas.size, span: canvas.span)
+        let side = minimumTarget * canvas.screenPoint
+        return frame.insetBy(dx: -max(0, (side - frame.width) / 2), dy: -max(0, (side - frame.height) / 2))
+    }
+
+    /// Whether `point`, in `canvas`'s coordinates, falls in `layer`'s hit box turned with it. Not
+    /// cut to the slide, so a fingertip's reach past a thin panorama's edge still finds it.
+    static func contains(_ point: CGPoint, layer: Layer, on canvas: LayerCanvas) -> Bool {
+        let box = hitBox(of: layer, on: canvas)
+        return box.contains(point.applying(turn(about: box, by: layer.placement.rotation).inverted()))
+    }
+
+    /// Turns by `rotation` radians about `box`'s center, as a layer turns.
+    static func turn(about box: CGRect, by rotation: Double) -> CGAffineTransform {
+        CGAffineTransform(translationX: box.midX, y: box.midY)
+            .rotated(by: rotation)
+            .translatedBy(x: -box.midX, y: -box.midY)
+    }
+
     /// The layer's unturned size on slides `slideWidth` wide, its border or highlight included.
     static func size(of layer: Layer, slideWidth: CGFloat) -> CGSize {
         switch layer.content {

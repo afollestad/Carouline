@@ -46,8 +46,8 @@ struct CellView: View {
     let session: CropSession
     /// Whether the cell is a panorama's, whose first photo sets how many slides it spans.
     var isPanorama = false
-    /// Whether a photo or a layer is selected anywhere on the strip, while which a long press is
-    /// the start of a drag rather than a menu.
+    /// Whether a photo or a layer is selected anywhere on the strip, while which a finger held down
+    /// may start a drag on the selection or a pinch anywhere, rather than a menu.
     var isAnythingSelected = false
     /// The photo's blur, as a Gaussian's sigma in points.
     var blur: CGFloat = 0
@@ -175,7 +175,8 @@ struct CellView: View {
                     .accessibilityHidden(true)
             }
         }
-        .gesture(cropGesture(for: image), isEnabled: isSelected)
+        // Dragged and pinched by the strip's selection gesture, rather than one of its own, which
+        // would claim a pinch's first finger. Its tap still keeps a tap on it from finishing.
         .onTapGesture {
             // A missing photo has nothing to frame; its own menu offers what can be done.
             if !isSelected, !isMissing {
@@ -211,8 +212,8 @@ struct CellView: View {
                     photoMenu
                 }
             }
-            // No menu while framing a photo or moving a layer, where a long press is the start of
-            // a drag, and the bar below offers the same choices.
+            // No menu while framing a photo or moving a layer, where a finger held down may start a
+            // drag or a pinch, and the bar below offers the same choices.
             .contextMenu {
                 if isAnythingSelected {
                     EmptyView()
@@ -227,24 +228,6 @@ struct CellView: View {
     private func select() {
         session.cellSize = size
         actions.select(address)
-    }
-
-    /// Drags pan and pinches zoom about where they started, together in one gesture.
-    private func cropGesture(for image: PlacedImage) -> some Gesture {
-        SimultaneousGesture(DragGesture(minimumDistance: 0), MagnifyGesture())
-            .onChanged { value in
-                session.frame(
-                    image,
-                    translation: value.first?.translation,
-                    magnification: value.second?.magnification,
-                    anchor: value.second?.startLocation ?? .zero
-                )
-            }
-            .onEnded { _ in
-                if let crop = session.endFraming() {
-                    actions.setCrop(crop, address)
-                }
-            }
     }
 
     /// Moves the photo a tenth of the cell, for VoiceOver, which can't drag.

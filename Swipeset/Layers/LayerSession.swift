@@ -13,11 +13,12 @@ import Observation
 @Observable
 final class LayerSession {
     var selection: LayerAddress? {
-        // A gesture cut short by a new selection never ends, so the next one would otherwise
-        // begin from its placement.
+        // A gesture still running when another layer is selected moves nothing more, and the
+        // next one begins from that layer's own placement, judging its drag afresh.
         didSet {
             if selection != oldValue {
                 gestureStart = nil
+                dragStartsOnLayer = nil
             }
         }
     }
@@ -66,6 +67,10 @@ final class LayerSession {
     /// still running when another layer is selected, as when an import selects its picture,
     /// never moves that one.
     @ObservationIgnored private var gestureLayerID: UUID?
+    /// Whether the current gesture's drag began on its layer, decided at its first update with a
+    /// drag, so a drag moves the layer only from on it, and keeps moving it once the layer has
+    /// left the finger's start.
+    @ObservationIgnored private var dragStartsOnLayer: Bool?
 
     /// `snap` shows a guide from the start, as snapshots need.
     init(selection: LayerAddress? = nil, snap: LayerSnap = LayerSnap()) {
@@ -75,6 +80,8 @@ final class LayerSession {
 
     /// Moves, sizes and turns `layer` by a gesture's values on `canvas`, each building on the
     /// placement the gesture began from, so the layer tracks the fingers exactly, then snaps it.
+    /// A drag that began off the layer moves nothing, and an update with nothing else to apply
+    /// changes nothing, not even where the gesture begins from.
     func move(_ layer: Layer, by gesture: LayerGesture, on canvas: LayerCanvas) {
         // Until the slide has measured itself there's nothing to move the layer across.
         guard canvas.size.width > 0, canvas.size.height > 0, selection?.layerID == layer.id else {
@@ -86,11 +93,15 @@ final class LayerSession {
         guard gestureLayerID == layer.id else {
             return
         }
-        let isStarting = gestureStart == nil
         let start = gestureStart ?? livePlacement ?? layer.placement
+        let translation = acceptedTranslation(of: gesture.drag, on: layer, at: start, canvas: canvas)
+        guard translation != nil || gesture.magnification != nil || gesture.rotation != nil else {
+            return
+        }
+        let isStarting = gestureStart == nil
         gestureStart = start
         var placement = start
-        if let translation = gesture.translation {
+        if let translation {
             placement.centerX += translation.width / canvas.slideWidth
             placement.centerY += translation.height / canvas.size.height
         }
@@ -100,7 +111,7 @@ final class LayerSession {
         if let rotation = gesture.rotation {
             placement.rotation += rotation
         }
-        let moves = gesture.translation != nil
+        let moves = translation != nil
         let turns = gesture.rotation != nil
         let held = isStarting ? LayerSnapping.snapped(start, on: canvas, previous: LayerSnap(), moves: moves, turns: turns).snap : snap
         let snapped = LayerSnapping.snapped(placement.clamped(span: canvas.span), on: canvas, previous: held, moves: moves, turns: turns)
@@ -109,6 +120,20 @@ final class LayerSession {
         }
         snap = snapped.snap
         livePlacement = snapped.placement
+    }
+
+    /// `drag`'s translation when the drag began on `layer` at the placement `start` the gesture
+    /// began from, which is where the finger first touched it, or nil.
+    private func acceptedTranslation(of drag: LayerDrag?, on layer: Layer, at start: LayerPlacement, canvas: LayerCanvas) -> CGSize? {
+        guard let drag else {
+            return nil
+        }
+        if dragStartsOnLayer == nil {
+            var started = layer
+            started.placement = start
+            dragStartsOnLayer = LayerGeometry.contains(drag.start, layer: started, on: canvas)
+        }
+        return dragStartsOnLayer == true ? drag.translation : nil
     }
 
     /// Starts editing `layer` on slide `slideID`, unless it's already the draft. A new layer
@@ -194,6 +219,7 @@ final class LayerSession {
             livePlacement = nil
             gestureStart = nil
             gestureLayerID = nil
+            dragStartsOnLayer = nil
             snap = LayerSnap()
         }
         guard gestureLayerID == nil || gestureLayerID == selection?.layerID else {
@@ -205,10 +231,17 @@ final class LayerSession {
 
 /// A drag's, a pinch's and a twist's values so far, any of which a gesture may lack.
 struct LayerGesture {
-    var translation: CGSize?
+    var drag: LayerDrag?
     var magnification: CGFloat?
     /// Radians clockwise.
     var rotation: Double?
+}
+
+/// Where a drag began on its canvas and how far it has moved since, in the canvas's points. One
+/// value, so a drag's translation never arrives without where it began.
+struct LayerDrag {
+    let start: CGPoint
+    let translation: CGSize
 }
 
 /// A page of the layers sheet past its list.

@@ -51,8 +51,8 @@ struct LayerInteraction {
     let actions: LayerActions
     /// The selected layer, when it's on this slide.
     let selectedLayerID: UUID?
-    /// Whether a photo or a layer is selected anywhere on the strip, while which a long press is
-    /// the start of a drag rather than a menu.
+    /// Whether a photo or a layer is selected anywhere on the strip, while which a finger held down
+    /// may start a drag on the selection or a pinch anywhere, rather than a menu.
     let isAnythingSelected: Bool
     /// Whether a photo is selected, which drags beneath the layers rather than them taking touches.
     let isPhotoSelected: Bool
@@ -170,6 +170,7 @@ private struct PlacedLayer: View {
         var placed = layer
         placed.placement = placement
         let frame = LayerGeometry.frame(of: placed, canvas: slide.size, span: slide.span)
+        let canvas = LayerCanvas(size: slide.size, span: slide.span, screenPoint: interaction?.screenPoint ?? 1)
         let isSelected = interaction?.selectedLayerID == layer.id
         let content = LayerContentView(layer: layer, projectID: slide.projectID, background: slide.background, size: frame.size)
             .environment(\.missingPictureActions, missingPictureActions)
@@ -188,7 +189,7 @@ private struct PlacedLayer: View {
             .position(x: frame.midX, y: frame.midY)
             .contentShape(
                 [.interaction, .contextMenuPreview],
-                LayerHitShape(frame: frame, rotation: placement.rotation, minimumSide: LayerGeometry.minimumTarget * (interaction?.screenPoint ?? 1))
+                LayerHitShape(box: LayerGeometry.hitBox(of: placed, on: canvas), rotation: placement.rotation)
             )
             .onTapGesture {
                 if !isSelected {
@@ -197,8 +198,8 @@ private struct PlacedLayer: View {
                     interaction?.actions.edit(slide.address(of: layer))
                 }
             }
-            // No menu while anything's selected, where a long press is the start of a drag, and
-            // the bar below offers the same choices.
+            // No menu while anything's selected, where a finger held down may start a drag or a
+            // pinch, and the bar below offers the same choices.
             .contextMenu {
                 if let interaction, !interaction.isAnythingSelected {
                     menu(interaction.actions)
@@ -285,22 +286,15 @@ private struct PlacedLayer: View {
     }
 }
 
-/// Where a layer takes touches, in its slide's space: its turned box, grown to a fingertip's
-/// target, and cut to the slide, since clipping hides a layer past the slide's edge but leaves
-/// it there to touch.
+/// Where a layer takes taps, in its slide's space: its hit box turned with it, and cut to the
+/// slide, since clipping hides a layer past the slide's edge but leaves it there to touch.
 private struct LayerHitShape: Shape {
-    let frame: CGRect
+    /// The layer's unturned frame grown to a fingertip's target, from `LayerGeometry.hitBox`.
+    let box: CGRect
     let rotation: Double
-    let minimumSide: CGFloat
 
     func path(in rect: CGRect) -> Path {
-        let grownX = max(0, (minimumSide - frame.width) / 2)
-        let grownY = max(0, (minimumSide - frame.height) / 2)
-        let box = frame.insetBy(dx: -grownX, dy: -grownY)
-        let turn = CGAffineTransform(translationX: box.midX, y: box.midY)
-            .rotated(by: rotation)
-            .translatedBy(x: -box.midX, y: -box.midY)
-        return Path(box).applying(turn).intersection(Path(rect))
+        Path(box).applying(LayerGeometry.turn(about: box, by: rotation)).intersection(Path(rect))
     }
 }
 

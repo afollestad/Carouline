@@ -17,6 +17,8 @@ struct SlideCard: View {
     let size: CGSize
     /// How many of the slide's points a point on screen covers, as the strip scales it.
     var screenPoint: CGFloat = 1
+    /// Where the strip's selection gesture finds the slide while it holds the selection.
+    var frames: SlideFrames?
     let importingCells: Set<CellAddress>
     /// Whether a picture is on its way onto the slide as a layer.
     var isImportingLayer = false
@@ -31,6 +33,8 @@ struct SlideCard: View {
     @State private var isConfirmingDelete = false
 
     var body: some View {
+        // Measured only while the slide holds the selection, so a scroll measures nothing.
+        let holdsSelection = session.selection?.slideID == slide.id || layerSession.selection?.slideID == slide.id
         VStack(spacing: 12) {
             CardPhotos(
                 slide: slide,
@@ -44,6 +48,14 @@ struct SlideCard: View {
                 isAnythingSelected: isAnythingSelected
             )
             .frame(width: size.width, height: size.height)
+            .onGeometryChange(for: CGRect?.self) { proxy in
+                holdsSelection ? proxy.frame(in: .named(SelectionGesture.space)) : nil
+            } action: { frame in
+                frames?.frames[slide.id] = frame.map { SlideFrame(frame: $0, size: size) }
+            }
+            .onDisappear {
+                frames?.frames[slide.id] = nil
+            }
             .overlay {
                 SlideLayers(
                     layers: slide.layers,
@@ -157,8 +169,8 @@ struct SlideCard: View {
         }
     }
 
-    /// A photo or a layer selected anywhere on the strip, while which a long press is the start
-    /// of a drag rather than a menu.
+    /// A photo or a layer selected anywhere on the strip, while which a finger held down may start
+    /// a drag on the selection or a pinch anywhere, rather than a menu.
     private var isAnythingSelected: Bool {
         session.selection != nil || layerSession.selection != nil
     }

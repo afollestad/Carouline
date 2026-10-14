@@ -12,8 +12,8 @@ import Observation
 @Observable
 final class CropSession {
     var selection: CellAddress? {
-        // A gesture cut short by a new selection, which disables it, never ends, so the next
-        // photo's first gesture would otherwise begin from its crop.
+        // A gesture still running when another photo is selected frames nothing more, and the
+        // next one begins from that photo's own crop.
         didSet {
             if selection != oldValue {
                 gestureStart = nil
