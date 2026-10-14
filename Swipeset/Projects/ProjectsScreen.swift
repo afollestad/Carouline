@@ -19,6 +19,9 @@ struct ProjectsScreen: View {
     /// Enough rows to read as a list while the library loads, and few enough that a short list
     /// arriving in their place doesn't look like most of it went missing.
     private static let loadingRowCount = 3
+    /// On top of the rows' own 5-point spacing, which alone left the first row tight under the
+    /// navigation bar.
+    private static let topMargin: CGFloat = 8
 
     var body: some View {
         content
@@ -98,6 +101,7 @@ struct ProjectsScreen: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .contentMargins(.top, Self.topMargin, for: .scrollContent)
     }
 
     /// The list's cards two to a row, spaced as the list spaces its rows.
@@ -126,6 +130,7 @@ struct ProjectsScreen: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 5)
         }
+        .contentMargins(.top, Self.topMargin, for: .scrollContent)
         // The cards draw their own glass and colors, which a link's default style would tint.
         .buttonStyle(.plain)
     }
@@ -156,6 +161,7 @@ struct ProjectsScreen: View {
                 .scrollContentBackground(.hidden)
             }
         }
+        .contentMargins(.top, Self.topMargin, for: .scrollContent)
         .scrollDisabled(true)
         // One element for the whole list, rather than rows of placeholder words.
         .accessibilityRepresentation {
