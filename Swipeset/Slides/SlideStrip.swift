@@ -25,7 +25,8 @@ struct SlideStrip: View {
     /// The slide whose layers sheet is open, which the strip holds still for, so the slide the
     /// sheet points at stays put.
     let layersSlideID: UUID?
-    /// Taps between the slides, which finish framing a photo or moving a layer.
+    /// Taps between the slides, or in the margins beside them while they're scaled down, which
+    /// finish framing a photo or moving a layer.
     let onBackgroundTap: () -> Void
     let onAddSlide: () -> Void
     let onChangeLayout: (UUID) -> Void
@@ -36,6 +37,7 @@ struct SlideStrip: View {
     /// The strip's size before `bottomRoom` is taken from it.
     @State private var fullSize: CGSize = .zero
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     /// The caption's height and the gap above it, which the slide makes room for.
     private static let captionSpace: CGFloat = 56
@@ -45,10 +47,10 @@ struct SlideStrip: View {
     /// arrow and the screen's edge take.
     private static let popoverMinWidth: CGFloat = 320
     private static let popoverMargin: CGFloat = 24
-    /// The least `typingScale` shrinks the slides to. In landscape the keyboard and the sheet's
+    /// The least `roomScale` shrinks the slides to. In landscape the keyboard and the sheet's
     /// typing height can outgrow the strip, which would scale them to nothing or flip them, though
     /// the sheet there is always full height and covers them.
-    private static let minimumTypingScale: CGFloat = 0.2
+    private static let minimumRoomScale: CGFloat = 0.2
 
     var body: some View {
         Group {
@@ -71,11 +73,21 @@ struct SlideStrip: View {
         } action: { size in
             fullSize = size
         }
-        .scaleEffect(typingScale, anchor: .top)
+        .scaleEffect(roomScale, anchor: .top)
+        // Past the scale, which would otherwise shrink the frame the sheet makes room in, and the
+        // sheet's resting height with it, over and over.
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            layerSession.stripFrame = frame
+        }
+        // Past the scale, so taps in the margins it leaves beside the slides still finish.
+        .contentShape(.rect)
+        .onTapGesture(perform: onBackgroundTap)
         .animation(.smooth(duration: 0.25), value: bottomRoom)
-        .animation(.smooth(duration: 0.25), value: typingScale)
+        .animation(.smooth(duration: 0.25), value: roomScale)
         // On a phone, the keyboard a text layer is typed with would lay the slides out smaller,
-        // which `typingScale` does instead. An iPad's slides keep making room for it.
+        // which `roomScale` does instead. An iPad's slides keep making room for it.
         .ignoresSafeArea(horizontalSizeClass == .compact ? .keyboard : [])
     }
 
@@ -97,17 +109,20 @@ struct SlideStrip: View {
         return min(room, fullSize.height / 2)
     }
 
-    /// How far a phone shrinks the slides while a text layer is typed, so the one being edited
-    /// stays in view above the keyboard and the short sheet over it: the room above the selection
-    /// bar's, fitted into the room they leave. Scaled rather than laid out smaller, since the lazy
-    /// stack drops the slide while laying out its new size, and the slide's layers sheet with it.
-    private var typingScale: CGFloat {
-        let room = layerSession.keyboardRoom
+    /// How far a phone shrinks the slides while its layers sheet is open, so the one being edited
+    /// stays in view and in reach above the sheet, or above the keyboard and the short sheet over
+    /// it while a text layer is typed: the room above the selection bar's, fitted into the room
+    /// they leave. Scaled rather than laid out smaller, since the lazy stack drops the slide while
+    /// laying out its new size, and the slide's layers sheet with it. Not in landscape, where the
+    /// sheet is always full height and covers the slides however small they are.
+    private var roomScale: CGFloat {
+        let sheetRoom = verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
+        let room = max(layerSession.keyboardRoom, sheetRoom)
         let content = fullSize.height - SelectionBar.reservedHeight
         guard horizontalSizeClass == .compact, room > 0, content > 0 else {
             return 1
         }
-        return min(1, max(Self.minimumTypingScale, (fullSize.height - room) / content))
+        return min(1, max(Self.minimumRoomScale, (fullSize.height - room) / content))
     }
 
     private var strip: some View {
@@ -123,6 +138,7 @@ struct SlideStrip: View {
                         canMoveLeft: index > 0,
                         canMoveRight: index < project.slides.count - 1,
                         size: cardSize(span: slide.span),
+                        screenPoint: 1 / roomScale,
                         importingCells: importingCells,
                         isImportingLayer: importingLayers[slide.id] != nil,
                         cellActions: cellActions,
@@ -153,7 +169,6 @@ struct SlideStrip: View {
             .padding(.bottom, SelectionBar.reservedHeight)
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
-            .onTapGesture(perform: onBackgroundTap)
             .gesture(selectionGesture, isEnabled: isAnythingSelected)
         }
         .scrollTargetBehavior(snapping)
@@ -214,7 +229,7 @@ struct SlideStrip: View {
               let layer = slide.layers.first(where: { $0.id == selection.layerID }) ?? layerSession.draftLayer(selection.layerID) else {
             return nil
         }
-        return (layer, LayerCanvas(size: cardSize(span: slide.span), span: slide.span))
+        return (layer, LayerCanvas(size: cardSize(span: slide.span), span: slide.span, screenPoint: 1 / roomScale))
     }
 
     private var selectedPhoto: PlacedImage? {

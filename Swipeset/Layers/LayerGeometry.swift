@@ -20,6 +20,9 @@ nonisolated enum LayerGeometry {
     /// A picture's longer side at a layer's natural size, as a fraction of a slide's width: half,
     /// so it sits over the slide without hiding it.
     static let pictureSide: CGFloat = 0.5
+    /// A fingertip's target on screen, which text in small type or a small picture takes touches
+    /// across.
+    static let minimumTarget: CGFloat = 44
     /// A picture's shadow, as shares of its longer side: its blur, as a Gaussian's sigma like a
     /// picture's blur, and how far down it falls. Soft and close, as text's is, so it lifts the
     /// picture off a busy slide without reading as a dark band along its edge.

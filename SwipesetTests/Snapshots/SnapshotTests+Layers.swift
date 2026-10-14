@@ -56,6 +56,14 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader))
     }
 
+    /// While a phone's layers sheet rests, the slides shrink to fit above it, so the one it edits
+    /// stays in view and in reach.
+    @Test func slidesAboveRestingSheet() async {
+        let session = LayerSession()
+        session.sheetRoom = 350
+        await assertScreenSnapshot(of: projectScreen(layeredProject, layerSession: session))
+    }
+
     @Test func selectedTextLayer() async {
         let project = layeredProject
         await assertScreenSnapshot(of: projectScreen(project, layerSession: selecting(fixtureID(183), in: project)))

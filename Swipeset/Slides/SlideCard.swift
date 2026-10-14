@@ -15,6 +15,8 @@ struct SlideCard: View {
     let canMoveLeft: Bool
     let canMoveRight: Bool
     let size: CGSize
+    /// How many of the slide's points a point on screen covers, as the strip scales it.
+    var screenPoint: CGFloat = 1
     let importingCells: Set<CellAddress>
     /// Whether a picture is on its way onto the slide as a layer.
     var isImportingLayer = false
@@ -56,7 +58,8 @@ struct SlideCard: View {
                         selectedLayerID: layerSession.selection?.slideID == slide.id ? layerSession.selection?.layerID : nil,
                         isAnythingSelected: isAnythingSelected,
                         isPhotoSelected: session.selection != nil,
-                        isDrafting: layerSession.draftSlideID == slide.id
+                        isDrafting: layerSession.draftSlideID == slide.id,
+                        screenPoint: screenPoint
                     )
                 )
             }
@@ -101,6 +104,9 @@ struct SlideCard: View {
                 .foregroundStyle(Color.primary)
             }
             .buttonStyle(.glass)
+            // Not while the slide's layers sheet is open, which this card presents: the delete
+            // confirmation can't show from it then, and moving or resizing the slide would close it.
+            .disabled(layerActions.isShowingSheet(slide.id).wrappedValue)
             .accessibilityLabel("\(spokenNumbers) Options")
             .frame(height: 44)
         }

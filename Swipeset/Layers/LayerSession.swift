@@ -3,6 +3,7 @@
 //  Swipeset
 //
 
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -27,6 +28,13 @@ final class LayerSession {
     /// The height the keyboard and the sheet over it cover while a text layer is typed, which the
     /// strip makes room above on a phone, so the slide stays in view.
     var keyboardRoom: CGFloat = 0
+    /// The height a phone's layers sheet covers once it settles at the height it rests or is
+    /// dragged to, which the strip makes room above as for the keyboard, so the slide stays in view
+    /// and in reach.
+    var sheetRoom: CGFloat = 0
+    /// The strip's unscaled frame on screen, which the layers sheet rests at half the height of
+    /// and measures its room up from the bottom of.
+    var stripFrame: CGRect = .zero
     /// The layer whose text is being typed, which drops the sheet to just its field. An editor
     /// clears only its own, since SwiftUI doesn't order one editor's going and the next's coming.
     var typingLayerID: UUID?

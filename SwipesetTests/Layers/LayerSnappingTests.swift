@@ -41,6 +41,21 @@ struct LayerSnappingTests {
         #expect(snap.guideY == nil)
     }
 
+    /// While the slides are scaled down on screen, a snap reaches as far on screen as ever, so
+    /// across more of the canvas.
+    @Test func reachesAsFarOnScreenWhileScaledDown() {
+        let scaled = LayerCanvas(size: CGSize(width: 400, height: 400), span: 1, screenPoint: 2)
+        // 12 canvas points off the middle: 6 on screen.
+        let (near, nearSnap) = snapped(LayerPlacement(centerX: 0.53, centerY: 0.5), on: scaled)
+        // 20 canvas points off: 10 on screen.
+        let (far, farSnap) = snapped(LayerPlacement(centerX: 0.55, centerY: 0.5), on: scaled)
+
+        #expect(near.centerX == 0.5)
+        #expect(nearSnap.guideX == 0.5)
+        #expect(far.centerX == 0.55)
+        #expect(farSnap.guideX == nil)
+    }
+
     /// A snap holds out to twice as far as it took hold, so a finger resting at its edge doesn't
     /// flicker it on and off.
     @Test func holdsASnapOutToTwiceItsReach() {

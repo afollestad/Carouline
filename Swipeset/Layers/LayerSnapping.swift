@@ -28,6 +28,9 @@ nonisolated struct LayerSnap: Hashable, Sendable {
 nonisolated struct LayerCanvas: Hashable, Sendable {
     let size: CGSize
     let span: Int
+    /// How many of the canvas's points a point on screen covers: more than one while a phone
+    /// scales the slides down above its layers sheet, so fingertip distances stay the same.
+    var screenPoint: CGFloat = 1
 
     var slideWidth: CGFloat {
         LayerGeometry.slideWidth(canvas: size, span: span)
@@ -62,11 +65,11 @@ nonisolated enum LayerSnapping {
         if moves {
             // Each slide's middle, and on a panorama its own middle, which can fall on a cut.
             let guidesX = Set((0..<max(1, canvas.span)).map { Double($0) + 0.5 } + [Double(canvas.span) / 2])
-            if let guide = nearest(placement.centerX, in: guidesX, scale: Double(canvas.slideWidth), previous: previous.guideX) {
+            if let guide = nearest(placement.centerX, in: guidesX, scale: Double(canvas.slideWidth / canvas.screenPoint), previous: previous.guideX) {
                 snapped.centerX = guide
                 snap.guideX = guide
             }
-            if let guide = nearest(placement.centerY, in: [0.5], scale: Double(canvas.size.height), previous: previous.guideY) {
+            if let guide = nearest(placement.centerY, in: [0.5], scale: Double(canvas.size.height / canvas.screenPoint), previous: previous.guideY) {
                 snapped.centerY = guide
                 snap.guideY = guide
             }
@@ -82,10 +85,10 @@ nonisolated enum LayerSnapping {
         return (snapped, snap)
     }
 
-    /// The guide in `guides` within reach of `value`, measured in points by `scale`: the one held
-    /// before out to `release` times as far, or else the closest within `distance`.
+    /// The guide in `guides` within reach of `value`, measured in points on screen by `scale`: the
+    /// one held before out to `release` times as far, or else the closest within `distance`.
     private static func nearest(_ value: Double, in guides: Set<Double>, scale: Double, previous: Double?) -> Double? {
-        guard scale > 0 else {
+        guard scale > 0, scale.isFinite else {
             return nil
         }
         if let previous, guides.contains(previous), abs(value - previous) * scale <= Double(distance) * release {

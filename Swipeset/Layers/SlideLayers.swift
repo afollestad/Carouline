@@ -58,6 +58,9 @@ struct LayerInteraction {
     let isPhotoSelected: Bool
     /// Whether the session's draft is on this slide, which then draws it in place of its layer.
     let isDrafting: Bool
+    /// How many of the slide's points a point on screen covers, which a fingertip's target grows by
+    /// while the slides are scaled down.
+    var screenPoint: CGFloat = 1
 }
 
 /// A slide's layers over a canvas of `size` spanning `span` slides, each where the export draws
@@ -163,9 +166,6 @@ private struct PlacedLayer: View {
     let slide: SlideLayers
     let interaction: LayerInteraction?
 
-    /// A fingertip's target, for text in small type or a small picture.
-    private static let minimumTarget: CGFloat = 44
-
     var body: some View {
         var placed = layer
         placed.placement = placement
@@ -188,7 +188,7 @@ private struct PlacedLayer: View {
             .position(x: frame.midX, y: frame.midY)
             .contentShape(
                 [.interaction, .contextMenuPreview],
-                LayerHitShape(frame: frame, rotation: placement.rotation, minimumSide: Self.minimumTarget)
+                LayerHitShape(frame: frame, rotation: placement.rotation, minimumSide: LayerGeometry.minimumTarget * (interaction?.screenPoint ?? 1))
             )
             .onTapGesture {
                 if !isSelected {
