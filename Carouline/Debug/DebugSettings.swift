@@ -21,13 +21,21 @@ final class DebugSettings {
         case editLayer
     }
 
-    /// Swaps the real projects for `SampleProjects` in a store of their own.
-    let usesSampleProjects: Bool
+    /// Projects to swap in for the real ones, in a store of their own, leaving the real ones alone.
+    enum Store {
+        /// `SampleProjects.all`, with something left to fill in each.
+        case samples
+        /// `DemoProjects.all`, finished for screenshots.
+        case demo
+        /// An empty store, which adds the sample a fresh install's first launch does, and
+        /// TipKit's datastore for one, so its tour starts over.
+        case firstLaunch
+    }
+
+    /// Nil for the real projects.
+    let store: Store?
     /// Leaves one sample photo's copy and the sample sticker's unwritten, so they show as missing.
     let missesSampleImage: Bool
-    /// Swaps the real projects for an empty store of its own, so each launch adds the sample a
-    /// fresh install's first launch does, and TipKit's datastore for one, so its tour starts over.
-    let simulatesFirstLaunch: Bool
     /// The project, by its place in the list, to open on launch.
     let openProjectIndex: Int?
     /// A photo in the open project to select on launch, by slide and cell index.
@@ -36,21 +44,32 @@ final class DebugSettings {
     let selectedLayer: (slide: Int, layer: Int)?
     let sheet: Sheet?
 
-    /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, leaving the real ones alone),
+    /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects), `-DebugDemoProjects` (`YES`
+    /// swaps in demo projects for screenshots, unless `-DebugSampleProjects` is on),
     /// `-DebugMissingImages` (`YES` leaves a sample photo's copy and the sample sticker's out, so
-    /// they show as missing), `-DebugFirstLaunch` (`YES` swaps in an empty store that adds the
-    /// first-launch sample, and an empty tips datastore that starts its tour, as a fresh install
-    /// does, unless `-DebugSampleProjects` is on; it ignores `-DebugMissingImages`),
-    /// `-DebugOpenProject` (a project's index in the list, from 0), `-DebugSelectCell` (a photo
-    /// to frame in it, as slide and cell indexes like `2,0`), `-DebugSelectLayer` (a layer to
-    /// move in it, as slide and layer indexes like `2,0`, layers counted from the bottom) and
-    /// `-DebugSheet` (`newProject` on the list, or `layout`, `export`, `layers`, `addLayer` or
-    /// `editLayer` in the open project, the last three for `-DebugSelectLayer`'s slide or else the
-    /// first, and `editLayer` for its layer) from `arguments`, ignoring values it can't parse.
+    /// they show as missing, with `-DebugSampleProjects`), `-DebugFirstLaunch` (`YES` swaps in an
+    /// empty store that adds the first-launch sample, and an empty tips datastore that starts its
+    /// tour, as a fresh install does, unless either of the others is on), `-DebugOpenProject` (a
+    /// project's index in the list, from 0), `-DebugSelectCell` (a photo to frame in it, as slide
+    /// and cell indexes like `2,0`), `-DebugSelectLayer` (a layer to move in it, as slide and
+    /// layer indexes like `2,0`, layers counted from the bottom) and `-DebugSheet` (`newProject`
+    /// on the list, or `layout`, `export`, `layers`, `addLayer` or `editLayer` in the open
+    /// project, the last three for `-DebugSelectLayer`'s slide or else the first, and `editLayer`
+    /// for its layer) from `arguments`, ignoring values it can't parse.
     init(arguments: [String: Any] = [:]) {
-        usesSampleProjects = (arguments["DebugSampleProjects"] as? String).map(Self.isTrue) ?? false
-        missesSampleImage = (arguments["DebugMissingImages"] as? String).map(Self.isTrue) ?? false
-        simulatesFirstLaunch = (arguments["DebugFirstLaunch"] as? String).map(Self.isTrue) ?? false
+        func isOn(_ key: String) -> Bool {
+            (arguments[key] as? String).map(Self.isTrue) ?? false
+        }
+        store = if isOn("DebugSampleProjects") {
+            .samples
+        } else if isOn("DebugDemoProjects") {
+            .demo
+        } else if isOn("DebugFirstLaunch") {
+            .firstLaunch
+        } else {
+            nil
+        }
+        missesSampleImage = isOn("DebugMissingImages")
         openProjectIndex = (arguments["DebugOpenProject"] as? String).flatMap { Int($0) }
         let cell = (arguments["DebugSelectCell"] as? String)?.split(separator: ",").compactMap { Int($0) } ?? []
         selectedCell = cell.count == 2 ? (cell[0], cell[1]) : nil

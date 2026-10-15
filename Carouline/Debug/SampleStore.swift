@@ -6,7 +6,7 @@
 #if DEBUG
 import Foundation
 
-/// Stores of `SampleProjects` under `tmp`, so samples never mix with real projects.
+/// Stores of `SampleProjects` or `DemoProjects` under `tmp`, so they never mix with real projects.
 enum SampleStore {
     static let paths = ProjectPaths(
         root: .temporaryDirectory.appending(path: "DebugSamples", directoryHint: .isDirectory),
@@ -20,12 +20,12 @@ enum SampleStore {
     /// over too, leaving the real datastore alone.
     static let firstLaunchTips = firstLaunchPaths.root.appending(path: "Tips", directoryHint: .isDirectory)
 
-    /// A store refilled with fresh samples, so every launch starts from the same ones. It writes
-    /// them before the store exists, and so before any window can load or change them.
+    /// A store refilled with fresh `projects`, so every launch starts from the same ones. It
+    /// writes them before the store exists, and so before any window can load or change them.
     /// `missingImage` leaves the copies of `SampleProjects.missingImageIDs` out.
-    static func make(missingImage: Bool = false) -> ProjectStore {
+    static func make(_ projects: [Project], missingImage: Bool = false) -> ProjectStore {
         try? FileManager.default.removeItem(at: paths.root)
-        for project in SampleProjects.all {
+        for project in projects {
             try? FileManager.default.createDirectory(at: paths.imagesFolder(for: project.id), withIntermediateDirectories: true)
             try? ProjectFile.encode(project).write(to: paths.file(for: project.id), options: .atomic)
             for image in project.images where !(missingImage && SampleProjects.missingImageIDs.contains(image.id)) {

@@ -30,12 +30,11 @@ struct CaroulineApp: App {
         #if DEBUG
         let debug = DebugSettings.fromLaunchArguments()
         _debug = State(initialValue: debug)
-        let store = if debug.usesSampleProjects {
-            SampleStore.make(missingImage: debug.missesSampleImage)
-        } else if debug.simulatesFirstLaunch {
-            SampleStore.makeFirstLaunch()
-        } else {
-            ProjectStore()
+        let store = switch debug.store {
+        case .samples: SampleStore.make(SampleProjects.all, missingImage: debug.missesSampleImage)
+        case .demo: SampleStore.make(DemoProjects.all)
+        case .firstLaunch: SampleStore.makeFirstLaunch()
+        case nil: ProjectStore()
         }
         #else
         let store = ProjectStore()
@@ -45,7 +44,7 @@ struct CaroulineApp: App {
         // Immediate, so each of the tour's tips follows the last rather than waiting a day.
         var tipOptions: [Tips.ConfigurationOption] = [.displayFrequency(.immediate)]
         #if DEBUG
-        if debug.simulatesFirstLaunch, !debug.usesSampleProjects {
+        if debug.store == .firstLaunch {
             tipOptions.append(.datastoreLocation(.url(SampleStore.firstLaunchTips)))
         }
         #endif

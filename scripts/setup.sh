@@ -9,6 +9,8 @@ cd "$repo_root"
 
 # shellcheck source=lib/testing.sh
 source "$repo_root/scripts/lib/testing.sh"
+# shellcheck source=lib/screenshots.sh
+source "$repo_root/scripts/lib/screenshots.sh"
 
 if ! command -v brew >/dev/null 2>&1; then
   echo "error: Homebrew is required. Install it from https://brew.sh/ and rerun this script." >&2
@@ -41,7 +43,7 @@ if [ -z "$ios_runtime" ]; then
 fi
 
 # Creates a simulator by this name on the newest iOS runtime unless one is there, since the run,
-# test and snapshot scripts find their devices by name and fail without them.
+# test, snapshot and screenshot scripts find their devices by name and fail without them.
 create_simulator() {
   local name=$1
   if xcrun simctl list devices available --json |
@@ -62,6 +64,9 @@ create_simulator() {
 
 create_simulator "$snapshot_phone_device"
 create_simulator "$snapshot_wide_device"
+for device in "${screenshot_devices[@]}"; do
+  create_simulator "$device"
+done
 
 echo "Setup complete. Next steps:"
 echo "  1. Build with ./scripts/build.sh"
