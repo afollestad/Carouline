@@ -9,12 +9,14 @@ import SwiftUI
 struct ProjectsScreen: View {
     let library: ProjectLibrary
     let onNewProject: () -> Void
-    @State private var size: CGSize = .zero
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var width: CGFloat = 0
+    /// About a phone's row, which holds a name and summary without stretching their few words
+    /// across a wide card. Rounding to it puts two cards a row on any iPad in portrait and three in
+    /// landscape, and it grows with the text, so larger sizes take fewer columns.
+    @ScaledMetric(relativeTo: .headline) private var cardWidth: CGFloat = 400
 
-    /// Two cards a row fill an iPad in landscape without stretching a row's few words across it,
-    /// and leave each name room that a third would cut short.
-    private static let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
+    private static let margin: CGFloat = 16
+    private static let columnSpacing: CGFloat = 16
     private static let unreadableNote = "Carouline leaves these as they are until you delete them."
     /// On top of the rows' own 5-point spacing, which alone left the first row tight under the
     /// navigation bar.
@@ -27,10 +29,10 @@ struct ProjectsScreen: View {
             // Fades the projects that scroll under the title, which the default cuts off at a
             // solid band with a hairline.
             .scrollEdgeEffectStyle(.soft, for: .top)
-            .onGeometryChange(for: CGSize.self) { proxy in
-                proxy.size
-            } action: { size in
-                self.size = size
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                self.width = width
             }
             .background {
                 GlowBackdrop()
@@ -69,10 +71,21 @@ struct ProjectsScreen: View {
         }
     }
 
-    /// Whether the projects sit in a grid, on a regular-width screen wider than it's tall, as an
-    /// iPad's in landscape. A narrow window and portrait keep the list, and its swipe to delete.
+    /// The number of cards a row that comes nearest `cardWidth`, at least one.
+    private var columnCount: Int {
+        let room = width - 2 * Self.margin + Self.columnSpacing
+        let columns = (room / (cardWidth + Self.columnSpacing)).rounded()
+        return max(1, Int(columns))
+    }
+
+    /// Whether the projects sit in a grid, when the screen has room for more than one card a row.
+    /// A single column keeps the list, and its swipe to delete.
     private var usesGrid: Bool {
-        horizontalSizeClass == .regular && size.width > size.height
+        columnCount > 1
+    }
+
+    private var gridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: Self.columnSpacing), count: columnCount)
     }
 
     private var list: some View {
@@ -105,18 +118,18 @@ struct ProjectsScreen: View {
         .contentMargins(.top, Self.topMargin, for: .scrollContent)
     }
 
-    /// The list's cards two to a row, spaced as the list spaces its rows.
+    /// The list's cards `columnCount` to a row, spaced as the list spaces its rows.
     private var grid: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                LazyVGrid(columns: Self.gridColumns, spacing: 10) {
+                LazyVGrid(columns: gridColumns, spacing: 10) {
                     ForEach(library.projects) { project in
                         projectRow(project, isInGrid: true)
                     }
                 }
                 if !library.unreadable.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        LazyVGrid(columns: Self.gridColumns, spacing: 10) {
+                        LazyVGrid(columns: gridColumns, spacing: 10) {
                             ForEach(library.unreadable) { project in
                                 unreadableRow(project, isInGrid: true)
                             }
@@ -128,7 +141,7 @@ struct ProjectsScreen: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Self.margin)
             .padding(.vertical, 5)
         }
         .contentMargins(.top, Self.topMargin, for: .scrollContent)
@@ -141,12 +154,12 @@ struct ProjectsScreen: View {
         Group {
             if usesGrid {
                 ScrollView {
-                    LazyVGrid(columns: Self.gridColumns, spacing: 10) {
+                    LazyVGrid(columns: gridColumns, spacing: 10) {
                         ForEach(0..<library.expectedCount, id: \.self) { _ in
                             LoadingRow()
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Self.margin)
                     .padding(.vertical, 5)
                 }
             } else {
@@ -188,12 +201,13 @@ struct ProjectsScreen: View {
 private extension View {
     /// A row as a glass card on the glow, in the list or the grid. An openable card is all a
     /// target, and its glass answers a press and the pointer, as a link's should; another stays
-    /// still.
+    /// still. A card that fills its grid row keeps level with the cards beside it when its name
+    /// wraps.
     @ViewBuilder
-    func glassCard(isOpenable: Bool) -> some View {
+    func glassCard(isOpenable: Bool, fillsRow: Bool = false) -> some View {
         let card = padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: fillsRow ? .infinity : nil, alignment: .leading)
             .contentShape(.rect(cornerRadius: 24))
             .contentShape([.contextMenuPreview, .hoverEffect], .rect(cornerRadius: 24))
         if isOpenable {
@@ -244,7 +258,7 @@ private struct ProjectRow: View {
                     .foregroundStyle(Color.secondary)
                     .accessibilityHidden(true)
             }
-            .glassCard(isOpenable: true)
+            .glassCard(isOpenable: true, fillsRow: isInGrid)
         }
         // The card draws its own chevron, inside its glass.
         .navigationLinkIndicatorVisibility(.hidden)
@@ -395,7 +409,7 @@ private struct UnreadableRow: View {
                     .foregroundStyle(Color.secondary)
             }
         }
-        .glassCard(isOpenable: false)
+        .glassCard(isOpenable: false, fillsRow: isInGrid)
         .accessibilityElement(children: .combine)
         .accessibilityActions {
             // The list's swipe action is VoiceOver's way to delete there.

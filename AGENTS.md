@@ -34,7 +34,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - `simctl` cannot tap or drag, so use `axe tap`, `axe drag` and `axe describe-ui` with `--udid`, which reach the simulator without the host's cursor. Never post host mouse events, which take over the user's.
 - Tap with `axe tap --tap-style physical`, since the default style can miss buttons in sheets.
 - Long-press with an `axe drag` that moves a point over `--duration 1.5`, since `axe touch` can fail with "could not establish simulator input". Move the zoom slider by dragging its thumb with `axe drag` too, since `axe slider` can't.
-- If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh -s` boots it again.
+- Never `axe drag` an iPad app's corner to resize its window, since input to a windowed app stops landing; reach other widths on another simulator. If every input fails, shut the simulator down with `xcrun simctl shutdown <udid>`, and `run.sh -s` boots it again.
 - The simulator has no camera, so its cells go straight to the photo picker, whose library already holds sample photos; add more with `xcrun simctl addmedia <udid> <files>`.
 - Judge launch and loading speed with the app opened from a device's Home Screen, or run with the scheme's "Debug executable" off. Xcode's debugger pauses the app for each of the 2,000-odd libraries it loads, adding seconds at launch and on first use of image decoding, haptics and the camera.
 - Restore every temporary patch before finishing. Keep a backup copy and confirm with `git diff`.
