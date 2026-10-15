@@ -26,11 +26,17 @@ struct CaroulineApp: App {
         #if DEBUG
         let debug = DebugSettings.fromLaunchArguments()
         _debug = State(initialValue: debug)
-        let store = debug.usesSampleProjects ? SampleStore.make(missingImage: debug.missesSampleImage) : ProjectStore()
+        let store = if debug.usesSampleProjects {
+            SampleStore.make(missingImage: debug.missesSampleImage)
+        } else if debug.simulatesFirstLaunch {
+            SampleStore.makeFirstLaunch()
+        } else {
+            ProjectStore()
+        }
         #else
         let store = ProjectStore()
         #endif
-        _library = State(initialValue: ProjectLibrary(store: store))
+        _library = State(initialValue: ProjectLibrary(store: store, makeSample: { SampleProjects.firstLaunch }))
         _imageLoader = State(initialValue: DiskImageLoader(paths: store.paths))
     }
 

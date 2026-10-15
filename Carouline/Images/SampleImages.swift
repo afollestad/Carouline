@@ -6,8 +6,8 @@
 import CoreGraphics
 import Foundation
 
-/// Stand-in photos drawn in code, the same for the same ID every time, for previews, snapshots
-/// and the debug sample store.
+/// Stand-in photos drawn in code, the same for the same ID every time, for previews, snapshots,
+/// the debug sample store and a fresh install's sample project.
 nonisolated enum SampleImages {
     /// `image` as drawn: a sticker for a PNG, which keeps transparency, and a photo otherwise.
     static func image(for image: PlacedImage, maxPixelSize: Int = .max) -> CGImage? {

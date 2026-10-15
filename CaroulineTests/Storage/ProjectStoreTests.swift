@@ -186,6 +186,54 @@ struct ProjectStoreTests {
         #expect(exists(leftover))
     }
 
+    @Test func addsTheSampleOnceToAnEmptyStore() async throws {
+        let sample = TestSample.project
+        let store = ProjectStore(paths: paths)
+        #expect(store.isAwaitingSample)
+
+        #expect(try await store.addSample { sample } == sample)
+        #expect(await ProjectStore(paths: paths).loadAll().projects == [sample])
+        #expect(sample.images.allSatisfy { exists(paths.imageFile(named: $0.fileName, in: sample.id)) })
+        #expect(try await store.addSample { sample } == nil)
+
+        try await store.delete(projectID: sample.id)
+        let relaunched = ProjectStore(paths: paths)
+        #expect(!relaunched.isAwaitingSample)
+        #expect(try await relaunched.addSample { sample } == nil)
+        #expect(await relaunched.loadAll().projects.isEmpty)
+    }
+
+    /// An update to a build with the sample finds the user's projects, and never adds it, even
+    /// once they're gone.
+    @Test func skipsTheSampleBesideExistingProjects() async throws {
+        let store = ProjectStore(paths: paths)
+        let project = Project(name: "Mine", aspectRatio: .square)
+        try await store.save(project)
+        #expect(!store.isAwaitingSample)
+
+        #expect(try await store.addSample { TestSample.project } == nil)
+        #expect(exists(paths.sampleMarker))
+
+        try await store.delete(projectID: project.id)
+        #expect(!store.isAwaitingSample)
+        #expect(try await store.addSample { TestSample.project } == nil)
+    }
+
+    /// A crash while the sample's copies were written leaves a folder without its JSON, which the
+    /// next launch sweeps before adding the sample again.
+    @Test func retriesASampleACrashLeftUnsaved() async throws {
+        let sample = TestSample.project
+        try FileManager.default.createDirectory(at: paths.imagesFolder(for: sample.id), withIntermediateDirectories: true)
+        try Data([0xFF, 0xD8]).write(to: paths.imageFile(named: sample.images[0].fileName, in: sample.id))
+        let store = ProjectStore(paths: paths)
+        #expect(!store.isAwaitingSample)
+
+        _ = await store.loadAll()
+
+        #expect(store.isAwaitingSample)
+        #expect(try await store.addSample { sample } == sample)
+    }
+
     // MARK: Helpers
 
     /// A file standing in for an image copy that finished importing.

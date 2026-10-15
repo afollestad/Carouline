@@ -7,8 +7,8 @@ import Foundation
 
 /// Where projects and their files live on disk.
 nonisolated struct ProjectPaths: Sendable {
-    /// Holds a folder for each project, with its JSON and image copies, and the trash that
-    /// deleted projects pass through.
+    /// Holds a folder for each project, with its JSON and image copies, the trash that deleted
+    /// projects pass through, and the marker that the first-launch sample was added.
     let root: URL
     /// Holds imports and exports in flight, which never outlive a launch.
     let temporary: URL
@@ -29,6 +29,12 @@ nonisolated struct ProjectPaths: Sendable {
 
     var exports: URL {
         temporary.appending(path: "Exports", directoryHint: .isDirectory)
+    }
+
+    /// Written once the store has had its first-launch sample, or found projects there already,
+    /// so a deleted sample never comes back.
+    var sampleMarker: URL {
+        root.appending(path: "SampleAdded", directoryHint: .notDirectory)
     }
 
     func folder(for projectID: UUID) -> URL {

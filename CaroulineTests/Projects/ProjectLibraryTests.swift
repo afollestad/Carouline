@@ -124,6 +124,55 @@ struct ProjectLibraryTests {
         #expect(ProjectLibrary(store: ProjectStore(paths: paths)).expectedCount == 2)
     }
 
+    /// A fresh install's first load adds the sample, with a placeholder standing in for it while
+    /// it's drawn, and a later launch finds the same one rather than adding another.
+    @Test func addsTheSampleOnFirstLoad() async {
+        let sample = TestSample.project
+        let library = ProjectLibrary(store: ProjectStore(paths: paths), makeSample: { sample })
+        #expect(library.expectedCount == 1)
+
+        await library.load()
+        #expect(library.projects == [sample])
+
+        let relaunched = ProjectLibrary(store: ProjectStore(paths: paths), makeSample: { sample })
+        #expect(relaunched.expectedCount == 1)
+        await relaunched.load()
+        #expect(relaunched.projects == [sample])
+    }
+
+    @Test func expectsNoSampleOnceItsBeenAdded() async {
+        let library = ProjectLibrary(store: ProjectStore(paths: paths), makeSample: { TestSample.project })
+        await library.load()
+        library.delete(TestSample.project.id)
+        await library.flush()
+
+        let relaunched = ProjectLibrary(store: ProjectStore(paths: paths), makeSample: { TestSample.project })
+        #expect(relaunched.expectedCount == 0)
+        await relaunched.load()
+        #expect(relaunched.projects.isEmpty)
+    }
+
+    /// An update finds the user's projects, so it adds no sample beside them.
+    @Test func addsNoSampleBesideProjects() async throws {
+        try await ProjectStore(paths: paths).save(Project(name: "Mine", aspectRatio: .square))
+        let library = ProjectLibrary(store: ProjectStore(paths: paths), makeSample: { TestSample.project })
+        #expect(library.expectedCount == 1)
+
+        await library.load()
+        #expect(library.projects.map(\.name) == ["Mine"])
+    }
+
+    /// A sample that can't be written leaves the empty state, without an alert for something the
+    /// user never asked for.
+    @Test func loadsDespiteASampleThatFails() async {
+        let library = ProjectLibrary(store: FailingStore(), makeSample: { TestSample.project })
+        await library.load()
+
+        #expect(library.isLoaded)
+        #expect(library.projects.isEmpty)
+        #expect(library.failure == nil)
+    }
+
     @Test func reportsAWriteThatFails() async {
         let library = ProjectLibrary(store: FailingStore(), projects: [])
         _ = library.createProject(aspectRatio: .portrait)
@@ -139,9 +188,14 @@ private actor FailingStore: ProjectStoring {
 
     nonisolated let paths = ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)
     nonisolated let storedProjectCount = 0
+    nonisolated let isAwaitingSample = true
 
     func loadAll() -> StoredProjects {
         StoredProjects()
+    }
+
+    func addSample(_ make: @Sendable () -> Project) throws -> Project? {
+        throw Failure()
     }
 
     func save(_ project: Project) throws {

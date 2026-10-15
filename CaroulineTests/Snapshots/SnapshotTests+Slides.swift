@@ -26,6 +26,11 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(gridFirst), appearance: .dark)
     }
 
+    /// The project a fresh install opens first, its title over its first photo.
+    @Test func firstLaunchSample() async {
+        await assertScreenSnapshot(of: projectScreen(SampleProjects.firstLaunch))
+    }
+
     @Test func storySlides() async {
         await assertScreenSnapshot(of: projectScreen(projects[1]))
     }

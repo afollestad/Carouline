@@ -22,9 +22,12 @@ final class ProjectLibrary {
     var failure: LibraryFailure?
 
     @ObservationIgnored let store: any ProjectStoring
-    /// How many projects the store held when the library was made, for placeholders to stand in
-    /// for until it loads.
+    /// How many projects the store held when the library was made, and the sample a first launch
+    /// adds, for placeholders to stand in for until it loads.
     @ObservationIgnored let expectedCount: Int
+    /// Builds the sample a fresh install's first load adds, which only the app passes, so
+    /// previews and tests keep the projects they set up.
+    @ObservationIgnored private let makeSample: (@Sendable () -> Project)?
     /// The newest write. Each one waits for the last, so a slow save can't land after, and
     /// overwrite, a newer one, and a file is only deleted once the JSON that dropped it is saved.
     @ObservationIgnored private var lastWrite: Task<Void, Never>?
@@ -34,14 +37,26 @@ final class ProjectLibrary {
     @ObservationIgnored var importTokens: [CellAddress: UUID] = [:]
 
     /// `projects`, when given, stand in for the store's, with `unreadable`, as previews and
-    /// snapshots need.
-    init(store: any ProjectStoring, projects: [Project]? = nil, unreadable: [UnreadableProject] = []) {
+    /// snapshots need. Otherwise the first load adds the project `makeSample` builds to a store
+    /// that's awaiting one.
+    init(
+        store: any ProjectStoring,
+        projects: [Project]? = nil,
+        unreadable: [UnreadableProject] = [],
+        makeSample: (@Sendable () -> Project)? = nil
+    ) {
         self.store = store
         self.projects = projects ?? []
         self.unreadable = unreadable
         isLoaded = projects != nil
+        self.makeSample = makeSample
         // From the parameters, since `isLoaded` can't be read until every property is set.
-        expectedCount = projects == nil ? store.storedProjectCount : 0
+        if projects == nil {
+            let count = store.storedProjectCount
+            expectedCount = count == 0 && makeSample != nil && store.isAwaitingSample ? 1 : count
+        } else {
+            expectedCount = 0
+        }
     }
 
     /// Loads the store's projects once, however many windows ask. A second load would sweep
@@ -55,8 +70,13 @@ final class ProjectLibrary {
             return
         }
         let store = store
+        let makeSample = makeSample
         let loading = Task {
-            let stored = await store.loadAll()
+            var stored = await store.loadAll()
+            // A sample that fails leaves the empty state, and the next launch tries again.
+            if let makeSample, let sample = try? await store.addSample(makeSample) {
+                stored.projects.insert(sample, at: 0)
+            }
             projects = stored.projects
             unreadable = stored.unreadable
             isLoaded = true

@@ -6,11 +6,15 @@
 #if DEBUG
 import Foundation
 
-/// A store of `SampleProjects` under `tmp`, so samples never mix with real projects.
+/// Stores of `SampleProjects` under `tmp`, so samples never mix with real projects.
 enum SampleStore {
     static let paths = ProjectPaths(
         root: .temporaryDirectory.appending(path: "DebugSamples", directoryHint: .isDirectory),
         temporary: .temporaryDirectory.appending(path: "DebugSamplesTemporary", directoryHint: .isDirectory)
+    )
+    static let firstLaunchPaths = ProjectPaths(
+        root: .temporaryDirectory.appending(path: "DebugFirstLaunch", directoryHint: .isDirectory),
+        temporary: .temporaryDirectory.appending(path: "DebugFirstLaunchTemporary", directoryHint: .isDirectory)
     )
 
     /// A store refilled with fresh samples, so every launch starts from the same ones. It writes
@@ -28,6 +32,13 @@ enum SampleStore {
             }
         }
         return ProjectStore(paths: paths)
+    }
+
+    /// An empty store, emptied again each launch, so every launch is a fresh install's first and
+    /// adds `SampleProjects.firstLaunch`.
+    static func makeFirstLaunch() -> ProjectStore {
+        try? FileManager.default.removeItem(at: firstLaunchPaths.root)
+        return ProjectStore(paths: firstLaunchPaths)
     }
 }
 #endif

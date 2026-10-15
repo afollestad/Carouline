@@ -10,6 +10,7 @@ import Foundation
 actor CountingStore: ProjectStoring {
     nonisolated let paths = ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)
     nonisolated let storedProjectCount = 0
+    nonisolated let isAwaitingSample = false
     private(set) var loads = 0
     private(set) var saves = 0
 
@@ -18,6 +19,10 @@ actor CountingStore: ProjectStoring {
         // Gives a second caller the chance to start its own load while this one is out.
         await Task.yield()
         return StoredProjects()
+    }
+
+    func addSample(_ make: @Sendable () -> Project) -> Project? {
+        nil
     }
 
     func save(_ project: Project) {

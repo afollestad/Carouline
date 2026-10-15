@@ -12,10 +12,20 @@ nonisolated protocol ProjectStoring: Sendable {
     /// without reading or sweeping any, so it's cheap enough to ask before the first frame. A
     /// folder a crash left without its JSON counts, though `loadAll()` sweeps it away.
     var storedProjectCount: Int { get }
+    /// Whether the store holds no projects and has never had its first-launch sample, as on a
+    /// fresh install's first launch, so `addSample(_:)` would add one. Cheap enough to ask
+    /// before the first frame.
+    var isAwaitingSample: Bool { get }
 
     /// Every project on disk, after sweeping away files nothing refers to. Call it once, before
     /// anything can change a project, since it deletes images no saved project refers to yet.
     func loadAll() async -> StoredProjects
+    /// Adds the project `make` builds, with its `SampleImages` drawn as its copies, and returns
+    /// it, when `isAwaitingSample`. Whenever it adds one or finds projects, it marks the store,
+    /// so a deleted sample stays gone and an update doesn't add one beside the projects already
+    /// there. Call it after `loadAll()`, whose sweep clears folders a crash left without their
+    /// JSON, which would otherwise count as projects.
+    func addSample(_ make: @Sendable () -> Project) async throws -> Project?
     func save(_ project: Project) async throws
     func delete(projectID: UUID) async throws
     func delete(_ unreadable: UnreadableProject) async throws
@@ -57,6 +67,10 @@ actor ProjectStore: ProjectStoring {
         directories(in: paths.projects).count
     }
 
+    nonisolated var isAwaitingSample: Bool {
+        storedProjectCount == 0 && !hasSampleMarker
+    }
+
     func loadAll() -> StoredProjects {
         for folder in [paths.trash, paths.imports, paths.exports] {
             try? FileManager.default.removeItem(at: folder)
@@ -82,6 +96,34 @@ actor ProjectStore: ProjectStoring {
         }
         stored.projects.sort { $0.modifiedAt > $1.modifiedAt }
         return stored
+    }
+
+    func addSample(_ make: @Sendable () -> Project) throws -> Project? {
+        guard isAwaitingSample else {
+            if !hasSampleMarker {
+                markSampleAdded()
+            }
+            return nil
+        }
+        let sample = make()
+        do {
+            try FileManager.default.createDirectory(at: paths.imagesFolder(for: sample.id), withIntermediateDirectories: true)
+            for image in sample.images {
+                guard let drawn = SampleImages.image(for: image) else {
+                    throw ImageImporter.ImportError.unwritable
+                }
+                try ImageImporter.write(drawn, to: paths.imageFile(named: image.fileName, in: sample.id), format: image.fileFormat)
+            }
+            try save(sample)
+        } catch {
+            // Otherwise the folder would stand in as a project, with a placeholder, until the next
+            // launch swept it.
+            try? discard(paths.folder(for: sample.id))
+            throw error
+        }
+        // A sample saved without its marker still shows. The next launch finds it and marks then.
+        markSampleAdded()
+        return sample
     }
 
     func save(_ project: Project) throws {
@@ -136,6 +178,15 @@ actor ProjectStore: ProjectStoring {
         try? FileManager.default.removeItem(at: destination)
     }
 
+    private nonisolated var hasSampleMarker: Bool {
+        FileManager.default.fileExists(atPath: paths.sampleMarker.path(percentEncoded: false))
+    }
+
+    private func markSampleAdded() {
+        try? FileManager.default.createDirectory(at: paths.root, withIntermediateDirectories: true)
+        try? Data().write(to: paths.sampleMarker)
+    }
+
     /// Deletes copies left by a replace, removal or import that a crash cut short.
     private func removeUnreferencedImages(of project: Project) {
         let kept = Set(project.images.map(\.fileName))
@@ -162,6 +213,8 @@ actor MockProjectStore: ProjectStoring {
     /// The projects it started with, without its saves since, which is all a library asks for
     /// before it loads.
     nonisolated let storedProjectCount: Int
+    /// Never, so previews and snapshots show only the projects they were given.
+    nonisolated let isAwaitingSample = false
     private var projects: [UUID: Project]
 
     init(projects: [Project] = [], paths: ProjectPaths = ProjectPaths(root: .temporaryDirectory, temporary: .temporaryDirectory)) {
@@ -172,6 +225,10 @@ actor MockProjectStore: ProjectStoring {
 
     func loadAll() -> StoredProjects {
         StoredProjects(projects: projects.values.sorted { $0.modifiedAt > $1.modifiedAt })
+    }
+
+    func addSample(_ make: @Sendable () -> Project) -> Project? {
+        nil
     }
 
     func save(_ project: Project) {
