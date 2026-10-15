@@ -18,7 +18,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Xcode 27 project with an iOS 26 deployment target, so gate iOS 27 APIs with `#available`. Use iOS 26 APIs such as Liquid Glass, scroll edge effects, and `navigationSubtitle` freely.
 - Don't register new files under `Carouline/` or `CaroulineTests/` in `project.pbxproj`, since source folders are synchronized groups that add them to their targets.
 - Set Info.plist keys, usage descriptions included, as `INFOPLIST_KEY_*` build settings; there is no Info.plist file.
-- First-time setup: `./scripts/setup.sh` installs `swiftlint`, `xcsift` and `axe` and a pre-commit hook that lints.
+- First-time setup: `./scripts/setup.sh` installs `swiftlint`, `xcsift` and `axe`, a pre-commit hook that lints, and any missing simulators the scripts run on.
 - Build, run, test, lint and snapshot through `scripts/`, not raw `xcodebuild`, `simctl launch` or `swiftlint`. They pin the simulator, test locale and DerivedData path (`.build/xcode`) that results and baselines depend on.
 - Build: `./scripts/build.sh`. Run: `./scripts/run.sh -b` builds first, while bare `run.sh` relaunches the last build; it prefers a reachable iPhone or iPad, so pass `-s` (or set `SIMULATOR` to pick another device) for the simulator, or `-d <name or UDID>` for any device.
 - Tests use Swift Testing: `./scripts/test.sh`, or pass identifiers such as `CaroulineTests/CaroulineAppTests`. It runs `SnapshotTests` on iPhone 18 Pro, `WideSnapshotTests` on iPad mini (A17 Pro), and everything else on `SIMULATOR`'s.
