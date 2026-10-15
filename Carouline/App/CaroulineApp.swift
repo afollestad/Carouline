@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import TipKit
 
 @main
 struct CaroulineApp: App {
@@ -18,6 +19,9 @@ struct CaroulineApp: App {
     @State private var library: ProjectLibrary
     /// One decode cache for every window, reading the library's store.
     @State private var imageLoader: DiskImageLoader
+    /// Whether TipKit is configured, which the sample's tour needs. Never under tests, whose
+    /// snapshots must not show a tip.
+    private let offersTours: Bool
     #if DEBUG
     @State private var debug: DebugSettings
     #endif
@@ -38,6 +42,14 @@ struct CaroulineApp: App {
         #endif
         _library = State(initialValue: ProjectLibrary(store: store, makeSample: { SampleProjects.firstLaunch }))
         _imageLoader = State(initialValue: DiskImageLoader(paths: store.paths))
+        // Immediate, so each of the tour's tips follows the last rather than waiting a day.
+        var tipOptions: [Tips.ConfigurationOption] = [.displayFrequency(.immediate)]
+        #if DEBUG
+        if debug.simulatesFirstLaunch, !debug.usesSampleProjects {
+            tipOptions.append(.datastoreLocation(.url(SampleStore.firstLaunchTips)))
+        }
+        #endif
+        offersTours = !Self.isHostingTests && (try? Tips.configure(tipOptions)) != nil
     }
 
     var body: some Scene {
@@ -55,10 +67,12 @@ struct CaroulineApp: App {
         #if DEBUG
         ContentView(library: library)
             .environment(\.imageLoader, imageLoader)
+            .environment(\.offersTours, offersTours)
             .environment(debug)
         #else
         ContentView(library: library)
             .environment(\.imageLoader, imageLoader)
+            .environment(\.offersTours, offersTours)
         #endif
     }
 }

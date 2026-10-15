@@ -26,7 +26,7 @@ final class DebugSettings {
     /// Leaves one sample photo's copy and the sample sticker's unwritten, so they show as missing.
     let missesSampleImage: Bool
     /// Swaps the real projects for an empty store of its own, so each launch adds the sample a
-    /// fresh install's first launch does.
+    /// fresh install's first launch does, and TipKit's datastore for one, so its tour starts over.
     let simulatesFirstLaunch: Bool
     /// The project, by its place in the list, to open on launch.
     let openProjectIndex: Int?
@@ -39,8 +39,8 @@ final class DebugSettings {
     /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, leaving the real ones alone),
     /// `-DebugMissingImages` (`YES` leaves a sample photo's copy and the sample sticker's out, so
     /// they show as missing), `-DebugFirstLaunch` (`YES` swaps in an empty store that adds the
-    /// first-launch sample, as a fresh install does, unless `-DebugSampleProjects` is on; it
-    /// ignores `-DebugMissingImages`),
+    /// first-launch sample, and an empty tips datastore that starts its tour, as a fresh install
+    /// does, unless `-DebugSampleProjects` is on; it ignores `-DebugMissingImages`),
     /// `-DebugOpenProject` (a project's index in the list, from 0), `-DebugSelectCell` (a photo
     /// to frame in it, as slide and cell indexes like `2,0`), `-DebugSelectLayer` (a layer to
     /// move in it, as slide and layer indexes like `2,0`, layers counted from the bottom) and

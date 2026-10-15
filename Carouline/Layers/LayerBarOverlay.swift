@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import TipKit
 
 /// The layer bar along the bottom of the project screen while a layer is selected, and what
 /// keeps the selection to a layer that's still there.
@@ -14,6 +15,8 @@ struct LayerBarOverlay: ViewModifier {
     /// Saves the size slider's placement once it's let go.
     let onCommitSize: () -> Void
     let onDone: () -> Void
+    @Environment(ProjectTour.self) private var tour: ProjectTour?
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     func body(content: Content) -> some View {
         content
@@ -32,32 +35,66 @@ struct LayerBarOverlay: ViewModifier {
                     session.selection = nil
                 }
             }
+            // A move, resize or turn of the layer the hint showed over, saved as it ends, finishes
+            // the hint. Another layer selected, or none, isn't a move.
+            .onChange(of: selectedPlacement) { old, new in
+                if let old, let new, old.layerID == new.layerID, old != new, tour?.visit.hasShownMoveTip == true {
+                    tour?.finish(through: .moveLayer)
+                }
+            }
+    }
+
+    /// The selected layer's placement as saved, with its ID.
+    private struct SelectedPlacement: Equatable {
+        let layerID: UUID
+        let placement: LayerPlacement
+    }
+
+    private var selectedPlacement: SelectedPlacement? {
+        selectedLayer.map { SelectedPlacement(layerID: $0.layer.id, placement: $0.layer.placement) }
     }
 
     @ViewBuilder
     private var bar: some View {
         if let selection = session.selection, let selected = selectedLayer {
             let layer = selected.layer
-            LayerBar(
-                layer: layer,
-                session: session,
-                isTop: selected.index == selected.count - 1,
-                isBottom: selected.index == 0,
-                onBringForward: { actions.move(selection, 1) },
-                onSendBackward: { actions.move(selection, -1) },
-                onStraighten: {
-                    var placement = session.livePlacement ?? layer.placement
-                    placement.rotation = 0
-                    session.livePlacement = nil
-                    actions.setPlacement(placement, selection)
-                },
-                onDelete: { actions.delete(selection) },
-                onCommitSize: onCommitSize,
-                onEdit: { actions.edit(selection) },
-                onDone: onDone
-            )
+            VStack(spacing: 0) {
+                if let moveTip = tour?.moveTip(isCompactHeight: verticalSizeClass == .compact) {
+                    TipView(moveTip, arrowEdge: .bottom)
+                        .tourTipStyle()
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: 560)
+                        // Sized with the bar, so it leaves the slide above as much room.
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                        .onAppear {
+                            tour?.visit.hasShownMoveTip = true
+                        }
+                }
+                layerBar(selection: selection, selected: selected, layer: layer)
+            }
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+    }
+
+    private func layerBar(selection: LayerAddress, selected: SelectedLayer, layer: Layer) -> some View {
+        LayerBar(
+            layer: layer,
+            session: session,
+            isTop: selected.index == selected.count - 1,
+            isBottom: selected.index == 0,
+            onBringForward: { actions.move(selection, 1) },
+            onSendBackward: { actions.move(selection, -1) },
+            onStraighten: {
+                var placement = session.livePlacement ?? layer.placement
+                placement.rotation = 0
+                session.livePlacement = nil
+                actions.setPlacement(placement, selection)
+            },
+            onDelete: { actions.delete(selection) },
+            onCommitSize: onCommitSize,
+            onEdit: { actions.edit(selection) },
+            onDone: onDone
+        )
     }
 
     /// The selected layer, its place in its slide's stack, and the stack's height. A new

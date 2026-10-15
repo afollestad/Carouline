@@ -54,7 +54,7 @@ nonisolated enum SampleProjects {
     /// and the panorama's isn't one that fades to the swipe hint's violet.
     static var firstLaunch: Project {
         Project(
-            id: sampleID(4),
+            id: firstLaunchID,
             name: "Sample Carousel",
             aspectRatio: .portrait,
             slides: [
@@ -72,6 +72,9 @@ nonisolated enum SampleProjects {
             createdAt: date(daysAgo: 0)
         )
     }
+
+    /// `firstLaunch`'s, which its tour runs on.
+    static let firstLaunchID = sampleID(4)
 
     /// The photo `-DebugMissingImages` leaves without a copy, which names a library original
     /// that doesn't exist, so restoring it shows how a missing original reads, and the sticker.

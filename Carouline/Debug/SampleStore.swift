@@ -16,6 +16,9 @@ enum SampleStore {
         root: .temporaryDirectory.appending(path: "DebugFirstLaunch", directoryHint: .isDirectory),
         temporary: .temporaryDirectory.appending(path: "DebugFirstLaunchTemporary", directoryHint: .isDirectory)
     )
+    /// TipKit's datastore for a first launch, reset with its store, so the sample's tour starts
+    /// over too, leaving the real datastore alone.
+    static let firstLaunchTips = firstLaunchPaths.root.appending(path: "Tips", directoryHint: .isDirectory)
 
     /// A store refilled with fresh samples, so every launch starts from the same ones. It writes
     /// them before the store exists, and so before any window can load or change them.
@@ -35,9 +38,10 @@ enum SampleStore {
     }
 
     /// An empty store, emptied again each launch, so every launch is a fresh install's first and
-    /// adds `SampleProjects.firstLaunch`.
+    /// adds `SampleProjects.firstLaunch`, with an empty folder for `firstLaunchTips`.
     static func makeFirstLaunch() -> ProjectStore {
         try? FileManager.default.removeItem(at: firstLaunchPaths.root)
+        try? FileManager.default.createDirectory(at: firstLaunchTips, withIntermediateDirectories: true)
         return ProjectStore(paths: firstLaunchPaths)
     }
 }

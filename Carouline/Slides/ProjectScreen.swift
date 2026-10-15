@@ -99,6 +99,14 @@ struct ProjectScreen: View {
             .toolbar {
                 toolbar(project)
             }
+            .modifier(ProjectTourHost(
+                project: project,
+                stripPosition: stripPosition,
+                presenter: presenter,
+                photoSelection: session.selection,
+                layerSelection: layerSession.selection,
+                isFailing: library.failure != nil
+            ))
         return presentations(over: screen, project: project)
     }
 
@@ -478,12 +486,6 @@ struct ProjectScreen: View {
         }
     }
     #endif
-}
-
-/// The width what's open opened at. Not observed, since it's set to the width the screen already
-/// has, so a write redraws nothing.
-private final class OpenedWidth {
-    var isCompact: Bool?
 }
 
 #Preview {

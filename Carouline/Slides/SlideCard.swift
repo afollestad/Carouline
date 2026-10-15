@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import TipKit
 
 /// One slide in the strip: its cells, and the caption under it with the slide's options.
 struct SlideCard: View {
@@ -31,6 +32,12 @@ struct SlideCard: View {
     let onDelete: () -> Void
     let onSetSpan: (Int) -> Void
     @State private var isConfirmingDelete = false
+    @Environment(ProjectTour.self) private var tour: ProjectTour?
+
+    /// The tour's tips' room from the slide's sides, and their widest, which keeps one to a phone's
+    /// width over an iPad's or a panorama's wider slide.
+    private static let tipInset: CGFloat = 12
+    private static let tipMaxWidth: CGFloat = 400
 
     var body: some View {
         // Measured only while the slide holds the selection, so a scroll measures nothing.
@@ -101,6 +108,13 @@ struct SlideCard: View {
                     .strokeBorder(.separator, lineWidth: 0.5)
             }
             .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+            // Over the layers, which the layer tip points at, and past the shadow, under which a
+            // tip's close button doesn't draw.
+            .overlay {
+                tourTips
+                    // From the slide, as glass over a slide takes its scheme.
+                    .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
+            }
             .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(spokenNumbers) of \(count), \(slide.layout.name)\(spokenLayers)")
@@ -137,16 +151,18 @@ struct SlideCard: View {
 
     @ViewBuilder
     private var options: some View {
-        Button("Change Layout…", systemImage: "rectangle.split.2x2", action: onChangeLayout)
+        Button("Change Layout…", systemImage: "rectangle.split.2x2") {
+            choose(onChangeLayout)
+        }
         Button("Add Layer…", systemImage: "square.2.layers.3d.top.filled") {
-            layerActions.openSheet(slide.id, [.add])
+            choose { layerActions.openSheet(slide.id, [.add]) }
         }
         Button("Edit Layers…", systemImage: "square.3.layers.3d") {
-            layerActions.openSheet(slide.id, [])
+            choose { layerActions.openSheet(slide.id, []) }
         }
         // Once there's a photo, since the first one sets the width to fit it.
         if slide.layout == .panorama, slide.cells.first?.image != nil {
-            Picker(selection: Binding { slide.span } set: { onSetSpan($0) }) {
+            Picker(selection: Binding { slide.span } set: { span in choose { onSetSpan(span) } }) {
                 ForEach(Slide.panoramaSpans, id: \.self) { span in
                     Text("\(span) Slides").tag(span)
                 }
@@ -156,23 +172,63 @@ struct SlideCard: View {
             .pickerStyle(.menu)
         }
         Button("Move Left", systemImage: "arrow.left") {
-            onMove(-1)
+            choose { onMove(-1) }
         }
         .disabled(!canMoveLeft)
         Button("Move Right", systemImage: "arrow.right") {
-            onMove(1)
+            choose { onMove(1) }
         }
         .disabled(!canMoveRight)
         Divider()
         Button(deleteTitle, systemImage: "trash", role: .destructive) {
-            isConfirmingDelete = true
+            choose { isConfirmingDelete = true }
         }
+    }
+
+    /// Does what the slide's menu offers, which finishes the tour's tip about the menu. Opening the
+    /// menu would be sooner, but SwiftUI hands it to UIKit, which reports no opening.
+    private func choose(_ action: () -> Void) {
+        tour?.finish(through: .slideMenu)
+        action()
     }
 
     /// A photo or a layer selected anywhere on the strip, while which a finger held down may start
     /// a drag on the selection or a pinch anywhere, rather than a menu.
     private var isAnythingSelected: Bool {
         session.selection != nil || layerSession.selection != nil
+    }
+
+    /// The tour's tips on the slide in front: one along its foot pointing down at its menu, or
+    /// one pointing at its top layer, below a layer in the slide's upper half and above one in
+    /// its lower half, so it never covers the layer it asks the user to tap. Inline rather than
+    /// popovers, which TipKit leaves on screen while a sheet opens, and after which the strip
+    /// presents no popover again.
+    @ViewBuilder
+    private var tourTips: some View {
+        if let tip = tour?.menuTip(on: slide.id) {
+            TipView(tip, arrowEdge: .bottom)
+                .tourTipStyle()
+                .frame(maxWidth: Self.tipMaxWidth)
+                .padding(Self.tipInset)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+        } else if let tip = tour?.layerTip(on: slide.id), let layer = slide.layers.last {
+            let frame = LayerGeometry.frame(of: layer, canvas: size, span: slide.span)
+            let isBelow = frame.midY < size.height / 2
+            ZStack {
+                Color.clear
+                    .frame(width: frame.width, height: frame.height)
+                    .tipAnchor(TourAnchor.layer)
+                    .position(x: frame.midX, y: frame.midY)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                TipView(tip, arrowEdge: isBelow ? .top : .bottom, anchorID: TourAnchor.layer)
+                    .tourTipStyle()
+                    .frame(maxWidth: Self.tipMaxWidth)
+                    .padding(.horizontal, Self.tipInset)
+                    .padding(isBelow ? .top : .bottom, isBelow ? frame.maxY : size.height - frame.minY)
+                    .frame(maxHeight: .infinity, alignment: isBelow ? .top : .bottom)
+            }
+        }
     }
 
     /// The slide's layers, as VoiceOver adds them to its label.

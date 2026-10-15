@@ -29,3 +29,9 @@ enum ProjectPresentation: Hashable, Identifiable {
         }
     }
 }
+
+/// The width what's open on the project screen opened at. Not observed, since it's set to the
+/// width the screen already has, so a write redraws nothing.
+final class OpenedWidth {
+    var isCompact: Bool?
+}
