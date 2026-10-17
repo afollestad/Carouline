@@ -22,7 +22,7 @@ struct AspectRatioSheet: View {
                             RatioTile(ratio: ratio)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(ratio.spokenRatio), \(ratio.name)")
+                        .accessibilityLabel("\(ratio.spokenRatio) \(ratio.name), \(ratio.uses)")
                     }
                 }
                 .padding()
@@ -56,7 +56,7 @@ private struct RatioTile: View {
                 .padding(.bottom, 4)
             Text(ratio.rawValue)
                 .font(.headline)
-            Text(ratio.name)
+            Text(ratio.uses)
                 .font(.caption)
         }
         .frame(maxWidth: .infinity)
