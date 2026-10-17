@@ -93,8 +93,7 @@ struct AspectRatioSheet: View {
         .tint(.accentColor)
     }
 
-    /// The Custom section's title, with Edit for its saved shapes. Done in the solid accent, and
-    /// Edit in the primary color, since a faint accent washes out on the sheet's glass.
+    /// The Custom section's title, with Edit for its saved shapes.
     private var customHeader: some View {
         HStack {
             Text("Custom")
@@ -107,21 +106,17 @@ struct AspectRatioSheet: View {
                         isEditing = false
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                // The sheet's primary color would draw over the button's own white.
-                .foregroundStyle(.white)
+                .buttonStyle(HeaderButtonStyle(isProminent: true))
             } else {
                 Button("Edit") {
                     withAnimation {
                         isEditing = true
                     }
                 }
-                .buttonStyle(.bordered)
-                .tint(Color.primary)
+                .buttonStyle(HeaderButtonStyle(isProminent: false))
                 .accessibilityHint("Shows a delete button on each saved shape.")
             }
         }
-        .controlSize(.small)
         // Set apart from the presets above, as a section of its own.
         .padding(.top, 16)
         // Room above the first row for its delete badges, clear of Done.
@@ -168,7 +163,7 @@ struct AspectRatioSheet: View {
             // Room for every field, which the keyboard would grow it to anyway.
             detent = .large
         } label: {
-            RatioTile(title: "New", caption: "Any ratio and size") {
+            RatioTile(title: "New", caption: "Any shape") {
                 NewShape()
             }
         }
@@ -219,8 +214,10 @@ private struct RatioTile<Preview: View>: View {
             Text(caption)
                 .font(.caption)
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
+        // As tall as its row, its preview at the top, so a caption that wraps doesn't leave its
+        // tile standing taller than the rest of the row.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // A plain fill rather than glass, which the sheet's own glass already is.
         .background(.fill.quaternary, in: .rect(cornerRadius: 16))
         .contentShape(.rect(cornerRadius: 16))
@@ -252,6 +249,24 @@ private struct NewShape: View {
         }
         .frame(width: 56, height: 56)
         .foregroundStyle(Color.primary)
+    }
+}
+
+/// Edit and Done on glass in a fingertip's height, matching the toolbar's glass buttons, even on
+/// the iPad's glass sheet. Done takes the accent, strong enough under white to read, and Edit the
+/// primary color, since a faint accent washes out on the glass.
+private struct HeaderButtonStyle: ButtonStyle {
+    let isProminent: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            // The sheet's primary color would draw over Done's white.
+            .foregroundStyle(isProminent ? Color.white : Color.primary)
+            .padding(.horizontal, 18)
+            .frame(minHeight: 44)
+            .glassEffect(isProminent ? .regular.tint(.accentColor).interactive() : .regular.interactive(), in: .capsule)
+            .contentShape(.capsule)
     }
 }
 
