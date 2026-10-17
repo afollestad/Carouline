@@ -22,11 +22,15 @@ extension WideSnapshotTests {
         await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader), on: .wide)
     }
 
-    @Test func newProjectSheet() async {
-        await assertScreenSnapshot(of: AspectRatioSheet { _ in }, on: .wide)
+    @Test func newProjectSheet() async throws {
+        let presets = try savedPresets()
+        await assertScreenSnapshot(of: AspectRatioSheet(presets: presets) { _ in }, on: .wide)
     }
 
     @Test func customRatioPage() async {
-        await assertScreenSnapshot(of: AspectRatioSheet(startsOnCustom: CustomRatioDraft()) { _ in }, on: .wide)
+        var draft = CustomRatioDraft()
+        draft.savesPreset = true
+        draft.presetName = "Etsy"
+        await assertScreenSnapshot(of: AspectRatioSheet(presets: CustomPresets(presets: []), startsOnCustom: draft) { _ in }, on: .wide)
     }
 }

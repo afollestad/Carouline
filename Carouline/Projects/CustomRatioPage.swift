@@ -11,8 +11,11 @@ struct CustomRatioPage: View {
     @Binding var draft: CustomRatioDraft
     /// Whether the sheet is at full height, where it's opaque rather than glass.
     let isFull: Bool
+    /// Whether the shape can be saved as a preset, which a newer build's presets file stops.
+    let canSave: Bool
     let onCreate: (AspectRatio) -> Void
     @FocusState private var focusedField: NumberField?
+    private static let presetNameRow = "presetName"
     /// The focused field's selection, all of its text as it takes focus.
     @State private var selection: TextSelection?
 
@@ -46,48 +49,84 @@ struct CustomRatioPage: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                ShapePreview(draft: draft)
-                    .listRowBackground(Color.clear)
-            }
-            Section {
-                HStack {
-                    // Labeled again, since a field with a prompt leaves its title out for VoiceOver.
-                    TextField("Ratio width", text: text(.ratioWidth), selection: selection(.ratioWidth), prompt: Text("Width"))
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .ratioWidth)
-                        .accessibilityLabel("Ratio width")
-                    Text(":")
-                        .accessibilityHidden(true)
-                    TextField("Ratio height", text: text(.ratioHeight), selection: selection(.ratioHeight), prompt: Text("Height"))
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField, equals: .ratioHeight)
-                        .accessibilityLabel("Ratio height")
+        ScrollViewReader { proxy in
+            Form {
+                Section {
+                    ShapePreview(draft: draft)
+                        .listRowBackground(Color.clear)
                 }
-                .font(.title3)
-                .multilineTextAlignment(.center)
-            } header: {
-                header("Ratio")
-            } footer: {
-                footer(draft.problems.contains(.ratio) ? CustomRatioDraft.Problem.ratio.message : nil)
+                Section {
+                    HStack {
+                        // Labeled again, since a field with a prompt leaves its title out for VoiceOver.
+                        TextField("Ratio width", text: text(.ratioWidth), selection: selection(.ratioWidth), prompt: Text("Width"))
+                            .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .ratioWidth)
+                            .accessibilityLabel("Ratio width")
+                        Text(":")
+                            .accessibilityHidden(true)
+                        TextField("Ratio height", text: text(.ratioHeight), selection: selection(.ratioHeight), prompt: Text("Height"))
+                            .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .ratioHeight)
+                            .accessibilityLabel("Ratio height")
+                    }
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                } header: {
+                    header("Ratio")
+                } footer: {
+                    footer(draft.problems.contains(.ratio) ? CustomRatioDraft.Problem.ratio.message : nil)
+                }
+                Section {
+                    sideRow("Width", field: .pixelWidth)
+                    sideRow("Height", field: .pixelHeight)
+                } header: {
+                    header("Size")
+                } footer: {
+                    footer(sizeNote)
+                }
+                if canSave {
+                    Section {
+                        Toggle("Save as Preset", isOn: $draft.savesPreset)
+                        if draft.savesPreset {
+                            LabeledContent("Name") {
+                                // VoiceOver reads the row's label for it.
+                                TextField("Preset name", text: $draft.presetName, prompt: Text("Optional"))
+                                    .multilineTextAlignment(.trailing)
+                            }
+                            .id(Self.presetNameRow)
+                        }
+                    } header: {
+                        header("Preset")
+                    } footer: {
+                        footer("Saved shapes show under Custom.")
+                    }
+                }
             }
-            Section {
-                sideRow("Width", field: .pixelWidth)
-                sideRow("Height", field: .pixelHeight)
-            } header: {
-                header("Size")
-            } footer: {
-                footer(draft.problems.contains(.size) ? CustomRatioDraft.Problem.size.message : "Type either side, and the other follows the ratio.")
+            // Room between a section's footer and the next one's header, which the default
+            // leaves reading as one block.
+            .listSectionSpacing(28)
+            // The sheet's glass shows through, except at full height, where the sheet is opaque
+            // and the rows would be lost on it.
+            .scrollContentBackground(isFull ? .visible : .hidden)
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: focusedField) { _, field in
+                selectAll(of: field)
             }
-        }
-        // The sheet's glass shows through, except at full height, where the sheet is opaque and
-        // the rows would be lost on it.
-        .scrollContentBackground(isFull ? .visible : .hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .scrollDismissesKeyboard(.interactively)
-        .onChange(of: focusedField) { _, field in
-            selectAll(of: field)
+            .onChange(of: draft.savesPreset) { _, savesPreset in
+                guard savesPreset else {
+                    return
+                }
+                // Brings the name field that turning it on adds into view, with the note below it,
+                // once the list has the field, which it doesn't yet as the switch turns on.
+                // Centered, since a bottom anchor stops short of the note: the field is near the
+                // list's end, so the list scrolls as far as it goes, bringing the note in too.
+                Task {
+                    withAnimation {
+                        proxy.scrollTo(Self.presetNameRow, anchor: .center)
+                    }
+                }
+            }
         }
         .navigationTitle("Custom Ratio")
         .navigationBarTitleDisplayMode(.inline)
@@ -101,6 +140,11 @@ struct CustomRatioPage: View {
                 .disabled(draft.aspectRatio == nil)
             }
         }
+    }
+
+    /// What's wrong with the size, or else how its sides follow the ratio.
+    private var sizeNote: String {
+        draft.problems.contains(.size) ? CustomRatioDraft.Problem.size.message : "Type either side, and the other follows the ratio."
     }
 
     private func sideRow(_ title: String, field: NumberField) -> some View {
@@ -200,7 +244,7 @@ private struct ShapePreview: View {
     Color.clear
         .sheet(isPresented: .constant(true)) {
             NavigationStack {
-                CustomRatioPage(draft: $draft, isFull: false) { _ in }
+                CustomRatioPage(draft: $draft, isFull: false, canSave: true) { _ in }
             }
             .presentationDetents([.medium, .large])
             .foregroundStyle(Color.primary)

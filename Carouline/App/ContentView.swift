@@ -7,6 +7,7 @@ import SwiftUI
 
 struct ContentView: View {
     let library: ProjectLibrary
+    let presets: CustomPresets
     @State private var path: [UUID] = []
     @State private var isChoosingShape = false
     /// A project created in the shape sheet, opened once the sheet is gone, since a push while it
@@ -31,7 +32,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $isChoosingShape, onDismiss: shapeSheetClosed) {
-            AspectRatioSheet(startsOnCustom: startingDraft) { ratio in
+            AspectRatioSheet(presets: presets, startsOnCustom: startingDraft) { ratio in
                 createdProjectID = library.createProject(aspectRatio: ratio).id
             }
         }
@@ -100,5 +101,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(library: ProjectLibrary(store: MockProjectStore(projects: SampleProjects.all)))
+    ContentView(library: ProjectLibrary(store: MockProjectStore(projects: SampleProjects.all)), presets: CustomPresets(presets: []))
 }

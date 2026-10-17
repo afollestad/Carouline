@@ -315,6 +315,16 @@ extension ScreenSnapshotting {
         Cell(image: PlacedImage(id: fixtureID(number), assetIdentifier: nil, pixelWidth: width, pixelHeight: height))
     }
 
+    /// A shape saved from the custom page with a name, and one without.
+    func savedPresets() throws -> CustomPresets {
+        let named = try #require(AspectRatio(width: 5, height: 7, pixelWidth: 2000, pixelHeight: 2800))
+        let unnamed = try #require(AspectRatio(width: 3, height: 2, pixelWidth: 1620, pixelHeight: 1080))
+        return CustomPresets(presets: [
+            CustomPreset(id: fixtureID(231), name: "Etsy", aspectRatio: named),
+            CustomPreset(id: fixtureID(232), name: "", aspectRatio: unnamed)
+        ])
+    }
+
     var unreadableProject: UnreadableProject {
         UnreadableProject(
             folder: URL(filePath: "/Projects/Newer", directoryHint: .isDirectory),

@@ -19,6 +19,8 @@ struct CaroulineApp: App {
     @State private var library: ProjectLibrary
     /// One decode cache for every window, reading the library's store.
     @State private var imageLoader: DiskImageLoader
+    /// The shapes saved from the New Project sheet, kept beside the library's store.
+    @State private var presets: CustomPresets
     /// Whether TipKit is configured, which the sample's tour needs. Never under tests, whose
     /// snapshots must not show a tip.
     private let offersTours: Bool
@@ -41,6 +43,7 @@ struct CaroulineApp: App {
         #endif
         _library = State(initialValue: ProjectLibrary(store: store, makeSample: { SampleProjects.firstLaunch }))
         _imageLoader = State(initialValue: DiskImageLoader(paths: store.paths))
+        _presets = State(initialValue: CustomPresets(file: store.paths.customPresets))
         // Immediate, so each of the tour's tips follows the last rather than waiting a day.
         var tipOptions: [Tips.ConfigurationOption] = [.displayFrequency(.immediate)]
         #if DEBUG
@@ -64,12 +67,12 @@ struct CaroulineApp: App {
     @ViewBuilder
     private var content: some View {
         #if DEBUG
-        ContentView(library: library)
+        ContentView(library: library, presets: presets)
             .environment(\.imageLoader, imageLoader)
             .environment(\.offersTours, offersTours)
             .environment(debug)
         #else
-        ContentView(library: library)
+        ContentView(library: library, presets: presets)
             .environment(\.imageLoader, imageLoader)
             .environment(\.offersTours, offersTours)
         #endif

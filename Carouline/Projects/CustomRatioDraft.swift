@@ -33,6 +33,10 @@ nonisolated struct CustomRatioDraft: Hashable, Sendable {
     private(set) var ratioHeight: String
     private(set) var pixelWidth: String
     private(set) var pixelHeight: String
+    /// Whether creating the project saves its shape as a preset too.
+    var savesPreset = false
+    /// The preset's name, which can stay empty.
+    var presetName = ""
     /// The side typed last, which keeps its pixels as the ratio changes, while the other follows.
     private var lockedSide = Side.width
     private let locale: Locale

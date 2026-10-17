@@ -37,18 +37,36 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: NavigationStack { ProjectsScreen(library: library) {} }.environment(\.imageLoader, imageLoader))
     }
 
-    @Test func newProjectSheet() async {
-        await assertScreenSnapshot(of: AspectRatioSheet { _ in })
+    @Test func newProjectSheet() async throws {
+        let presets = try savedPresets()
+        await assertScreenSnapshot(of: AspectRatioSheet(presets: presets) { _ in })
+    }
+
+    /// The New tile follows the presets until there are saved shapes for a Custom section.
+    @Test func newProjectSheetWithoutPresets() async {
+        await assertScreenSnapshot(of: AspectRatioSheet(presets: CustomPresets(presets: [])) { _ in })
+    }
+
+    /// Each saved shape shows its delete badge, and Done stands in for Edit and the New tile.
+    @Test func newProjectSheetEditing() async throws {
+        let presets = try savedPresets()
+        await assertScreenSnapshot(of: AspectRatioSheet(presets: presets, isEditing: true) { _ in })
     }
 
     @Test func customRatioPage() async {
-        await assertScreenSnapshot(of: AspectRatioSheet(startsOnCustom: CustomRatioDraft()) { _ in })
+        var draft = CustomRatioDraft()
+        draft.savesPreset = true
+        draft.presetName = "Etsy"
+        await assertScreenSnapshot(of: AspectRatioSheet(presets: CustomPresets(presets: []), startsOnCustom: draft) { _ in })
     }
 
-    /// A side past its limits says so, and the other side still follows the ratio.
+    /// A ratio and a side past their limits each say so under their fields, with room before the
+    /// next section, and the other side still follows the ratio.
     @Test func customRatioProblem() async {
         var draft = CustomRatioDraft()
         draft.setPixelWidth("5000")
-        await assertScreenSnapshot(of: AspectRatioSheet(startsOnCustom: draft) { _ in })
+        draft.setRatioWidth("3")
+        draft.setRatioHeight("1")
+        await assertScreenSnapshot(of: AspectRatioSheet(presets: CustomPresets(presets: []), startsOnCustom: draft) { _ in })
     }
 }
