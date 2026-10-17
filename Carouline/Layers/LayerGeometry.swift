@@ -8,9 +8,9 @@ import CoreGraphics
 /// Where a layer sits and how big it draws, from its placement and its slide. The screen and the
 /// export both measure layers here, so a layer sits the same in each.
 nonisolated enum LayerGeometry {
-    /// A slide's width in an export, which text lays out at before it's scaled, so its lines
-    /// break the same on every screen.
-    static let referenceSlideWidth: CGFloat = 1080
+    /// A preset's slide width in an export, which text lays out at before it's scaled to the
+    /// slide's, so its lines break the same on every screen and in an export of any size.
+    static let referenceSlideWidth = CGFloat(AspectRatio.presetWidth)
     /// Type at a layer's natural size, as a fraction of a slide's width: a headline's size on a
     /// phone-sized slide.
     static let fontSize: CGFloat = 0.08

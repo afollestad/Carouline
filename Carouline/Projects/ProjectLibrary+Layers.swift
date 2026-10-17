@@ -58,8 +58,9 @@ extension ProjectLibrary {
             let remaining = (importingLayers[slideID] ?? 1) - 1
             importingLayers[slideID] = remaining > 0 ? remaining : nil
         }
+        let slideWidth = project(projectID)?.aspectRatio.pixelWidth ?? 0
         let request = CopyRequest(projectID: projectID, assetIdentifier: assetIdentifier, crop: ImageCrop()) { photo, destination in
-            try await ImageImporter.makeLayerCopy(of: photo, at: destination)
+            try await ImageImporter.makeLayerCopy(of: photo, at: destination, slideWidth: slideWidth)
         }
         var address: LayerAddress?
         do {
@@ -100,8 +101,9 @@ extension ProjectLibrary {
         if let refused = await readAccess(to: photos, asking: asking) {
             return refused
         }
+        let slideWidth = project(address.projectID)?.aspectRatio.pixelWidth ?? 0
         let request = CopyRequest(projectID: address.projectID, assetIdentifier: assetIdentifier, crop: missing.crop) { photo, destination in
-            try await ImageImporter.makeLayerCopy(of: photo, at: destination)
+            try await ImageImporter.makeLayerCopy(of: photo, at: destination, slideWidth: slideWidth)
         }
         var isRestored = false
         do {

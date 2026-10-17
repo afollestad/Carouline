@@ -11,9 +11,9 @@ import UIKit
 
 struct ImageImporterTests {
     private let temporary = TemporaryDirectory("ImageImporterTests")
-    /// A cell's and a panorama's copies, for a portrait project's 1350-pixel-tall slides.
-    private let cell = ImageImporter.CopyLimit(slideHeight: 1350, isPanorama: false)
-    private let panorama = ImageImporter.CopyLimit(slideHeight: 1350, isPanorama: true)
+    /// A cell's and a panorama's copies, for a portrait project's 1080 by 1350-pixel slides.
+    private let cell = ImageImporter.CopyLimit(slideWidth: 1080, slideHeight: 1350, isPanorama: false)
+    private let panorama = ImageImporter.CopyLimit(slideWidth: 1080, slideHeight: 1350, isPanorama: true)
 
     private func file(_ name: String) throws -> URL {
         try FileManager.default.createDirectory(at: temporary.url, withIntermediateDirectories: true)
@@ -75,8 +75,33 @@ struct ImageImporterTests {
         #expect(cell.longestSide(width: 8000, height: 2000) == 9797)
         #expect(cell.longestSide(width: 0, height: 0) == ImageImporter.maximumPixelSize)
         // Landscape slides are short enough for the usual copy to fill a panorama of them.
-        let landscapeCell = ImageImporter.CopyLimit(slideHeight: 566, isPanorama: false)
+        let landscapeCell = ImageImporter.CopyLimit(slideWidth: 1080, slideHeight: 566, isPanorama: false)
         #expect(landscapeCell.longestSide(width: 8000, height: 2000) == ImageImporter.maximumPixelSize)
+    }
+
+    /// Slides twice a preset's width keep copies twice as large, and wider ones keep more again,
+    /// up to `maximumPixels`, which a photo of unknown size skips.
+    @Test func growsACopyWithItsSlidesWidth() {
+        let doubled = ImageImporter.CopyLimit(slideWidth: 2160, slideHeight: 2700, isPanorama: false)
+        #expect(doubled.longestSide(width: 8000, height: 4000) == 6144)
+        #expect(doubled.longestSide(width: 0, height: 0) == 6144)
+        // About 24 megapixels, 5796 by 4140, however wide the slides.
+        let widest = ImageImporter.CopyLimit(slideWidth: 4096, slideHeight: 5120, isPanorama: false)
+        #expect(widest.longestSide(width: 7000, height: 5000) == 5796)
+        let widestPanorama = ImageImporter.CopyLimit(slideWidth: 4096, slideHeight: 5120, isPanorama: true)
+        #expect(widestPanorama.longestSide(width: 80000, height: 2000) == 30983)
+        #expect(widestPanorama.longestSide(width: 0, height: 0) == 40960)
+        // Never less than a preset's.
+        let narrow = ImageImporter.CopyLimit(slideWidth: 400, slideHeight: 500, isPanorama: false)
+        #expect(narrow.longestSide(width: 7000, height: 5000) == ImageImporter.maximumPixelSize)
+    }
+
+    @Test func growsALayersCopyWithItsSlidesWidth() {
+        #expect(ImageImporter.layerLongestSide(width: 4000, height: 3000, slideWidth: 1080) == 2160)
+        #expect(ImageImporter.layerLongestSide(width: 4000, height: 3000, slideWidth: 2160) == 4320)
+        // About 24 megapixels, 4898 square, at the widest slides.
+        #expect(ImageImporter.layerLongestSide(width: 5000, height: 5000, slideWidth: 4096) == 4898)
+        #expect(ImageImporter.layerLongestSide(width: 0, height: 0, slideWidth: 1080) == 2160)
     }
 
     @Test func keepsASmallPhotoAtItsOwnSize() async throws {
@@ -131,7 +156,7 @@ struct ImageImporterTests {
         try TestImages.writePNG(width: 200, height: 100, to: source)
         let copy = try file("layer")
 
-        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy)
+        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy, slideWidth: 1080)
 
         #expect(made.format == .png)
         let image = try #require(TestImages.decode(copy))
@@ -145,7 +170,7 @@ struct ImageImporterTests {
         try TestImages.writePNG(width: 200, height: 100, isOpaque: true, to: source)
         let copy = try file("layer")
 
-        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy)
+        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy, slideWidth: 1080)
 
         #expect(made.format == .jpeg)
         #expect(TestImages.decode(copy) != nil)
@@ -156,7 +181,7 @@ struct ImageImporterTests {
         try TestImages.writeJPEG(width: 4000, height: 3000, to: source)
         let copy = try file("layer")
 
-        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy)
+        let made = try await ImageImporter.makeLayerCopy(of: .file(source), at: copy, slideWidth: 1080)
 
         #expect(made.size == CGSize(width: 2160, height: 1620))
         #expect(made.format == .jpeg)

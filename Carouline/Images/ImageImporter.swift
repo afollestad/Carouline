@@ -20,40 +20,71 @@ nonisolated enum PhotoSource: Sendable {
 /// Makes the app's own copy of a photo: upright, no larger than its slides can use, as a JPEG,
 /// or as a PNG for a layer's picture with transparency to keep.
 nonisolated enum ImageImporter {
-    /// Room for a full zoom into the smallest cells of a 1080-pixel export, while a 48-megapixel
-    /// photo's copy stays near a tenth of its size.
+    /// Room for a full zoom into the smallest cells of a preset's 1080-pixel export, while a
+    /// 48-megapixel photo's copy stays near a tenth of its size. A wider export's copies keep
+    /// more, in step with its width, within `maximumPixels`.
     static let maximumPixelSize = 3072
-    /// A layer's picture at its largest in a 1080-pixel export: its longer side half a slide at
-    /// its natural size, `LayerGeometry.pictureSide`, times the largest scale, which is four.
+    /// A layer's picture at its largest in a preset's export: its longer side half a slide at its
+    /// natural size, `LayerGeometry.pictureSide`, times the largest scale, which is four. A wider
+    /// export's keep more, as cells' copies do.
     static let maximumLayerPixelSize = 2160
+    /// About 96 MB decoded, the most of a photo any copy keeps, so one nearer square isn't kept
+    /// whole for a panorama or a wide export.
+    static let maximumPixels = 24_000_000.0
 
     /// The most of a photo a copy keeps.
     struct CopyLimit: Hashable, Sendable {
+        /// The export width of the project's slides, which every limit grows with.
+        let slideWidth: Int
         /// The export height of the project's slides, which a panorama of the photo fills.
         let slideHeight: Int
         /// Whether the copy fills a panorama rather than a cell.
         let isPanorama: Bool
 
-        /// As wide as the widest panorama's export.
-        private static let panoramaSide = 1080 * Slide.panoramaSpans.upperBound
-        /// About 96 MB decoded, so a photo nearer square isn't kept whole.
-        private static let panoramaPixels = 24_000_000.0
-
         /// The longer side of the copy of an upright `width` by `height` photo. A panorama's copy
-        /// keeps up to the widest panorama's export, within `panoramaPixels`. So does a cell's
-        /// when the photo is too wide for `maximumPixelSize` to fill a panorama of these slides,
-        /// so it stays sharp if the slide becomes one; any other cell's keeps `maximumPixelSize`.
+        /// keeps up to the widest panorama's export, within `maximumPixels`. So does a cell's
+        /// when the photo is too wide for a cell's usual copy to fill a panorama of these slides,
+        /// so it stays sharp if the slide becomes one; any other cell's keeps
+        /// `maximumPixelSize`. Both grow with slides wider than a preset's, a cell's within
+        /// `maximumPixels` too, except for a photo of unknown size.
         func longestSide(width: Int, height: Int) -> Int {
-            let isWide = height > 0 && width * slideHeight > height * maximumPixelSize
-            guard isPanorama || isWide else {
-                return maximumPixelSize
-            }
+            let scale = ImageImporter.scale(forSlideWidth: slideWidth)
+            let cellSide = Int(Double(maximumPixelSize) * scale)
+            // As wide as the widest panorama's export.
+            let panoramaSide = Int(Double(AspectRatio.presetWidth * Slide.panoramaSpans.upperBound) * scale)
             guard width > 0, height > 0 else {
-                return Self.panoramaSide
+                return isPanorama ? panoramaSide : cellSide
             }
-            let aspect = Double(max(width, height)) / Double(min(width, height))
-            return min(Self.panoramaSide, Int((Self.panoramaPixels * aspect).squareRoot()))
+            let budget = budgetedSide(width: width, height: height)
+            let side = min(cellSide, budget)
+            let isWide = width * slideHeight > height * side
+            guard isPanorama || isWide else {
+                return side
+            }
+            return min(panoramaSide, budget)
         }
+    }
+
+    /// The longer side of a layer's copy of an upright `width` by `height` picture.
+    static func layerLongestSide(width: Int, height: Int, slideWidth: Int) -> Int {
+        let side = Int(Double(maximumLayerPixelSize) * scale(forSlideWidth: slideWidth))
+        guard width > 0, height > 0 else {
+            return side
+        }
+        return min(side, budgetedSide(width: width, height: height))
+    }
+
+    /// How many times a preset's width slides `slideWidth` pixels wide are, and never less than
+    /// once, so a narrow export's copies stay as sharp as a preset's.
+    private static func scale(forSlideWidth slideWidth: Int) -> Double {
+        max(1, Double(slideWidth) / Double(AspectRatio.presetWidth))
+    }
+
+    /// The longer side that keeps an upright `width` by `height` image, both more than zero,
+    /// within `maximumPixels`.
+    private static func budgetedSide(width: Int, height: Int) -> Int {
+        let aspect = Double(max(width, height)) / Double(min(width, height))
+        return Int((maximumPixels * aspect).squareRoot())
     }
 
     enum ImportError: Error {
@@ -75,13 +106,15 @@ nonisolated enum ImageImporter {
         return Copy(size: CGSize(width: image.width, height: image.height), format: .jpeg)
     }
 
-    /// Writes `source`'s copy for a layer to `destination`, no larger than a layer draws: a PNG
-    /// when a file or a library original has transparency to keep, as a sticker or a logo cut
-    /// out of its background does, and otherwise a JPEG, which is far smaller. A camera capture
-    /// has none to keep.
+    /// Writes `source`'s copy for a layer to `destination`, no larger than a layer draws on slides
+    /// `slideWidth` pixels wide: a PNG when a file or a library original has transparency to keep,
+    /// as a sticker or a logo cut out of its background does, and otherwise a JPEG, which is far
+    /// smaller. A camera capture has none to keep.
     @concurrent
-    static func makeLayerCopy(of source: PhotoSource, at destination: URL) async throws -> Copy {
-        let image = try upright(source) { _, _ in maximumLayerPixelSize }
+    static func makeLayerCopy(of source: PhotoSource, at destination: URL, slideWidth: Int) async throws -> Copy {
+        let image = try upright(source) { width, height in
+            layerLongestSide(width: width, height: height, slideWidth: slideWidth)
+        }
         let format: ImageFileFormat = hasTransparency(image) ? .png : .jpeg
         try write(image, to: destination, format: format)
         return Copy(size: CGSize(width: image.width, height: image.height), format: format)

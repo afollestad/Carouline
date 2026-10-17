@@ -14,7 +14,7 @@ struct AspectRatioSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
-                    ForEach(AspectRatio.allCases) { ratio in
+                    ForEach(AspectRatio.presets, id: \.self) { ratio in
                         Button {
                             onChoose(ratio)
                             dismiss()
@@ -22,7 +22,7 @@ struct AspectRatioSheet: View {
                             RatioTile(ratio: ratio)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(ratio.spokenRatio) \(ratio.name), \(ratio.uses)")
+                        .accessibilityLabel("\(ratio.spokenRatio) \(ratio.name), \(ratio.uses ?? "")")
                     }
                 }
                 .padding()
@@ -54,9 +54,9 @@ private struct RatioTile: View {
                 .aspectRatio(ratio.widthOverHeight, contentMode: .fit)
                 .frame(width: 72, height: 72)
                 .padding(.bottom, 4)
-            Text(ratio.rawValue)
+            Text(ratio.label)
                 .font(.headline)
-            Text(ratio.uses)
+            Text(ratio.uses ?? "")
                 .font(.caption)
         }
         .frame(maxWidth: .infinity)

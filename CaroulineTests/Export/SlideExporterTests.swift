@@ -40,7 +40,7 @@ struct SlideExporterTests {
         Cell(image: PlacedImage(assetIdentifier: nil, pixelWidth: 200, pixelHeight: 100, crop: ImageCrop(centerX: centerX)))
     }
 
-    @Test(arguments: AspectRatio.allCases)
+    @Test(arguments: AspectRatio.presets)
     func writesEachSlideAtItsShapesSize(_ ratio: AspectRatio) async throws {
         let project = Project(name: "Size", aspectRatio: ratio, slides: [Slide(layout: .single, cells: [photo()])])
 
@@ -50,6 +50,16 @@ struct SlideExporterTests {
         #expect(CGSize(width: image.width, height: image.height) == ratio.exportSize)
         #expect(image.bitsPerComponent == 8)
         #expect(image.colorSpace?.name == CGColorSpace.sRGB)
+    }
+
+    @Test func writesAShapeOfTheUsersOwnAtItsSize() async throws {
+        let shape = try #require(AspectRatio(width: 5, height: 7, pixelWidth: 2000, pixelHeight: 2800))
+        let project = Project(name: "Size", aspectRatio: shape, slides: [Slide(layout: .single, cells: [photo()])])
+
+        let file = try #require(try await exporter.export(project).files.first)
+
+        let image = try #require(TestImages.decode(file))
+        #expect(CGSize(width: image.width, height: image.height) == CGSize(width: 2000, height: 2800))
     }
 
     @Test func namesFilesInOrderAfterTheProject() async throws {

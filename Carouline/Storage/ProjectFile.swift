@@ -14,14 +14,19 @@ nonisolated enum ProjectFile {
     /// saved, and whose PNG copies its launch sweep would delete.
     /// Version 4 moved the style from the project onto each slide, which a version 3 build
     /// can't read.
-    static let currentFormatVersion = slideStyleVersion
+    /// Version 5 saved the aspect ratio's terms and export size, for shapes of the user's own,
+    /// rather than a preset's name, which a version 4 build can't read.
+    static let currentFormatVersion = customShapeVersion
 
     /// The first version to keep a style on each slide rather than one on the project.
     private static let slideStyleVersion = 4
+    /// The first version to save an aspect ratio as its terms and size rather than by name.
+    private static let customShapeVersion = 5
 
     enum ReadError: Error, Hashable, Sendable {
         /// Not a project this build understands: unparseable, unversioned, or with a shape out of
-        /// range, as a slide with more cells than its layout or a span its layout can't have.
+        /// range, as a slide with more cells than its layout, a span its layout can't have, or an
+        /// aspect ratio past those a build makes.
         /// Out-of-range layer values, blur and styles are clamped instead, since clamping keeps
         /// every photo and layer.
         case damaged
@@ -34,9 +39,10 @@ nonisolated enum ProjectFile {
         try makeEncoder().encode(Document(formatVersion: currentFormatVersion, project: project))
     }
 
-    /// Versions 1 to 3 kept one style on the project, which each slide takes. Otherwise `Slide`
-    /// reads a missing `span` as 1, and missing layers and blur as none, `PlacedImage` a missing
-    /// `fileFormat` as JPEG, and `ImageLayer` a missing `hasShadow` as none.
+    /// Versions 1 to 3 kept one style on the project, which each slide takes. Otherwise
+    /// `AspectRatio` reads versions 1 to 4's preset name, `Slide` a missing `span` as 1, and
+    /// missing layers and blur as none, `PlacedImage` a missing `fileFormat` as JPEG, and
+    /// `ImageLayer` a missing `hasShadow` as none.
     static func decode(_ data: Data) throws -> Project {
         let decoder = makeDecoder()
         guard let probe = try? decoder.decode(Probe.self, from: data), probe.formatVersion >= 1 else {

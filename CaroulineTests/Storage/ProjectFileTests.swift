@@ -60,10 +60,40 @@ struct ProjectFileTests {
 
     @Test func readsVersion4() throws {
         let project = try ProjectFile.decode(Data(Self.version4.utf8))
+        #expect(project.aspectRatio == .square)
         #expect(project.slides.map(\.style) == [.standard, SlideStyle(spacing: 0.02, border: 0.03, background: .black)])
         #expect(project.slides.map(\.blur) == [0, 0.02])
+    }
+
+    @Test func readsVersion5() throws {
+        let project = try ProjectFile.decode(Data(Self.version5.utf8))
+        #expect(project.aspectRatio == AspectRatio(width: 5, height: 7, pixelWidth: 2000, pixelHeight: 2800))
+        #expect(project.slides.map(\.style) == [.standard, SlideStyle(spacing: 0.02, border: 0.03, background: .black)])
         // Writes back as read, with the style on every slide, even the standard one.
-        #expect(String(bytes: try ProjectFile.encode(project), encoding: .utf8) == Self.version4)
+        #expect(String(bytes: try ProjectFile.encode(project), encoding: .utf8) == Self.version5)
+    }
+
+    /// Versions 1 to 4 saved only presets, by name.
+    @Test func readsEveryPresetByItsOldName() throws {
+        for preset in AspectRatio.presets {
+            let json = Self.version4.replacingOccurrences(of: "\"aspectRatio\" : \"1:1\"", with: "\"aspectRatio\" : \"\(preset.label)\"")
+            #expect(try ProjectFile.decode(Data(json.utf8)).aspectRatio == preset)
+        }
+    }
+
+    /// No build makes a shape past its limits, nor saved any but a preset by name.
+    @Test func refusesAShapeNoBuildMakes() {
+        let shapes = [
+            Self.version4.replacingOccurrences(of: "\"aspectRatio\" : \"1:1\"", with: "\"aspectRatio\" : \"5:7\""),
+            Self.version5.replacingOccurrences(of: "\"height\" : 7", with: "\"height\" : 1"),
+            Self.version5.replacingOccurrences(of: "\"pixelHeight\" : 2800", with: "\"pixelHeight\" : 5000"),
+            Self.version5.replacingOccurrences(of: "\"pixelHeight\" : 2800", with: "\"pixelHeight\" : 2900")
+        ]
+        for json in shapes {
+            #expect(throws: ProjectFile.ReadError.damaged) {
+                try ProjectFile.decode(Data(json.utf8))
+            }
+        }
     }
 
     /// Versions 1 to 3 kept one style on the project, which every slide takes.
@@ -138,7 +168,7 @@ struct ProjectFileTests {
         let flush = SlideStyle(spacing: 0, border: 0, background: .black)
         let project = Project(
             name: "Trip",
-            aspectRatio: .landscape,
+            aspectRatio: try #require(AspectRatio(width: 2.25, height: 1.5, pixelWidth: 3000, pixelHeight: 2000)),
             slides: [
                 Slide(layout: .grid, cells: [Cell(image: image), Cell(), Cell(), Cell()], style: framed),
                 Slide(

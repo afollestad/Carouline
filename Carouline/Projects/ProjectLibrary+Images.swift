@@ -228,8 +228,10 @@ extension ProjectLibrary {
 
     /// How much of a photo the cell at `address` keeps, for its project's slides.
     private func copyLimit(for address: CellAddress) -> ImageImporter.CopyLimit {
-        ImageImporter.CopyLimit(
-            slideHeight: project(address.projectID).map { Int($0.aspectRatio.exportSize.height) } ?? 0,
+        let shape = project(address.projectID)?.aspectRatio
+        return ImageImporter.CopyLimit(
+            slideWidth: shape?.pixelWidth ?? 0,
+            slideHeight: shape?.pixelHeight ?? 0,
             isPanorama: slide(containing: address)?.layout == .panorama
         )
     }

@@ -111,7 +111,7 @@ nonisolated struct ImageCrop: Codable, Hashable, Sendable {
         self.centerY = centerY
     }
 
-    /// Five times past filling the cell is past where a 3072-pixel copy turns soft in a
-    /// 1080-pixel export's smallest cells.
+    /// Five times past filling the cell is past where a cell's copy, 3072 pixels for a preset's
+    /// export and more for a wider one, turns soft in the export's smallest cells.
     static let maximumScale = 5.0
 }

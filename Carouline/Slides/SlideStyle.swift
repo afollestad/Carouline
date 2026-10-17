@@ -8,7 +8,7 @@ import UIKit
 /// The space between and around a slide's cells, and the color showing through it.
 nonisolated struct SlideStyle: Codable, Hashable, Sendable {
     /// The gap between cells, as a fraction of one slide's width even in a panorama, so it looks
-    /// the same on screen and in a 1080-pixel export, and the same across and down a tall slide.
+    /// the same on screen and in an export of any size, and the same across and down a tall slide.
     var spacing: Double
     /// The margin around the cells, as a fraction of one slide's width. A panorama's frames the
     /// whole panorama, leaving its cuts without one.

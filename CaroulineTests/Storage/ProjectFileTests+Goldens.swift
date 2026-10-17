@@ -212,12 +212,93 @@ extension ProjectFileTests {
         """
 
     /// A project as version 4 saves it, with a slide in the standard style and a blurred one on
-    /// black. Every build must keep reading it, and writes it back the same.
+    /// black. Every build must keep reading it.
     static let version4 = """
         {
           "formatVersion" : 4,
           "project" : {
             "aspectRatio" : "1:1",
+            "createdAt" : "2026-10-12T15:00:00Z",
+            "id" : "6A1F2B3C-0000-4000-8000-000000000001",
+            "modifiedAt" : "2026-10-12T16:30:00Z",
+            "name" : "Lisbon",
+            "slides" : [
+              {
+                "cells" : [
+                  {
+                    "image" : {
+                      "assetIdentifier" : "ABC123/L0/001",
+                      "crop" : {
+                        "centerX" : 0.5,
+                        "centerY" : 0.5,
+                        "scale" : 1
+                      },
+                      "id" : "6A1F2B3C-0000-4000-8000-000000000003",
+                      "pixelHeight" : 3072,
+                      "pixelWidth" : 2304
+                    }
+                  }
+                ],
+                "id" : "6A1F2B3C-0000-4000-8000-000000000002",
+                "layout" : "single",
+                "span" : 1,
+                "style" : {
+                  "background" : {
+                    "blue" : 1,
+                    "green" : 1,
+                    "red" : 1
+                  },
+                  "border" : 0,
+                  "spacing" : 0.01
+                }
+              },
+              {
+                "blur" : 0.02,
+                "cells" : [
+                  {
+                    "image" : {
+                      "crop" : {
+                        "centerX" : 0.5,
+                        "centerY" : 0.5,
+                        "scale" : 2
+                      },
+                      "id" : "6A1F2B3C-0000-4000-8000-000000000005",
+                      "pixelHeight" : 2048,
+                      "pixelWidth" : 2048
+                    }
+                  }
+                ],
+                "id" : "6A1F2B3C-0000-4000-8000-000000000004",
+                "layout" : "single",
+                "span" : 1,
+                "style" : {
+                  "background" : {
+                    "blue" : 0,
+                    "green" : 0,
+                    "red" : 0
+                  },
+                  "border" : 0.03,
+                  "spacing" : 0.02
+                }
+              }
+            ]
+          }
+        }
+        """
+
+    /// A project as version 5 saves it, in a 5:7 shape at 2000 by 2800 pixels, with a slide in
+    /// the standard style and a blurred one on black. Every build must keep reading it, and
+    /// writes it back the same.
+    static let version5 = """
+        {
+          "formatVersion" : 5,
+          "project" : {
+            "aspectRatio" : {
+              "height" : 7,
+              "pixelHeight" : 2800,
+              "pixelWidth" : 2000,
+              "width" : 5
+            },
             "createdAt" : "2026-10-12T15:00:00Z",
             "id" : "6A1F2B3C-0000-4000-8000-000000000001",
             "modifiedAt" : "2026-10-12T16:30:00Z",
