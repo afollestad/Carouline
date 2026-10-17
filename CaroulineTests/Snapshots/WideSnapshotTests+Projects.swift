@@ -25,4 +25,8 @@ extension WideSnapshotTests {
     @Test func newProjectSheet() async {
         await assertScreenSnapshot(of: AspectRatioSheet { _ in }, on: .wide)
     }
+
+    @Test func customRatioPage() async {
+        await assertScreenSnapshot(of: AspectRatioSheet(startsOnCustom: CustomRatioDraft()) { _ in }, on: .wide)
+    }
 }

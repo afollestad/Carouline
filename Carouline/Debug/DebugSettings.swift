@@ -14,11 +14,20 @@ final class DebugSettings {
     /// A sheet to open on launch, since `simctl` can't tap to one.
     enum Sheet: String {
         case newProject
+        case customRatio
         case layout
         case export
         case layers
         case addLayer
         case editLayer
+
+        /// Whether it opens in the open project, rather than on the projects list.
+        var opensInProject: Bool {
+            switch self {
+            case .newProject, .customRatio: false
+            case .layout, .export, .layers, .addLayer, .editLayer: true
+            }
+        }
     }
 
     /// Projects to swap in for the real ones, in a store of their own, leaving the real ones alone.
@@ -52,10 +61,10 @@ final class DebugSettings {
     /// tour, as a fresh install does, unless either of the others is on), `-DebugOpenProject` (a
     /// project's index in the list, from 0), `-DebugSelectCell` (a photo to frame in it, as slide
     /// and cell indexes like `2,0`), `-DebugSelectLayer` (a layer to move in it, as slide and
-    /// layer indexes like `2,0`, layers counted from the bottom) and `-DebugSheet` (`newProject`
-    /// on the list, or `layout`, `export`, `layers`, `addLayer` or `editLayer` in the open
-    /// project, the last three for `-DebugSelectLayer`'s slide or else the first, and `editLayer`
-    /// for its layer) from `arguments`, ignoring values it can't parse.
+    /// layer indexes like `2,0`, layers counted from the bottom) and `-DebugSheet` (`newProject`, or
+    /// `customRatio` for its custom page, on the list, or `layout`, `export`, `layers`, `addLayer`
+    /// or `editLayer` in the open project, the last three for `-DebugSelectLayer`'s slide or else
+    /// the first, and `editLayer` for its layer) from `arguments`, ignoring values it can't parse.
     init(arguments: [String: Any] = [:]) {
         func isOn(_ key: String) -> Bool {
             (arguments[key] as? String).map(Self.isTrue) ?? false

@@ -40,4 +40,15 @@ extension SnapshotTests {
     @Test func newProjectSheet() async {
         await assertScreenSnapshot(of: AspectRatioSheet { _ in })
     }
+
+    @Test func customRatioPage() async {
+        await assertScreenSnapshot(of: AspectRatioSheet(startsOnCustom: CustomRatioDraft()) { _ in })
+    }
+
+    /// A side past its limits says so, and the other side still follows the ratio.
+    @Test func customRatioProblem() async {
+        var draft = CustomRatioDraft()
+        draft.setPixelWidth("5000")
+        await assertScreenSnapshot(of: AspectRatioSheet(startsOnCustom: draft) { _ in })
+    }
 }

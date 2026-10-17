@@ -464,7 +464,7 @@ struct ProjectScreen: View {
     /// `-DebugSheet`'s sheet, after a moment, since a presentation on the first frame doesn't
     /// render, and the strip can't scroll to a slide before it has measured the slides.
     private func openDebugSheet() async {
-        guard debug?.selectedCell != nil || debug?.selectedLayer != nil || (debug?.sheet).map({ $0 != .newProject }) == true else {
+        guard debug?.selectedCell != nil || debug?.selectedLayer != nil || (debug?.sheet?.opensInProject) == true else {
             return
         }
         try? await Task.sleep(for: .milliseconds(500))
@@ -482,7 +482,7 @@ struct ProjectScreen: View {
         case .layers: layerSlideID.map { layerActions.openSheet($0, []) }
         case .addLayer: layerSlideID.map { layerActions.openSheet($0, [.add]) }
         case .editLayer: layerSession.selection.map { layerActions.edit($0) }
-        case .newProject, nil: break
+        case .newProject, .customRatio, nil: break
         }
     }
     #endif

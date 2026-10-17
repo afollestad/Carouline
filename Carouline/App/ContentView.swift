@@ -14,9 +14,14 @@ struct ContentView: View {
     @State private var createdProjectID: UUID?
     #if DEBUG
     @Environment(DebugSettings.self) private var debug: DebugSettings?
+    /// Opens the shape sheet on its custom page, for `-DebugSheet customRatio`, until it closes.
+    @State private var opensCustomRatio = false
     #endif
 
     var body: some View {
+        // Read here rather than only in the sheet's content, so a change to it updates the view
+        // and the sheet opens with it.
+        let startingDraft = startingDraft
         NavigationStack(path: $path) {
             ProjectsScreen(library: library) {
                 isChoosingShape = true
@@ -25,8 +30,8 @@ struct ContentView: View {
                 ProjectScreen(library: library, projectID: projectID)
             }
         }
-        .sheet(isPresented: $isChoosingShape, onDismiss: openCreatedProject) {
-            AspectRatioSheet { ratio in
+        .sheet(isPresented: $isChoosingShape, onDismiss: shapeSheetClosed) {
+            AspectRatioSheet(startsOnCustom: startingDraft) { ratio in
                 createdProjectID = library.createProject(aspectRatio: ratio).id
             }
         }
@@ -53,6 +58,22 @@ struct ContentView: View {
         }
     }
 
+    /// The custom page's fields to open the shape sheet on, or nil to open it on the presets.
+    private var startingDraft: CustomRatioDraft? {
+        #if DEBUG
+        opensCustomRatio ? CustomRatioDraft() : nil
+        #else
+        nil
+        #endif
+    }
+
+    private func shapeSheetClosed() {
+        #if DEBUG
+        opensCustomRatio = false
+        #endif
+        openCreatedProject()
+    }
+
     private func openCreatedProject() {
         guard let createdProjectID else {
             return
@@ -68,10 +89,11 @@ struct ContentView: View {
         if let index = debug?.openProjectIndex, library.projects.indices.contains(index) {
             path = [library.projects[index].id]
         }
-        guard debug?.sheet == .newProject else {
+        guard let sheet = debug?.sheet, !sheet.opensInProject else {
             return
         }
         try? await Task.sleep(for: .milliseconds(500))
+        opensCustomRatio = sheet == .customRatio
         isChoosingShape = true
     }
     #endif
