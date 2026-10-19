@@ -77,6 +77,9 @@ struct ProjectTourHost: ViewModifier {
         let placement = ShareTipPlacement(button: button, in: size)
         let tipView = TipView(tip, arrowEdge: placement.arrowEdge, anchorID: TourAnchor.share)
             .tourTipStyle()
+            // As the tour's other tips are, so one beside a bar down the screen's side, which
+            // starts level with the button, still fits below it.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         return ZStack {
             Color.clear
                 .frame(width: button.width, height: button.height)

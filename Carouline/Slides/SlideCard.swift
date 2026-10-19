@@ -38,11 +38,14 @@ struct SlideCard: View {
     /// width over an iPad's or a panorama's wider slide.
     private static let tipInset: CGFloat = 12
     private static let tipMaxWidth: CGFloat = 400
+    /// The room between the slide and its caption, which the menu tip's arrow reaches across, to
+    /// the top of the caption's frame, just above its glass.
+    private static let captionSpacing: CGFloat = 12
 
     var body: some View {
         // Measured only while the slide holds the selection, so a scroll measures nothing.
         let holdsSelection = session.selection?.slideID == slide.id || layerSession.selection?.slideID == slide.id
-        VStack(spacing: 12) {
+        VStack(spacing: Self.captionSpacing) {
             CardPhotos(
                 slide: slide,
                 projectID: projectID,
@@ -198,18 +201,19 @@ struct SlideCard: View {
         session.selection != nil || layerSession.selection != nil
     }
 
-    /// The tour's tips on the slide in front: one along its foot pointing down at its menu, or
-    /// one pointing at its top layer, below a layer in the slide's upper half and above one in
-    /// its lower half, so it never covers the layer it asks the user to tap. Inline rather than
-    /// popovers, which TipKit leaves on screen while a sheet opens, and after which the strip
-    /// presents no popover again.
+    /// The tour's tips on the slide in front: one along its foot pointing down at its menu, its
+    /// arrow past the slide, or one pointing at its top layer, below a layer in the slide's upper
+    /// half and above one in its lower half, so it never covers the layer it asks the user to tap.
+    /// Inline rather than popovers, which TipKit leaves on screen while a sheet opens, and after
+    /// which the strip presents no popover again.
     @ViewBuilder
     private var tourTips: some View {
         if let tip = tour?.menuTip(on: slide.id) {
             TipView(tip, arrowEdge: .bottom)
                 .tourTipStyle()
                 .frame(maxWidth: Self.tipMaxWidth)
-                .padding(Self.tipInset)
+                .padding([.horizontal, .top], Self.tipInset)
+                .padding(.bottom, -Self.captionSpacing)
                 .frame(maxHeight: .infinity, alignment: .bottom)
         } else if let tip = tour?.layerTip(on: slide.id), let layer = slide.layers.last {
             let frame = LayerGeometry.frame(of: layer, canvas: size, span: slide.span)
