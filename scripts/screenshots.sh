@@ -6,10 +6,11 @@ usage() {
 Usage: ./scripts/screenshots.sh [-b|--build] [--dark] [-d|--device <name>]... [-o|--output <dir>]
 
 Launches the app's demo projects (`-DebugDemoProjects YES`) in each App Store screenshot state
-and saves a PNG of each to <dir>/<device>/, `.build/screenshots` by default, emptying that
-folder first. Captures on iPhone 18 Pro, iPad Pro 13-inch (M5) (16GB) and iPhone Duo unless
-`-d` names others. `-b` builds first, and `--dark` captures in dark mode, restoring each
-simulator's appearance afterward.
+and saves a PNG of each, without the alpha channel App Store Connect rejects, to
+<dir>/<device>/, `.build/screenshots` by default, emptying that folder first. Captures on
+iPhone 18 Pro, iPad Pro 13-inch (M5) (16GB) and iPhone Duo unless `-d` names others. `-b`
+builds first, and `--dark` captures in dark mode, restoring each simulator's appearance
+afterward.
 
 Shots keep each simulator's orientation, an iPad's multitasking mode, and iPhone Duo's fold,
 which simctl can't set: rotate it in Device Hub, choose Full Screen Apps in an iPad's Settings >
@@ -184,5 +185,6 @@ for device in "${devices[@]}"; do
     capture_settled "$udid" "$display" "$device_dir/$name.png"
     echo "Saved $device_dir/$name.png"
   done
+  xcrun swift "$repo_root/scripts/lib/drop-alpha.swift" "$device_dir"/*.png
   xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
 done
