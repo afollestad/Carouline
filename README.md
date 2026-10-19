@@ -11,7 +11,7 @@ Carouline is a native iOS app for photo carousels. Pick a slide shape, or a rati
 ./scripts/test.sh              # Run unit and snapshot tests
 ./scripts/snapshots.sh verify  # Compare snapshots against their baselines (record to update them)
 ./scripts/lint.sh              # Run SwiftLint
-./scripts/screenshots.sh -b    # Build, then capture the demo projects for the App Store on iPhone 18 Pro and iPad Pro 13-inch (--dark for dark mode)
+./scripts/screenshots.sh -b    # Build, then capture the demo projects for the App Store on iPhone 18 Pro, iPad Pro 13-inch and iPhone Duo (--dark for dark mode)
 ```
 
 ## License

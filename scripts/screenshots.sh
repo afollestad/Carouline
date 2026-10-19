@@ -7,13 +7,14 @@ Usage: ./scripts/screenshots.sh [-b|--build] [--dark] [-d|--device <name>]... [-
 
 Launches the app's demo projects (`-DebugDemoProjects YES`) in each App Store screenshot state
 and saves a PNG of each to <dir>/<device>/, `.build/screenshots` by default, emptying that
-folder first. Captures on iPhone 18 Pro and iPad Pro 13-inch (M5) (16GB) unless `-d` names
-others. `-b` builds first, and `--dark` captures in dark mode, restoring each simulator's
-appearance afterward.
+folder first. Captures on iPhone 18 Pro, iPad Pro 13-inch (M5) (16GB) and iPhone Duo unless
+`-d` names others. `-b` builds first, and `--dark` captures in dark mode, restoring each
+simulator's appearance afterward.
 
-Shots keep each simulator's orientation, and an iPad's multitasking mode, which simctl can't
-set: rotate it in Simulator, and choose Full Screen Apps in its Settings > Multitasking &
-Gestures to hide the window's resize handle.
+Shots keep each simulator's orientation, an iPad's multitasking mode, and iPhone Duo's fold,
+which simctl can't set: rotate it in Device Hub, choose Full Screen Apps in an iPad's Settings >
+Multitasking & Gestures to hide the window's resize handle, and unfold the Duo there to shoot
+its larger inner display rather than the outer. App Store Connect takes either display's size.
 USAGE
 }
 
@@ -98,19 +99,19 @@ restore() {
 }
 trap restore EXIT
 
-# Saves the screen to `$2` once the app on simulator `$1` stops moving: four seconds for it to
-# launch, then until two frames a second apart match, so loading placeholders, the debug
+# Saves display `$2` to `$3` once the app on simulator `$1` stops moving: four seconds for it
+# to launch, then until two frames a second apart match, so loading placeholders, the debug
 # sheet's half-second delay and its slide in are all over. Gives up after twenty seconds. A
 # warm launch stays blank until about two seconds in while it writes the demo store, and blank
 # frames match each other, so a shorter wait could keep one.
 capture_settled() {
-  local udid=$1 destination=$2
+  local udid=$1 display=$2 destination=$3
   local previous="$scratch/previous.png" current="$scratch/current.png"
   sleep 4
-  xcrun simctl io "$udid" screenshot "$previous" >/dev/null 2>&1
+  xcrun simctl io "$udid" screenshot --display="$display" "$previous" >/dev/null 2>&1
   for _ in $(seq 1 20); do
     sleep 1
-    xcrun simctl io "$udid" screenshot "$current" >/dev/null 2>&1
+    xcrun simctl io "$udid" screenshot --display="$display" "$current" >/dev/null 2>&1
     if cmp -s "$previous" "$current"; then
       mv "$current" "$destination"
       return
@@ -119,6 +120,12 @@ capture_settled() {
   done
   echo "warning: the screen never settled; kept its last frame" >&2
   mv "$previous" "$destination"
+}
+
+# Prints the `simctl io` name of each of simulator `$1`'s built-in displays: one, or a
+# foldable's two. simctl's default can be the one that's off, so shots name theirs.
+built_in_displays() {
+  xcrun simctl io "$1" enumerate | awk '/Device Name:/ { name = $3 } /Screen Type: Integrated/ { print name }'
 }
 
 for device in "${devices[@]}"; do
@@ -136,10 +143,35 @@ for device in "${devices[@]}"; do
   fi
   xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
   xcrun simctl install "$udid" "$app_path"
+  displays=()
+  while IFS= read -r listed; do
+    displays+=("$listed")
+  done < <(built_in_displays "$udid")
+  if [ ${#displays[@]} -eq 0 ]; then
+    echo "error: found no built-in display on '$device'" >&2
+    exit 1
+  fi
   # A launch to throw away, since the first after an install is the slowest, and could still be
   # blank when the capture starts.
   xcrun simctl launch "$udid" "$bundle_id" -DebugDemoProjects YES >/dev/null
-  capture_settled "$udid" "$scratch/warm-up.png"
+  for candidate in "${displays[@]}"; do
+    capture_settled "$udid" "$candidate" "$scratch/warm-up.png"
+  done
+  # Shoots a foldable's lit display. Once the app has settled, the one that's off captures solid
+  # black, whose PNG is a fraction of a lit one's size. A blank launch frame is nearly as small,
+  # so the frames to compare come after every display has settled.
+  display=${displays[0]}
+  if [ ${#displays[@]} -gt 1 ]; then
+    largest=-1
+    for candidate in "${displays[@]}"; do
+      xcrun simctl io "$udid" screenshot --display="$candidate" "$scratch/display.png" >/dev/null 2>&1
+      size=$(stat -f %z "$scratch/display.png")
+      if [ "$size" -gt "$largest" ]; then
+        display=$candidate
+        largest=$size
+      fi
+    done
+  fi
 
   device_dir="$output_dir/$device"
   rm -rf "$device_dir"
@@ -149,7 +181,7 @@ for device in "${devices[@]}"; do
     read -r -a launch_args <<<"${state#*|}"
     xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
     xcrun simctl launch "$udid" "$bundle_id" -DebugDemoProjects YES ${launch_args[@]+"${launch_args[@]}"} >/dev/null
-    capture_settled "$udid" "$device_dir/$name.png"
+    capture_settled "$udid" "$display" "$device_dir/$name.png"
     echo "Saved $device_dir/$name.png"
   done
   xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
