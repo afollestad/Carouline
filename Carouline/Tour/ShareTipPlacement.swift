@@ -27,6 +27,9 @@ nonisolated struct ShareTipPlacement: Equatable {
     /// The least a tip under the bar rounds its corners to reach a button near the screen's edge,
     /// below which it reads as square beside the bar's round glass.
     static let minimumCornerRadius: CGFloat = 10
+    /// How far a bar button's glass reaches past its measured frame, measured, which a tip under
+    /// the bar lines its trailing edge up with.
+    static let glassOutset: CGFloat = 4
     /// The room between the arrow's point and the button's measured frame, which its glass
     /// reaches past.
     static let buttonGap: CGFloat = 12
@@ -37,10 +40,13 @@ nonisolated struct ShareTipPlacement: Equatable {
         guard button.midY >= 0 else {
             arrowEdge = .top
             alignment = .topTrailing
-            padding = EdgeInsets(top: 0, leading: Self.inset, bottom: 0, trailing: Self.inset)
-            // A bar's trailing button sits nearer the screen's edge than TipKit's corners let the
-            // arrow come, so the corners tighten until the arrow reaches the button's middle.
-            let reach = size.width - Self.inset - button.midX
+            // Its trailing edge lines up with the button's glass, which an iPad's bar sets nearer
+            // the screen's edge than a phone's, so the arrow has as far to reach on each.
+            let trailing = max(0, size.width - button.maxX - Self.glassOutset)
+            padding = EdgeInsets(top: 0, leading: Self.inset, bottom: 0, trailing: trailing)
+            // The button's middle then sits nearer the tip's edge than TipKit's corners let the
+            // arrow come, so the corners tighten until the arrow reaches it.
+            let reach = size.width - trailing - button.midX
             cornerRadius = reach < Self.arrowCornerInset ? max(Self.minimumCornerRadius, reach - Self.arrowCornerMargin) : nil
             return
         }
