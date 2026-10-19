@@ -75,6 +75,8 @@ struct ProjectTourHost: ViewModifier {
     /// measures outside the screen's space, so the tip points at a stand-in over the button.
     private func shareTipView(_ tip: any Tip, pointingAt button: CGRect, in size: CGSize) -> some View {
         let placement = ShareTipPlacement(button: button, in: size)
+        let tipView = TipView(tip, arrowEdge: placement.arrowEdge, anchorID: TourAnchor.share)
+            .tourTipStyle()
         return ZStack {
             Color.clear
                 .frame(width: button.width, height: button.height)
@@ -82,11 +84,16 @@ struct ProjectTourHost: ViewModifier {
                 .position(x: button.midX, y: button.midY)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
-            TipView(tip, arrowEdge: placement.arrowEdge, anchorID: TourAnchor.share)
-                .tourTipStyle()
-                .padding(placement.padding)
-                .frame(maxWidth: 560)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: placement.alignment)
+            Group {
+                if let cornerRadius = placement.cornerRadius {
+                    tipView.tipCornerRadius(cornerRadius)
+                } else {
+                    tipView
+                }
+            }
+            .padding(placement.padding)
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: placement.alignment)
         }
     }
 
