@@ -5,7 +5,7 @@ Carouline is a native iOS app for photo carousels. Pick a slide shape, or a rati
 ## Development
 
 ```sh
-./scripts/setup.sh             # Install SwiftLint, xcsift and AXe, a lint pre-commit hook, and the simulators the scripts run on
+./scripts/setup.sh             # Install SwiftLint, xcsift, AXe and duoctl, a lint pre-commit hook, and the simulators the scripts run on
 ./scripts/build.sh             # Build for the iOS Simulator (--device <udid> for an iPhone or iPad)
 ./scripts/run.sh -b            # Build, install, and launch on a reachable iPhone or iPad, else the simulator (-s for the simulator; -d <name or UDID> for a device; omit -b to relaunch the last build; pass launch arguments after --)
 ./scripts/test.sh              # Run unit and snapshot tests
