@@ -26,12 +26,6 @@ struct SheetHeightTests {
         #expect(SheetHeight.restingHeight(stripHeight: 0, typingHeight: 150) == nil)
     }
 
-    /// UIKit drops the sheet to its typing height at the bottom before the keyboard lifts it.
-    @Test func ridesTheKeyboardOnlyOnceLiftedOffTheBottom() {
-        #expect(!SheetHeight.ridesKeyboard(room: 151, typingHeight: 150))
-        #expect(SheetHeight.ridesKeyboard(room: 466, typingHeight: 150))
-    }
-
     @Test func coversTheStripFromItsTopDown() {
         #expect(SheetHeight.room(stripBottom: 800, sheetTop: 450) == 350)
     }

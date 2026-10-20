@@ -35,13 +35,6 @@ nonisolated enum SheetHeight: Hashable, Sendable {
     /// over the bottom safe area covers a little more or less than it.
     static let settlingSlack: CGFloat = 24
 
-    /// Whether a sheet at its typing height that covers `room` rides the keyboard, rather than
-    /// sitting at the bottom, where UIKit can drop it before the keyboard lifts it and again before
-    /// the keyboard goes. The keyboard lifts it by far more than `settlingSlack`.
-    static func ridesKeyboard(room: CGFloat, typingHeight: CGFloat) -> Bool {
-        room > typingHeight + settlingSlack
-    }
-
     /// The room a sheet whose top is at `sheetTop` covers above a strip ending at `stripBottom`,
     /// both on screen: none until the strip has measured itself, or for a sheet below it.
     static func room(stripBottom: CGFloat, sheetTop: CGFloat) -> CGFloat {

@@ -29,6 +29,13 @@ struct LayersSheet: View {
     /// The sheet's top on screen as last measured, to make room from again once the strip changes
     /// size, as on a turn, which can measure the strip's new bottom after the sheet's new top.
     @State private var measuredTop = MeasuredTop()
+    /// Whether the keyboard is on screen or headed there, which UIKit says before it moves the
+    /// sheet either way.
+    @State private var isKeyboardUp = false
+    /// The sheet's top while text is typed with no keyboard up, made room for only once it has
+    /// stayed there for `keyboardWait`, since UIKit reports the sheet there before the keyboard
+    /// lifts it.
+    @State private var unliftedTop: CGFloat?
     /// The picker for a picture to add, opened from the sheet, since one opened from the screen
     /// can't show over it.
     @State private var isPickingImage = false
@@ -49,6 +56,9 @@ struct LayersSheet: View {
     /// More than a fast drag moves the sheet between two frames, and less than it jumps as it
     /// opens, closes or snaps to a height, so a drag's steps land at once and a jump animates.
     private static let dragStep: CGFloat = 30
+    /// Longer than the keyboard takes to begin showing as text is typed, so a sheet it hasn't
+    /// lifted by then has no keyboard coming, as with a hardware one.
+    private static let keyboardWait = Duration.seconds(1)
 
     var body: some View {
         NavigationStack(path: $session.sheetPath) {
@@ -107,6 +117,23 @@ struct LayersSheet: View {
                 follow(top)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+            guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+                  let screen = notification.object as? UIScreen else {
+                return
+            }
+            isKeyboardUp = frame.intersects(screen.bounds)
+        }
+        // A sheet the keyboard hasn't lifted by now won't be, so the slides make room for it there.
+        .task(id: unliftedTop) {
+            guard let top = unliftedTop else {
+                return
+            }
+            try? await Task.sleep(for: Self.keyboardWait)
+            if !Task.isCancelled {
+                makeRoom(SheetHeight.room(stripBottom: session.stripBottom, sheetTop: top))
+            }
+        }
         .photosPicker(
             isPresented: $isPickingImage,
             selection: $pickedImage,
@@ -137,21 +164,17 @@ struct LayersSheet: View {
             withAnimation {
                 height = isTyping ? .typing : .resting
             }
-            guard let restingHeight else {
+            // Typing starts with the slides kept where they are until the keyboard lifts the
+            // sheet, or doesn't come, and ends with no sheet left waiting for it.
+            unliftedTop = nil
+            guard !isTyping, !isGone, let restingHeight else {
                 return
             }
-            if isTyping {
-                // No more than the resting room until the sheet rides the keyboard, rather than the
-                // large height's, which would keep the slide typed on tiny until then, or throughout
-                // if no keyboard shows.
-                session.sheetRoom = min(session.sheetRoom, restingHeight)
-            } else if !isGone {
-                // Room for where it's headed, so slides typed on from another height go straight
-                // there, rather than to wherever the sheet passes on its way. Not as it goes,
-                // which ends the typing too and leaves no room.
-                session.sheetRoom = restingHeight
-                awaitsRest = true
-            }
+            // Room for where it's headed, so slides typed on from another height go straight
+            // there, rather than to wherever the sheet passes on its way. Not as it goes, which
+            // ends the typing too and leaves no room.
+            session.sheetRoom = restingHeight
+            awaitsRest = true
         }
         // A sheet dragged elsewhere before it rests is followed from there.
         .onChange(of: height) { _, height in
@@ -234,23 +257,33 @@ struct LayersSheet: View {
     }
 
     /// Makes room for the sheet wherever its top is, so the slides grow and shrink as it's dragged
-    /// or rides the keyboard. Not while text is typed until the keyboard lifts it, nor on its way
-    /// to resting after typing, until it gets there, since UIKit reports it at the heights it
-    /// passes as the keyboard comes and goes.
+    /// or rides the keyboard. While text is typed, at once only with the keyboard up, as UIKit
+    /// reports the sheet where it waits before the keyboard lifts it and again as the keyboard
+    /// goes, and otherwise once it stays there. Nor on its way to resting after typing, until it
+    /// gets there, as UIKit reports the heights it passes.
     private func follow(_ top: CGFloat) {
         guard !isGone else {
             return
         }
-        let room = SheetHeight.room(stripBottom: session.stripBottom, sheetTop: top)
-        if isTyping, !SheetHeight.ridesKeyboard(room: room, typingHeight: Self.typingHeight(at: dynamicTypeSize)) {
-            return
+        if isTyping {
+            guard isKeyboardUp else {
+                unliftedTop = top
+                return
+            }
+            unliftedTop = nil
         }
+        let room = SheetHeight.room(stripBottom: session.stripBottom, sheetTop: top)
         if awaitsRest {
             if let restingHeight, abs(room - restingHeight) > SheetHeight.settlingSlack {
                 return
             }
             awaitsRest = false
         }
+        makeRoom(room)
+    }
+
+    /// Makes `room` for the sheet: at once for a drag's small steps, and animated for a jump.
+    private func makeRoom(_ room: CGFloat) {
         withTransaction(\.disablesAnimations, abs(room - session.sheetRoom) < Self.dragStep) {
             session.sheetRoom = room
         }
