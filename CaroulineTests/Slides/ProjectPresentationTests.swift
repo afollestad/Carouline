@@ -41,6 +41,16 @@ struct ProjectPresentationTests {
         #expect(style.prefersSheets(for: .export, isCompact: true, in: project))
     }
 
+    /// A slide's layers sheet leaves the slides taking taps, so a tap off the slide closes it, and
+    /// does nothing else. The others close themselves on a tap outside.
+    @Test func closesOnlyALayersSheetOnABackgroundTap() {
+        let camera = ProjectPresentation.camera(CellAddress(projectID: UUID(), slideID: UUID(), index: 0))
+        #expect(ProjectPresentation.layers(UUID()).closesOnBackgroundTap)
+        for presentation in [ProjectPresentation.layout(.newSlide), .export, .photoPicker, camera] {
+            #expect(!presentation.closesOnBackgroundTap)
+        }
+    }
+
     @Test func neverOpensThePhotoPickerOrCameraAsTheSheet() {
         let camera = ProjectPresentation.camera(CellAddress(projectID: UUID(), slideID: UUID(), index: 0))
         for prefersSheets in [true, false] {

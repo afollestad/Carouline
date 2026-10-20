@@ -40,7 +40,7 @@ struct SlideStrip: View {
     /// popover doesn't fit, rather than in a popover beside the slide.
     var layersInSheet = false
     /// Taps between the slides, or in the margins beside them while they're scaled down, which
-    /// finish framing a photo or moving a layer.
+    /// close a slide's layers, or else finish framing a photo or moving a layer.
     let onBackgroundTap: () -> Void
     let onAddSlide: () -> Void
     let onChangeLayout: (UUID) -> Void

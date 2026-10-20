@@ -29,6 +29,14 @@ enum ProjectPresentation: Hashable, Identifiable {
         case .photoPicker, .camera: false
         }
     }
+
+    /// Whether a tap on the strip's background closes it, and only that, leaving the selection as a
+    /// tap outside any sheet does: a slide's layers, whose sheet leaves the slides taking taps, so
+    /// UIKit never closes it on a tap there. Their popover, and the others, close on a tap outside
+    /// themselves.
+    var closesOnBackgroundTap: Bool {
+        if case .layers = self { true } else { false }
+    }
 }
 
 /// Whether what's open on the project screen opened as a sheet or a popover, and the strip's size,

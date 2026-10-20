@@ -43,10 +43,14 @@ struct PresentationQueue<Item: Hashable> {
         dismiss { $0 == item }
     }
 
-    /// Closes what's open if `matches` says it's the presentation being dismissed.
-    mutating func dismiss(where matches: (Item) -> Bool) {
-        if let current, matches(current) {
-            self.current = nil
+    /// Closes what's open if `matches` says it's the presentation being dismissed, reporting
+    /// whether it did, so a tap can close what's open or else do what it otherwise would.
+    @discardableResult
+    mutating func dismiss(where matches: (Item) -> Bool) -> Bool {
+        guard let current, matches(current) else {
+            return false
         }
+        self.current = nil
+        return true
     }
 }

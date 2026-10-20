@@ -86,12 +86,16 @@ struct PresentationQueueTests {
         #expect(queue.current == nil)
     }
 
+    /// It reports whether it closed anything, so a tap can close what's open or else do its own work.
     @Test func dismissesByCase() {
         var queue = PresentationQueue<Sheet>()
         queue.present(.layout(2))
 
-        queue.dismiss { if case .layout = $0 { true } else { false } }
-
+        let closedExport = queue.dismiss { $0 == .export }
+        #expect(!closedExport)
+        #expect(queue.current == .layout(2))
+        let closedLayout = queue.dismiss { if case .layout = $0 { true } else { false } }
+        #expect(closedLayout)
         #expect(queue.current == nil)
     }
 }

@@ -265,7 +265,11 @@ struct ProjectScreen: View {
             layerActions: layerActions,
             layersSlideID: layersSlideID,
             layersInSheet: presentsAsSheets,
-            onBackgroundTap: { select(nil) },
+            onBackgroundTap: {
+                if !presenter.dismiss(where: { $0.closesOnBackgroundTap }) {
+                    select(nil)
+                }
+            },
             onAddSlide: { presenter.present(.layout(.newSlide)) },
             onChangeLayout: { presenter.present(.layout(.change($0))) },
             onMove: { slideID, offset in
