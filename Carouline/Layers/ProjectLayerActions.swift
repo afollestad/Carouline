@@ -108,11 +108,11 @@ struct ProjectLayerActions {
     }
 
     /// Deletes the layer at `address`. A new text layer is still only its draft, which is
-    /// dropped, with its sheet, rather than the library's.
+    /// discarded rather than the library's, and its editor goes back to the list as a deleted
+    /// layer's does.
     private func delete(_ address: LayerAddress) {
         if session.isDraftNew, session.draftLayerID == address.layerID {
-            session.draft = nil
-            presenter.dismiss(.layers(address.slideID))
+            session.discardDraft()
             select(nil)
             return
         }

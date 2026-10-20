@@ -65,6 +65,7 @@ struct LayersSheet: View {
                         projectID: projectID,
                         slideID: slideID,
                         session: session,
+                        delete: actions.delete,
                         close: close
                     )
                     // A new page for each layer, even one swapped in where another's was, so each
@@ -77,6 +78,7 @@ struct LayersSheet: View {
                         projectID: projectID,
                         slideID: slideID,
                         session: session,
+                        delete: actions.delete,
                         close: close
                     )
                     .id(layerID)

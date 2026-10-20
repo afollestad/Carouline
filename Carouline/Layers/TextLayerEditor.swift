@@ -13,6 +13,7 @@ struct TextLayerEditor: View {
     let projectID: UUID
     let slideID: UUID
     let session: LayerSession
+    let delete: (LayerAddress) -> Void
     let close: () -> Void
     @FocusState private var isTyping: Bool
     @State private var keyboardHeight: CGFloat = 0
@@ -64,7 +65,8 @@ struct TextLayerEditor: View {
             page: .text(layerID),
             address: LayerAddress(projectID: projectID, slideID: slideID, layerID: layerID),
             library: library,
-            session: session
+            session: session,
+            delete: delete
         ) {
             // Only its own typing: the next layer's editor may have begun its own already.
             if session.typingLayerID == layerID {
@@ -219,6 +221,7 @@ private struct FontTile: View {
             projectID: UUID(),
             slideID: slideID,
             session: session,
+            delete: { _ in },
             close: {}
         )
     }

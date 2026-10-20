@@ -6,19 +6,31 @@
 import SwiftUI
 
 /// What every layer editor shares: it edits the session's draft of its layer, which the slide
-/// draws as it changes, begun as its page appears and saved once as the page goes, and its page
-/// leaves the sheet once the layer is deleted.
+/// draws as it changes, begun as its page appears and saved once as the page goes, it offers to
+/// delete the layer, and its page leaves the sheet once the layer is deleted.
 struct LayerDraftEditing: ViewModifier {
     /// The editor's page in the layers sheet.
     let page: LayersPage
     let address: LayerAddress
     let library: ProjectLibrary
     let session: LayerSession
+    /// Deletes the layer, as the screen does from the slide.
+    let delete: (LayerAddress) -> Void
     /// Ends anything else of the editor's own as its page goes, before the draft is saved.
     var onLeave: () -> Void = {}
+    @State private var isConfirmingDelete = false
 
     func body(content: Content) -> some View {
         content
+            .toolbar {
+                // Not while typing, where Done takes its place, so a tap meant to end the typing
+                // can't land on it.
+                if session.typingLayerID != address.layerID {
+                    ToolbarItem(placement: .primaryAction) {
+                        deleteButton
+                    }
+                }
+            }
             .onAppear {
                 // Another layer's editor may not have gone yet, and SwiftUI doesn't order the two.
                 if session.draftLayerID != address.layerID {
@@ -41,8 +53,9 @@ struct LayerDraftEditing: ViewModifier {
                     session.saveDraft(to: library, projectID: address.projectID)
                 }
             }
-            // A layer deleted while its editor is open, from the slide or with it, leaves nothing
-            // to edit. Only its own page goes, since the path may already be on to another's.
+            // A layer deleted while its editor is open, from the slide, the editor or with its
+            // slide, leaves nothing to edit. Only its own page goes, since the path may already be
+            // on to another's.
             .onChange(of: isGone, initial: true) { _, isGone in
                 if isGone {
                     session.sheetPath.removeAll { $0 == page }
@@ -53,5 +66,23 @@ struct LayerDraftEditing: ViewModifier {
     /// Whether the layer is in neither the library nor, while it's new, the draft.
     private var isGone: Bool {
         library.layer(at: address) == nil && !(session.isDraftNew && session.draftLayerID == address.layerID)
+    }
+
+    private var deleteButton: some View {
+        Button("Delete Layer", systemImage: "trash", role: .destructive) {
+            isConfirmingDelete = true
+        }
+        // Red for a destructive item, rather than the sheet's accent, which washes out on the glass.
+        .tint(.red)
+        // From the button, so on iPad it points there.
+        .confirmationDialog("Delete Layer?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+            Button("Delete Layer", role: .destructive) {
+                delete(address)
+            }
+        } message: {
+            if case .image = page {
+                Text("Its picture is removed from the project. The original stays in your photo library.")
+            }
+        }
     }
 }

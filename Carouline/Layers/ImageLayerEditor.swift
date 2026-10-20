@@ -15,6 +15,7 @@ struct ImageLayerEditor: View {
     let projectID: UUID
     let slideID: UUID
     let session: LayerSession
+    let delete: (LayerAddress) -> Void
     let close: () -> Void
 
     /// A border's width when its color is picked with none yet, so the pick shows: a print's narrow
@@ -44,7 +45,8 @@ struct ImageLayerEditor: View {
             page: .image(layerID),
             address: LayerAddress(projectID: projectID, slideID: slideID, layerID: layerID),
             library: library,
-            session: session
+            session: session,
+            delete: delete
         ))
     }
 
@@ -122,6 +124,7 @@ struct ImageLayerEditor: View {
             projectID: UUID(),
             slideID: slideID,
             session: session,
+            delete: { _ in },
             close: {}
         )
     }

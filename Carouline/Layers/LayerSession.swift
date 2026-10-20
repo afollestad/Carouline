@@ -186,10 +186,7 @@ final class LayerSession {
     func saveDraft(to library: ProjectLibrary, projectID: UUID, endingEdit: Bool = true) {
         defer {
             if endingEdit {
-                draft = nil
-                draftLayerID = nil
-                draftSlideID = nil
-                isDraftNew = false
+                discardDraft()
             }
         }
         guard let draft, let slideID = draftSlideID else {
@@ -207,6 +204,14 @@ final class LayerSession {
         } else if library.layer(at: address) != nil {
             library.setContent(draft.content, at: address)
         }
+    }
+
+    /// Ends the draft without saving it, as deleting a new layer does.
+    func discardDraft() {
+        draft = nil
+        draftLayerID = nil
+        draftSlideID = nil
+        isDraftNew = false
     }
 
     /// Starts editing `slide`'s blur and style from what it has.

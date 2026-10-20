@@ -245,8 +245,9 @@ struct LayerDraftTests {
         #expect(session.sheetPath == [.image(picture.id)])
     }
 
-    /// Deleting new text that's still only a draft drops it, and its sheet, rather than the library's.
-    @Test func deletingNewTextDropsItsDraft() {
+    /// Deleting new text that's still only a draft discards it rather than the library's, ending
+    /// the draft so its editor goes back to the list, with the sheet left open.
+    @Test func deletingNewTextDiscardsItsDraft() {
         let session = LayerSession()
         var presenter = PresentationQueue<ProjectPresentation>()
         presenter.present(.layers(slideID))
@@ -256,10 +257,30 @@ struct LayerDraftTests {
         let actions = actions(session: session, presenter: Binding { presenter } set: { presenter = $0 })
 
         actions.delete(address(layer))
+        #expect(session.draftLayer(layer.id) == nil)
+        #expect(!session.isDraftNew)
         session.saveDraft(to: library, projectID: projectID)
 
         #expect(session.selection == nil)
-        #expect(presenter.current == nil)
+        #expect(presenter.current == .layers(slideID))
         #expect(saved(layer) == nil)
+    }
+
+    /// Deleting a saved layer from its editor leaves the sheet open, and the editor's draft, saved
+    /// as its page goes, doesn't bring it back.
+    @Test func deletingASavedLayerKeepsItsSheetOpen() {
+        let session = LayerSession()
+        var presenter = PresentationQueue<ProjectPresentation>()
+        presenter.present(.layers(slideID))
+        let layer = text("Day one")
+        library.saveLayer(layer, in: slideID, of: projectID)
+        session.beginDraft(of: layer, on: slideID)
+        let actions = actions(session: session, presenter: Binding { presenter } set: { presenter = $0 })
+
+        actions.delete(address(layer))
+        session.saveDraft(to: library, projectID: projectID)
+
+        #expect(saved(layer) == nil)
+        #expect(presenter.current == .layers(slideID))
     }
 }
