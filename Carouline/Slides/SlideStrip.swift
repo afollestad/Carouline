@@ -182,32 +182,7 @@ struct SlideStrip: View {
         return ScrollView(.horizontal) {
             LazyHStack(alignment: .slideCenter, spacing: Self.spacing) {
                 ForEach(Array(project.slides.enumerated()), id: \.element.id) { index, slide in
-                    SlideCard(
-                        slide: slide,
-                        projectID: project.id,
-                        numbers: numbers[index],
-                        count: project.carouselSlideCount,
-                        canMoveLeft: index > 0,
-                        canMoveRight: index < project.slides.count - 1,
-                        size: cardSize(span: slide.span),
-                        screenPoint: screenPoint,
-                        frames: slideFrames,
-                        importingCells: importingCells,
-                        isImportingLayer: importingLayers[slide.id] != nil,
-                        cellActions: cellActions,
-                        session: session,
-                        layerSession: layerSession,
-                        layerActions: layerActions,
-                        onChangeLayout: { onChangeLayout(slide.id) },
-                        onMove: { onMove(slide.id, $0) },
-                        onDelete: { onDelete(slide.id) },
-                        onSetSpan: { onSetSpan(slide.id, $0) }
-                    )
-                    .id(StripItem.slide(slide.id))
-                    // The others hold still too while a slide's layers sheet is open, to fingers and
-                    // VoiceOver alike, so nothing on them is selected or edited out from under it.
-                    .allowsHitTesting(layersSlideID == nil || layersSlideID == slide.id)
-                    .accessibilityHidden(layersSlideID != nil && layersSlideID != slide.id)
+                    card(for: slide, at: index, numbers: numbers[index], screenPoint: screenPoint)
                 }
                 AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
                     .id(StripItem.add)
@@ -233,11 +208,45 @@ struct SlideStrip: View {
         .sensoryFeedback(.alignment, trigger: layerSession.snapsTaken)
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
+        // Unclipped, so the slides either side of the middle one still peek in from the screen's
+        // edges while the strip is scaled down for a layers sheet, rather than ending in a straight
+        // cut at the scroll view's scaled edges.
+        .scrollClipDisabled()
         .scrollEdgeEffectStyle(.soft, for: .top)
         // Cut off where the column starts, as the scroll view reaches on under it whatever its
         // safe area, and kept from taking taps there, which a clip alone still lets through.
         .clipShape(TrailingClip(isClipping: barColumnWidth > 0))
         .contentShape(TrailingClip(isClipping: barColumnWidth > 0))
+    }
+
+    /// The slide at `index` in the strip, numbered `numbers` in the carousel.
+    private func card(for slide: Slide, at index: Int, numbers: ClosedRange<Int>, screenPoint: CGFloat) -> some View {
+        SlideCard(
+            slide: slide,
+            projectID: project.id,
+            numbers: numbers,
+            count: project.carouselSlideCount,
+            canMoveLeft: index > 0,
+            canMoveRight: index < project.slides.count - 1,
+            size: cardSize(span: slide.span),
+            screenPoint: screenPoint,
+            frames: slideFrames,
+            importingCells: importingCells,
+            isImportingLayer: importingLayers[slide.id] != nil,
+            cellActions: cellActions,
+            session: session,
+            layerSession: layerSession,
+            layerActions: layerActions,
+            onChangeLayout: { onChangeLayout(slide.id) },
+            onMove: { onMove(slide.id, $0) },
+            onDelete: { onDelete(slide.id) },
+            onSetSpan: { onSetSpan(slide.id, $0) }
+        )
+        .id(StripItem.slide(slide.id))
+        // The others hold still too while a slide's layers sheet is open, to fingers and
+        // VoiceOver alike, so nothing on them is selected or edited out from under it.
+        .allowsHitTesting(layersSlideID == nil || layersSlideID == slide.id)
+        .accessibilityHidden(layersSlideID != nil && layersSlideID != slide.id)
     }
 
     private var isAnythingSelected: Bool {
