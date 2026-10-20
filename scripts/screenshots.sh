@@ -109,7 +109,9 @@ restore() {
   for entry in ${fold_restores[@]+"${fold_restores[@]}"}; do
     IFS='|' read -r udid screen orientation <<<"$entry"
     if [ "$screen" = cover ]; then
-      duoctl -d "$udid" close >/dev/null 2>&1 || true
+      # A fold can time out, so it gets a second try, and a warning should that fail too.
+      duoctl -d "$udid" close >/dev/null 2>&1 || duoctl -d "$udid" close >/dev/null 2>&1 ||
+        echo "warning: duoctl couldn't fold '$udid' back. Fold it with 'duoctl -d $udid close'." >&2
     fi
     duoctl -d "$udid" rotate "$orientation" >/dev/null 2>&1 || true
   done
@@ -122,6 +124,22 @@ restore() {
   rm -rf "$scratch"
 }
 trap restore EXIT
+
+# Runs duoctl on Duo `$1` with the rest of the arguments, retrying for the few seconds after a boot
+# when it finds no display, and giving up at once on any other error.
+duo() {
+  local udid=$1
+  shift
+  for _ in $(seq 1 30); do
+    if duoctl -d "$udid" "$@" 2>"$scratch/duoctl-error"; then
+      return
+    fi
+    grep -q "no display is active" "$scratch/duoctl-error" || break
+    sleep 1
+  done
+  cat "$scratch/duoctl-error" >&2
+  return 1
+}
 
 # Stops the run when duoctl can't unfold Duo `$1`, which a simulator stuck mid-fold also causes
 # until it reboots.
@@ -177,11 +195,11 @@ for device in "${devices[@]}"; do
       echo "error: iPhone Duo needs duoctl to unfold it. Run ./scripts/setup.sh to install it." >&2
       exit 1
     fi
-    fold=$(duoctl -d "$udid" state) || fold_failed "$device" "$udid"
+    fold=$(duo "$udid" state) || fold_failed "$device" "$udid"
     fold_restores+=("$udid|$(jq -r .activeScreen <<<"$fold")|$(jq -r .orientation <<<"$fold")")
-    duoctl -d "$udid" open >/dev/null || fold_failed "$device" "$udid"
-    duoctl -d "$udid" rotate landscape >/dev/null || fold_failed "$device" "$udid"
-    display=$(duoctl -d "$udid" state | jq -r .displayId) || fold_failed "$device" "$udid"
+    duo "$udid" open >/dev/null || fold_failed "$device" "$udid"
+    duo "$udid" rotate landscape >/dev/null || fold_failed "$device" "$udid"
+    display=$(duo "$udid" state | jq -r .displayId) || fold_failed "$device" "$udid"
   fi
   xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
   xcrun simctl install "$udid" "$app_path"
