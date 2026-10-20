@@ -17,7 +17,10 @@ struct AspectRatioSheet: View {
     @State private var draft: CustomRatioDraft
     /// Whether the saved shapes show their delete badges.
     @State private var isEditing: Bool
+    @State private var firstTile: CGRect = .zero
     @Environment(\.dismiss) private var dismiss
+
+    private static let spacing: CGFloat = 12
 
     private enum Page: Hashable {
         case custom
@@ -42,7 +45,7 @@ struct AspectRatioSheet: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: Self.spacing)], spacing: Self.spacing) {
                     Section {
                         ForEach(AspectRatio.presets, id: \.self) { ratio in
                             Button {
@@ -54,6 +57,13 @@ struct AspectRatioSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("\(ratio.spokenRatio) \(ratio.name), \(ratio.uses ?? "")")
+                            .onGeometryChange(for: CGRect.self) { proxy in
+                                proxy.frame(in: TileSheetOpening.contentSpace)
+                            } action: { frame in
+                                if ratio == AspectRatio.presets.first {
+                                    firstTile = frame
+                                }
+                            }
                         }
                         // With the presets until there are saved shapes to give a section of
                         // their own.
@@ -75,8 +85,10 @@ struct AspectRatioSheet: View {
                     }
                 }
                 .padding()
+                .coordinateSpace(TileSheetOpening.contentSpace)
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
+            .modifier(TileSheetOpening(detent: $detent, firstTile: firstTile, rowSpacing: Self.spacing))
             .navigationTitle("New Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -88,7 +100,7 @@ struct AspectRatioSheet: View {
                 CustomRatioPage(draft: $draft, isFull: detent == .large, canSave: presets.canSave, onCreate: create)
             }
         }
-        .presentationDetents([.medium, .large], selection: $detent)
+        .presentationDetents(Set([.medium, .large, detent]), selection: $detent)
         .foregroundStyle(Color.primary)
         .tint(.accentColor)
     }

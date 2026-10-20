@@ -14,12 +14,16 @@ struct LayoutSheet: View {
     let photosLost: (SlideLayout) -> Int
     let onChoose: (SlideLayout) -> Void
     @State private var pendingLayout: SlideLayout?
+    @State private var detent: PresentationDetent = .medium
+    @State private var firstTile: CGRect = .zero
     @Environment(\.dismiss) private var dismiss
+
+    private static let spacing: CGFloat = 12
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth), spacing: 12)], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth), spacing: Self.spacing)], spacing: Self.spacing) {
                     ForEach(SlideLayout.allCases) { layout in
                         Button {
                             choose(layout)
@@ -30,11 +34,20 @@ struct LayoutSheet: View {
                         .accessibilityLabel(layout.name)
                         .accessibilityHint(layout == .panorama ? "One photo across several slides that swipe as one image" : "")
                         .accessibilityAddTraits(layout == current ? .isSelected : [])
+                        .onGeometryChange(for: CGRect.self) { proxy in
+                            proxy.frame(in: TileSheetOpening.contentSpace)
+                        } action: { frame in
+                            if layout == SlideLayout.allCases.first {
+                                firstTile = frame
+                            }
+                        }
                     }
                 }
                 .padding()
+                .coordinateSpace(TileSheetOpening.contentSpace)
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
+            .modifier(TileSheetOpening(detent: $detent, firstTile: firstTile, rowSpacing: Self.spacing))
             .navigationTitle(current == nil ? "New Slide" : "Change Layout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -56,7 +69,7 @@ struct LayoutSheet: View {
                 Text("“\(layout.name)” holds \(count == 1 ? "1 photo" : "\(count) photos"), so the slide's last ones are removed.")
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents(Set([.medium, .large, detent]), selection: $detent)
         .foregroundStyle(Color.primary)
         .tint(.accentColor)
     }
