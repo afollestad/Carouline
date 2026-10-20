@@ -20,8 +20,15 @@ struct LayersSheet: View {
     /// Runs as the sheet's content goes, once it no longer covers the screen.
     let onGone: () -> Void
     @State private var height = SheetHeight.resting
-    /// Waits for the sheet to come to rest before the strip makes room for it.
-    @State private var settling = Settling()
+    /// Whether the sheet's content has gone, after which neither its geometry, still changing as
+    /// it goes, nor typing ending with it makes room.
+    @State private var isGone = false
+    /// Whether typing has ended and the sheet is headed for its resting height, which the strip
+    /// makes room for before it gets there.
+    @State private var awaitsRest = false
+    /// The sheet's top on screen as last measured, to make room from again once the strip changes
+    /// size, as on a turn, which can measure the strip's new bottom after the sheet's new top.
+    @State private var measuredTop = MeasuredTop()
     /// The picker for a picture to add, opened from the sheet, since one opened from the screen
     /// can't show over it.
     @State private var isPickingImage = false
@@ -39,9 +46,9 @@ struct LayersSheet: View {
     /// An iPad popover's size: tall enough for the text editor's field, typefaces and colors
     /// without scrolling.
     static let popoverSize = CGSize(width: 380, height: 480)
-    /// Longer than the gap between a drag's frames, so the strip makes room once, where the sheet
-    /// comes to rest, rather than following it frame by frame.
-    private static let settleDelay = Duration.milliseconds(120)
+    /// More than a fast drag moves the sheet between two frames, and less than it jumps as it
+    /// opens, closes or snaps to a height, so a drag's steps land at once and a jump animates.
+    private static let dragStep: CGFloat = 30
 
     var body: some View {
         NavigationStack(path: $session.sheetPath) {
@@ -87,12 +94,16 @@ struct LayersSheet: View {
         }
         .environment(\.isLayersSheetFull, height == .large)
         // Measured on screen rather than taken from the detent, so the room includes any gap below
-        // a sheet that floats over the bottom safe area.
+        // a sheet that floats over the bottom safe area, and the slides follow a drag.
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.frame(in: .global).minY
         } action: { top in
-            settling.run(after: Self.settleDelay) {
-                settle(at: top)
+            measuredTop.value = top
+            follow(top)
+        }
+        .onChange(of: session.stripHeight) {
+            if let top = measuredTop.value {
+                follow(top)
             }
         }
         .photosPicker(
@@ -125,18 +136,32 @@ struct LayersSheet: View {
             withAnimation {
                 height = isTyping ? .typing : .resting
             }
-            // Room for where it's headed, so slides typed on from another height go straight
-            // there, rather than to full size until it settles. Not as it goes, which ends the
-            // typing too and leaves no room.
-            if !isTyping, !settling.isStopped, let restingHeight {
+            guard let restingHeight else {
+                return
+            }
+            if isTyping {
+                // No more than the resting room, which the keyboard's outgrows as it shows, rather
+                // than the large height's, which would keep the slide typed on tiny.
+                session.sheetRoom = min(session.sheetRoom, restingHeight)
+            } else if !isGone {
+                // Room for where it's headed, so slides typed on from another height go straight
+                // there, rather than to wherever the sheet passes on its way. Not as it goes,
+                // which ends the typing too and leaves no room.
                 session.sheetRoom = restingHeight
+                awaitsRest = true
+            }
+        }
+        // A sheet dragged elsewhere before it rests is followed from there.
+        .onChange(of: height) { _, height in
+            if height != .resting {
+                awaitsRest = false
             }
         }
         .onAppear {
-            settling.start()
+            isGone = false
         }
         .onDisappear {
-            settling.stop()
+            isGone = true
             session.typingLayerID = nil
             session.keyboardRoom = 0
             session.sheetRoom = 0
@@ -157,8 +182,8 @@ struct LayersSheet: View {
         .height(Self.typingHeight(at: dynamicTypeSize))
     }
 
-    /// Half the strip, which the strip makes room above, or the system's half height until the
-    /// strip has measured itself, as previews and snapshots never do.
+    /// A share of the strip, which the strip makes room above, or the system's half height until
+    /// the strip has measured itself, as previews and snapshots never do.
     private var restingDetent: PresentationDetent {
         restingHeight.map { .height($0) } ?? .medium
     }
@@ -207,23 +232,24 @@ struct LayersSheet: View {
         dismiss()
     }
 
-    /// Makes room for the sheet where it came to rest, once that's the height selected, which a
-    /// drag writes back as it lets go. Not partway, where a finger held still mid-drag leaves it,
-    /// nor riding the keyboard, whose room the strip takes from the keyboard's own.
-    private func settle(at top: CGFloat) {
-        let room = SheetHeight.room(stripBottom: session.stripBottom, sheetTop: top)
-        guard !isTyping, let restingHeight, SheetHeight.rests(
-            at: height,
-            room: room,
-            typingHeight: Self.typingHeight(at: dynamicTypeSize),
-            restingHeight: restingHeight,
-            stripHeight: session.stripHeight
-        ) else {
+    /// Makes room for the sheet wherever its top is, so the slides grow and shrink as it's
+    /// dragged. Not riding the keyboard, whose room the strip takes from the keyboard's own, nor
+    /// on its way to resting after typing, until it gets there, since UIKit reports it at the
+    /// heights it passes as the keyboard goes.
+    private func follow(_ top: CGFloat) {
+        guard !isTyping, !isGone else {
             return
         }
-        // None at large, which covers the slides however small they'd be, so they're whole again
-        // as it's dragged back down.
-        session.sheetRoom = height == .large ? 0 : room
+        let room = SheetHeight.room(stripBottom: session.stripBottom, sheetTop: top)
+        if awaitsRest {
+            if let restingHeight, abs(room - restingHeight) > SheetHeight.settlingSlack {
+                return
+            }
+            awaitsRest = false
+        }
+        withTransaction(\.disablesAnimations, abs(room - session.sheetRoom) < Self.dragStep) {
+            session.sheetRoom = room
+        }
     }
 
     /// Adds a layer of `kind`: new text starts as a draft in the middle of the slide, or of a
@@ -251,36 +277,9 @@ struct LayersSheet: View {
     }
 }
 
-/// Runs an action once whatever keeps restarting it holds still for a moment, until it's stopped
-/// for good, as a sheet's geometry still changes while it goes.
-private final class Settling {
-    private var task: Task<Void, Never>?
-    /// Whether it's stopped for good, as it is once the sheet starts going.
-    private(set) var isStopped = false
-
-    func run(after delay: Duration, _ action: @escaping @MainActor () -> Void) {
-        task?.cancel()
-        guard !isStopped else {
-            return
-        }
-        task = Task { [weak self] in
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled, self?.isStopped == false else {
-                return
-            }
-            action()
-        }
-    }
-
-    func start() {
-        isStopped = false
-    }
-
-    func stop() {
-        isStopped = true
-        task?.cancel()
-        task = nil
-    }
+/// The sheet's top, kept without redrawing the sheet as it changes, as it does each frame of a drag.
+private final class MeasuredTop {
+    var value: CGFloat?
 }
 
 #Preview {

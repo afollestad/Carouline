@@ -67,19 +67,16 @@ struct SlideStrip: View {
     private static let captionSpace: CGFloat = 56
     private static let spacing: CGFloat = 20
     private static let addButtonSize: CGFloat = 56
-    /// The least `roomScale` shrinks the slides to. In landscape the keyboard and the sheet's
-    /// typing height can outgrow the strip, which would scale them to nothing or flip them, though
-    /// the sheet there is always full height and covers them.
-    private static let minimumRoomScale: CGFloat = 0.2
 
     var body: some View {
-        Group {
+        let fit = roomFit
+        return Group {
             if project.slides.isEmpty {
                 GhostSlide(size: cardSize(span: 1), onAdd: onAddSlide)
                     .padding(.bottom, SelectionBar.reservedHeight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                strip
+                strip(screenPoint: 1 / fit.scale)
             }
         }
         .onGeometryChange(for: CGSize.self) { proxy in
@@ -87,9 +84,10 @@ struct SlideStrip: View {
         } action: { size in
             self.size = size
         }
-        .scaleEffect(roomScale, anchor: .top)
-        // Past the scale, which would otherwise shrink the strip the sheet makes room in, and the
-        // sheet's resting height with it, over and over.
+        .scaleEffect(fit.scale, anchor: .top)
+        .offset(y: fit.offset)
+        // Past the scale and the offset, which would otherwise shrink and move the strip the sheet
+        // makes room in, and the sheet's resting height with it, over and over.
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.height
         } action: { height in
@@ -100,8 +98,8 @@ struct SlideStrip: View {
         } action: { bottom in
             layerSession.stripBottom = bottom
         }
-        // Past the scale, so taps in the margins it leaves beside the slides still finish, and
-        // pinches there still reach the selection.
+        // Past the scale and the offset, so taps in the margins they leave beside the slides
+        // still finish, and pinches there still reach the selection.
         .contentShape(.rect)
         .onTapGesture(perform: onBackgroundTap)
         .modifier(SelectionGesture(
@@ -115,9 +113,9 @@ struct SlideStrip: View {
             holdsStrip: $holdsStill,
             isStripScrolling: isScrolling
         ))
-        .animation(.smooth(duration: 0.25), value: roomScale)
+        .animation(.smooth(duration: 0.25), value: fit)
         // Under a sheet, the keyboard a text layer is typed with would lay the slides out smaller,
-        // which `roomScale` does instead. Beside a popover, they keep making room for it.
+        // which `roomFit` does instead. Beside a popover, they keep making room for it.
         .ignoresSafeArea(sitsUnderSheet ? .keyboard : [])
         .onGeometryChange(for: CGRect.self) { proxy in
             proxy.frame(in: .global)
@@ -152,31 +150,34 @@ struct SlideStrip: View {
     /// big: the room either side is at least its width, which UIKit doesn't narrow to fit, so
     /// little more than its arrow reaches the slide. Where it doesn't, as on an iPad in portrait or
     /// iPhone Duo in landscape, a slide's layers show in a sheet. Not below the slide, where even
-    /// with the slides shrunk to half the strip UIKit finds too little room and puts it over the
-    /// slide's side.
+    /// with the slides shrunk UIKit finds too little room and puts it over the slide's side.
     static func layersPopoverFits(span: Int, aspectRatio: AspectRatio, in size: CGSize) -> Bool {
         let card = cardSize(span: span, aspectRatio: aspectRatio, isRegular: true, in: size)
         return (size.width - card.width) / 2 >= LayersSheet.popoverSize.width
     }
 
-    /// How far the slides shrink while a layers sheet is open over them, so the one being edited
-    /// stays in view and in reach above the sheet, or above the keyboard and the short sheet over
-    /// it while a text layer is typed: the room above the selection bar's, fitted into the room
-    /// they leave. Scaled rather than laid out smaller, since the lazy stack drops the slide while
-    /// laying out its new size, and rebuilds it. Not at a compact height, as a phone's in
-    /// landscape, where the sheet is always full height and covers the slides however small they
-    /// are.
-    private var roomScale: CGFloat {
-        let sheetRoom = verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
-        let room = max(layerSession.keyboardRoom, sheetRoom)
-        let content = size.height - SelectionBar.reservedHeight
-        guard sitsUnderSheet, room > 0, content > 0 else {
-            return 1
+    /// How far the slides shrink and move up while a layers sheet is open over them, so the one
+    /// being edited stays in view and in reach above the sheet, or above the keyboard and the short
+    /// sheet over it while a text layer is typed: the tallest slide and its caption, fitted into
+    /// the room they leave. Scaled rather than laid out smaller, since the lazy stack drops the
+    /// slide while laying out its new size, and rebuilds it. Not at a compact height, as a phone's
+    /// in landscape, where the sheet is always full height and covers the slides however small
+    /// they are.
+    private var roomFit: RoomFit {
+        guard sitsUnderSheet else {
+            return .identity
         }
-        return min(1, max(Self.minimumRoomScale, (size.height - room) / content))
+        let sheetRoom = verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
+        let span = project.slides.map(\.span).min() ?? 1
+        return RoomFit(
+            slideHeight: cardSize(span: span).height + Self.captionSpace,
+            stripHeight: size.height,
+            bottomReserve: SelectionBar.reservedHeight,
+            room: max(layerSession.keyboardRoom, sheetRoom)
+        )
     }
 
-    private var strip: some View {
+    private func strip(screenPoint: CGFloat) -> some View {
         let numbers = project.slideNumbers
         return ScrollView(.horizontal) {
             LazyHStack(alignment: .slideCenter, spacing: Self.spacing) {
@@ -189,7 +190,7 @@ struct SlideStrip: View {
                         canMoveLeft: index > 0,
                         canMoveRight: index < project.slides.count - 1,
                         size: cardSize(span: slide.span),
-                        screenPoint: 1 / roomScale,
+                        screenPoint: screenPoint,
                         frames: slideFrames,
                         importingCells: importingCells,
                         isImportingLayer: importingLayers[slide.id] != nil,

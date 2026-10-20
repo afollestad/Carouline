@@ -30,16 +30,15 @@ final class LayerSession {
     /// The height the keyboard and the sheet over it cover while a text layer is typed, which the
     /// strip makes room above under the sheet, so the slide stays in view.
     var keyboardRoom: CGFloat = 0
-    /// The height the layers sheet covers once it settles at the height it rests or is dragged
-    /// to, which the strip makes room above as for the keyboard, so the slide stays in view and in
-    /// reach.
+    /// The height the layers sheet covers wherever it is, as it's dragged too, which the strip
+    /// makes room above as for the keyboard, so the slide stays in view and in reach.
     var sheetRoom: CGFloat = 0
-    /// The strip's unscaled height, which the layers sheet rests at half of. Read from the strip's
-    /// size rather than its frame on screen, which whatever moves the screen around it changes,
-    /// so the sheet's heights change only with the strip.
+    /// The strip's unscaled height, which the layers sheet's resting height is a share of. Read
+    /// from the strip's size rather than its frame on screen, which whatever moves the screen
+    /// around it changes, so the sheet's heights change only with the strip.
     var stripHeight: CGFloat = 0
     /// Where the strip's unscaled frame ends on screen, which the layers sheet measures its room
-    /// up from. Read only as the sheet settles, so it redraws nothing.
+    /// up from. Read only by the sheet as it makes room, so it redraws nothing.
     @ObservationIgnored var stripBottom: CGFloat = 0
     /// The layer whose text is being typed, which drops the sheet to just its field. An editor
     /// clears only its own, since SwiftUI doesn't order one editor's going and the next's coming.
