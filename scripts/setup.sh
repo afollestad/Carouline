@@ -35,32 +35,45 @@ install_brew_formula skarol/tap/duoctl
 
 "$repo_root/scripts/install-git-hooks.sh"
 
-# xcodebuild runs a destination named without an OS on the newest iOS, so the scripts' simulators
-# belong on the newest runtime, where the snapshot baselines are recorded.
-ios_runtime=$(xcrun simctl list runtimes available --json |
-  jq -r '[.runtimes[] | select(.platform == "iOS")] | sort_by(.version | split(".") | map(tonumber)) | last | .identifier // empty')
-if [ -z "$ios_runtime" ]; then
+# Prints the newest available iOS simulator runtime that can run a device type, or any iOS runtime
+# when no type is given, or nothing.
+newest_ios_runtime() {
+  xcrun simctl list runtimes available --json |
+    jq -r --arg type "${1:-}" '[.runtimes[] | select(.platform == "iOS" and ($type == "" or any((.supportedDeviceTypes // [])[]; .identifier == $type)))] | sort_by(.version | split(".") | map(tonumber)) | last | .identifier // empty'
+}
+
+if [ -z "$(newest_ios_runtime)" ]; then
   echo "error: no iOS simulator runtime is installed. Install one with 'xcodebuild -downloadPlatform iOS' and rerun this script." >&2
   exit 1
 fi
 
-# Creates a simulator by this name on the newest iOS runtime unless one is there, since the run,
-# test, snapshot and screenshot scripts find their devices by name and fail without them.
+# Creates a simulator by this name unless one is there, since the run, test, snapshot and screenshot
+# scripts find their devices by name and fail without them. It goes on the newest runtime that can
+# run the device, which xcodebuild picks for a destination named without an OS and where the
+# snapshot baselines are recorded. That isn't always the newest iOS: Xcode 27.1's iOS 27.1 runtime
+# runs only iPhone Duo.
 create_simulator() {
   local name=$1
-  if xcrun simctl list devices available --json |
-    jq -e --arg runtime "$ios_runtime" --arg name "$name" '(.devices[$runtime] // []) | any(.name == $name)' >/dev/null; then
-    echo "$name simulator already exists"
-    return
-  fi
-  local device_type
+  local device_type runtime
   device_type=$(xcrun simctl list devicetypes --json |
     jq -r --arg name "$name" 'first(.devicetypes[] | select(.name == $name) | .identifier) // empty')
   if [ -z "$device_type" ]; then
     echo "error: this Xcode has no '$name' simulator. Update Xcode and rerun this script." >&2
     exit 1
   fi
-  xcrun simctl create "$name" "$device_type" "$ios_runtime" >/dev/null
+  runtime=$(newest_ios_runtime "$device_type")
+  if [ -z "$runtime" ]; then
+    # A Mac can have a device type without a runtime that runs it, like iPhone Duo without the
+    # iOS 27.1 runtime, and only the scripts that use the device need it.
+    echo "warning: skipping the $name simulator, since no installed iOS runtime can run it. Update Xcode and rerun this script to create it." >&2
+    return
+  fi
+  if xcrun simctl list devices available --json |
+    jq -e --arg runtime "$runtime" --arg name "$name" '(.devices[$runtime] // []) | any(.name == $name)' >/dev/null; then
+    echo "$name simulator already exists"
+    return
+  fi
+  xcrun simctl create "$name" "$device_type" "$runtime" >/dev/null
   echo "Created $name simulator"
 }
 
