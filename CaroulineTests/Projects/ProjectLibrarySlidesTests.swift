@@ -163,17 +163,18 @@ struct ProjectLibrarySlidesTests {
         #expect(saved.map(\.style) == [.standard, style])
     }
 
-    /// A new slide takes the last one's style, and a project's first the standard one.
-    @Test func givesANewSlideTheLastOnesStyle() async throws {
+    /// A new slide takes the last one's style without its border, and a project's first the
+    /// standard one.
+    @Test func givesANewSlideTheLastOnesStyleWithoutItsBorder() async throws {
         let (library, projectID) = await makeLibrary()
         let first = try #require(library.addSlide(.single, to: projectID))
         #expect(slides(library, projectID).map(\.style) == [.standard])
-        let style = SlideStyle(spacing: 0, border: 0.04, background: .black)
+        let style = SlideStyle(spacing: 0.03, border: 0.04, background: .black)
         library.setStyle(style, blur: 0, of: first, in: projectID)
 
         library.addSlide(.grid, to: projectID)
 
-        #expect(slides(library, projectID).map(\.style) == [style, style])
+        #expect(slides(library, projectID).map(\.style) == [style, SlideStyle(spacing: 0.03, border: 0, background: .black)])
     }
 
     /// Every slide takes the style and keeps its own blur, and slides already alike don't save.

@@ -7,14 +7,17 @@ import Foundation
 
 extension ProjectLibrary {
     /// Appends a slide in `layout` to project `projectID`, returning the new slide's ID. It takes
-    /// the last slide's style, so a carousel stays alike until a slide is styled apart, and a
-    /// project's first takes the standard one.
+    /// the last slide's spacing and background, so a carousel stays alike until a slide is styled
+    /// apart, but not its border, which frames that slide alone. A project's first takes the
+    /// standard style.
     @discardableResult
     func addSlide(_ layout: SlideLayout, to projectID: UUID) -> UUID? {
         guard let project = project(projectID) else {
             return nil
         }
-        let slide = Slide(layout: layout, style: project.slides.last?.style ?? .standard)
+        var style = project.slides.last?.style ?? .standard
+        style.border = SlideStyle.standard.border
+        let slide = Slide(layout: layout, style: style)
         update(projectID) { $0.slides.append(slide) }
         return slide.id
     }
