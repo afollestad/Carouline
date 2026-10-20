@@ -44,6 +44,10 @@ struct SlideStrip: View {
     /// Whether a finger is scrolling the strip, or it's still coasting from one, which the fingers
     /// down meanwhile leave the selection alone for.
     @State private var isScrolling = false
+    /// Where the strip is on screen, inside the safe area, and where the screen behind it is, which
+    /// find a column of bar buttons beside it.
+    @State private var safeFrame: CGRect = .zero
+    @State private var screenFrame: CGRect = .zero
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -114,6 +118,27 @@ struct SlideStrip: View {
         // On a phone, the keyboard a text layer is typed with would lay the slides out smaller,
         // which `roomScale` does instead. An iPad's slides keep making room for it.
         .ignoresSafeArea(horizontalSizeClass == .compact ? .keyboard : [])
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            safeFrame = frame
+        }
+        .background {
+            Color.clear
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: .global)
+                } action: { frame in
+                    screenFrame = frame
+                }
+                .ignoresSafeArea()
+        }
+    }
+
+    /// How far a column of bar buttons reaches in from the trailing edge, as iPhone Duo stacks them
+    /// there, which the strip stops short of rather than scrolling slides under: the safe area's
+    /// trailing inset past its leading one, since a notch's are the same on both sides.
+    private var barColumnWidth: CGFloat {
+        max(0, (screenFrame.maxX - safeFrame.maxX) - (safeFrame.minX - screenFrame.minX))
     }
 
     /// Room under the slides, so the one being edited shrinks to stay in view above an iPad's
@@ -207,6 +232,9 @@ struct SlideStrip: View {
         .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
+        // Cut off where the column starts, as the scroll view reaches on under it whatever its
+        // safe area.
+        .clipShape(TrailingClip(isClipping: barColumnWidth > 0))
     }
 
     private var isAnythingSelected: Bool {
@@ -243,6 +271,20 @@ struct SlideStrip: View {
         let maxHeight = max(0, size.height - Self.captionSpace - SelectionBar.reservedHeight - 32)
         let width = max(0, min(maxWidth, maxHeight * ratio))
         return CGSize(width: width, height: width / ratio)
+    }
+}
+
+/// Clips off what's past the trailing edge, when `isClipping`, leaving the other edges open, so
+/// slides still reach under the leading safe area and the bars above and below.
+private struct TrailingClip: Shape {
+    /// Far enough past the open edges to hold anything drawn beyond them.
+    private static let reach: CGFloat = 10_000
+
+    let isClipping: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let open = rect.insetBy(dx: -Self.reach, dy: -Self.reach)
+        return Path(isClipping ? open.divided(atDistance: rect.maxX - open.minX, from: .minXEdge).slice : open)
     }
 }
 
