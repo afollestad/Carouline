@@ -11,6 +11,17 @@ enum StripItem: Hashable {
     case add
 }
 
+extension Project {
+    /// The slide in the middle of the strip at `position`, which lights the backdrop.
+    func frontSlide(at position: StripItem?) -> Slide? {
+        switch position {
+        case .slide(let slideID): slides.first { $0.id == slideID } ?? slides.first
+        case .add: slides.last
+        case nil: slides.first
+        }
+    }
+}
+
 /// A project's slides side by side, with the button for another after the last.
 struct SlideStrip: View {
     let project: Project
@@ -25,6 +36,9 @@ struct SlideStrip: View {
     /// The slide whose layers sheet is open, which the strip holds still for, so the slide being
     /// edited stays put.
     let layersSlideID: UUID?
+    /// Whether a slide's layers show in a sheet over the strip, as on a phone or wherever their
+    /// popover doesn't fit, rather than in a popover beside the slide.
+    var layersInSheet = false
     /// Taps between the slides, or in the margins beside them while they're scaled down, which
     /// finish framing a photo or moving a layer.
     let onBackgroundTap: () -> Void
@@ -34,8 +48,6 @@ struct SlideStrip: View {
     let onDelete: (UUID) -> Void
     let onSetSpan: (UUID, Int) -> Void
     @State private var size: CGSize = .zero
-    /// The strip's size before `bottomRoom` is taken from it.
-    @State private var fullSize: CGSize = .zero
     /// Where the slides holding a selection are, which the selection's gesture moves it on.
     @State private var slideFrames = SlideFrames()
     /// Whether the strip holds still for a gesture moving the selection, which starts on it or
@@ -55,10 +67,6 @@ struct SlideStrip: View {
     private static let captionSpace: CGFloat = 56
     private static let spacing: CGFloat = 20
     private static let addButtonSize: CGFloat = 56
-    /// The narrowest an iPad's layers popover can be squeezed beside its slide, and the room its
-    /// arrow and the screen's edge take.
-    private static let popoverMinWidth: CGFloat = 320
-    private static let popoverMargin: CGFloat = 24
     /// The least `roomScale` shrinks the slides to. In landscape the keyboard and the sheet's
     /// typing height can outgrow the strip, which would scale them to nothing or flip them, though
     /// the sheet there is always full height and covers them.
@@ -78,12 +86,6 @@ struct SlideStrip: View {
             proxy.size
         } action: { size in
             self.size = size
-        }
-        .padding(.bottom, bottomRoom)
-        .onGeometryChange(for: CGSize.self) { proxy in
-            proxy.size
-        } action: { size in
-            fullSize = size
         }
         .scaleEffect(roomScale, anchor: .top)
         // Past the scale, which would otherwise shrink the strip the sheet makes room in, and the
@@ -113,11 +115,10 @@ struct SlideStrip: View {
             holdsStrip: $holdsStill,
             isStripScrolling: isScrolling
         ))
-        .animation(.smooth(duration: 0.25), value: bottomRoom)
         .animation(.smooth(duration: 0.25), value: roomScale)
-        // On a phone, the keyboard a text layer is typed with would lay the slides out smaller,
-        // which `roomScale` does instead. An iPad's slides keep making room for it.
-        .ignoresSafeArea(horizontalSizeClass == .compact ? .keyboard : [])
+        // Under a sheet, the keyboard a text layer is typed with would lay the slides out smaller,
+        // which `roomScale` does instead. Beside a popover, they keep making room for it.
+        .ignoresSafeArea(sitsUnderSheet ? .keyboard : [])
         .onGeometryChange(for: CGRect.self) { proxy in
             proxy.frame(in: .global)
         } action: { frame in
@@ -141,38 +142,38 @@ struct SlideStrip: View {
         max(0, (screenFrame.maxX - safeFrame.maxX) - (safeFrame.minX - screenFrame.minX))
     }
 
-    /// Room under the slides, so the one being edited shrinks to stay in view above an iPad's
-    /// layers popover when the slide leaves it no room beside.
-    private var bottomRoom: CGFloat {
-        guard horizontalSizeClass != .compact,
-              let slide = project.slides.first(where: { $0.id == layersSlideID }) else {
-            return 0
-        }
-        // Measured at the full size, so the room taken can't change whether room is taken.
-        let sideRoom = (fullSize.width - cardSize(span: slide.span, in: fullSize).width) / 2
-        guard sideRoom < Self.popoverMinWidth + Self.popoverMargin else {
-            return 0
-        }
-        // The selection bar's room is kept already, and the popover covers it. Half the strip
-        // stays for the slide, however short the screen.
-        let room = LayersSheet.popoverSize.height + Self.popoverMargin - SelectionBar.reservedHeight
-        return min(room, fullSize.height / 2)
+    /// Whether the slides sit under a layers sheet, which they make room above by scaling, rather
+    /// than beside a popover, which they lay themselves out around.
+    private var sitsUnderSheet: Bool {
+        horizontalSizeClass == .compact || layersInSheet
     }
 
-    /// How far a phone shrinks the slides while its layers sheet is open, so the one being edited
+    /// Whether an iPad's layers popover fits beside a slide `span` slides wide on a strip `size`
+    /// big: the room either side is at least its width, which UIKit doesn't narrow to fit, so
+    /// little more than its arrow reaches the slide. Where it doesn't, as on an iPad in portrait or
+    /// iPhone Duo in landscape, a slide's layers show in a sheet. Not below the slide, where even
+    /// with the slides shrunk to half the strip UIKit finds too little room and puts it over the
+    /// slide's side.
+    static func layersPopoverFits(span: Int, aspectRatio: AspectRatio, in size: CGSize) -> Bool {
+        let card = cardSize(span: span, aspectRatio: aspectRatio, isRegular: true, in: size)
+        return (size.width - card.width) / 2 >= LayersSheet.popoverSize.width
+    }
+
+    /// How far the slides shrink while a layers sheet is open over them, so the one being edited
     /// stays in view and in reach above the sheet, or above the keyboard and the short sheet over
     /// it while a text layer is typed: the room above the selection bar's, fitted into the room
     /// they leave. Scaled rather than laid out smaller, since the lazy stack drops the slide while
-    /// laying out its new size, and rebuilds it. Not in landscape, where the sheet is always full
-    /// height and covers the slides however small they are.
+    /// laying out its new size, and rebuilds it. Not at a compact height, as a phone's in
+    /// landscape, where the sheet is always full height and covers the slides however small they
+    /// are.
     private var roomScale: CGFloat {
         let sheetRoom = verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
         let room = max(layerSession.keyboardRoom, sheetRoom)
-        let content = fullSize.height - SelectionBar.reservedHeight
-        guard horizontalSizeClass == .compact, room > 0, content > 0 else {
+        let content = size.height - SelectionBar.reservedHeight
+        guard sitsUnderSheet, room > 0, content > 0 else {
             return 1
         }
-        return min(1, max(Self.minimumRoomScale, (fullSize.height - room) / content))
+        return min(1, max(Self.minimumRoomScale, (size.height - room) / content))
     }
 
     private var strip: some View {
@@ -262,14 +263,17 @@ struct SlideStrip: View {
         cardSize(span: project.slides.first?.span ?? 1).width
     }
 
+    private func cardSize(span: Int) -> CGSize {
+        Self.cardSize(span: span, aspectRatio: project.aspectRatio, isRegular: horizontalSizeClass == .regular, in: size)
+    }
+
     /// The project's shape, `span` slides wide, fitted to the screen, leaving the slides either
     /// side peeking in at the edges so the strip reads as one to scroll. A panorama fits in the
     /// same room as a slide, so all of it can be framed at once.
-    private func cardSize(span: Int, in size: CGSize? = nil) -> CGSize {
-        let size = size ?? self.size
-        let ratio = project.aspectRatio.widthOverHeight * CGFloat(span)
-        let maxWidth = size.width * (horizontalSizeClass == .regular ? 0.7 : 0.82)
-        let maxHeight = max(0, size.height - Self.captionSpace - SelectionBar.reservedHeight - 32)
+    private static func cardSize(span: Int, aspectRatio: AspectRatio, isRegular: Bool, in size: CGSize) -> CGSize {
+        let ratio = aspectRatio.widthOverHeight * CGFloat(span)
+        let maxWidth = size.width * (isRegular ? 0.7 : 0.82)
+        let maxHeight = max(0, size.height - captionSpace - SelectionBar.reservedHeight - 32)
         let width = max(0, min(maxWidth, maxHeight * ratio))
         return CGSize(width: width, height: width / ratio)
     }

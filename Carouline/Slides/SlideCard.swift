@@ -140,7 +140,7 @@ struct SlideCard: View {
             .frame(height: 44)
         }
         // A wide screen's popover pointing at its slide, from the card, not its caption's glass
-        // button, whose style the popover would take on. A phone's sheet comes from the screen.
+        // button, whose style the popover would take on. A sheet comes from the screen.
         .popover(isPresented: layerActions.showsPopover ? layerActions.isShowingSheet(slide.id) : .constant(false)) {
             layerActions.sheet(slide.id)
                 .frame(idealWidth: LayersSheet.popoverSize.width, idealHeight: LayersSheet.popoverSize.height)

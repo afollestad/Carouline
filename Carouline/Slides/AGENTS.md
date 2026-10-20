@@ -1,6 +1,6 @@
 ## Slides
 
-- Keep `SlideStrip`'s layout size fixed while a layers sheet is open on a phone, and shrink its slides with `scaleEffect`, as `roomScale` does. The lazy stack drops the card being edited while laying out a new size, and rebuilds it.
+- Keep `SlideStrip`'s layout size fixed while a layers sheet is open, and shrink its slides with `scaleEffect`, as `roomScale` does. The lazy stack drops the card being edited while laying out a new size, and rebuilds it.
 - Keep drags and pinches on the selection in `SelectionGesture`, over the whole strip, since a gesture on a cell or a layer would claim a pinch's first finger. Its `TouchTracking` claims the touches once they move the selection, so a short drag doesn't end as a tap on whatever it crossed.
 - Move the selection by the fingers `TouchTracking` reports to `SelectionTouches`, since SwiftUI's gesture values end or reset as a finger lifts or lands. Take `MagnifyGesture` and `RotateGesture` values only for a trackpad's pinch, which reports no fingers.
 - Never put a high-priority `DragGesture` or a `SpatialEventGesture` over the strip. The first holds its scrolling back for every drag, even off the selection, and under the second a tap on a menu inside the strip also reaches its background tap.

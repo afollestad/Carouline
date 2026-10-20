@@ -155,8 +155,8 @@ struct LayersSheet: View {
         .height(Self.typingHeight(at: dynamicTypeSize))
     }
 
-    /// Half the strip, which the strip makes room above on a phone, or the system's half height
-    /// until the strip has measured itself, as previews and snapshots never do.
+    /// Half the strip, which the strip makes room above, or the system's half height until the
+    /// strip has measured itself, as previews and snapshots never do.
     private var restingDetent: PresentationDetent {
         restingHeight.map { .height($0) } ?? .medium
     }

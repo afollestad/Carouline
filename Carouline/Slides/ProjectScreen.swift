@@ -13,10 +13,10 @@ struct ProjectScreen: View {
     /// What's open over the screen. Asks go through it, since one made while another is up
     /// never shows.
     @State private var presenter = PresentationQueue<ProjectPresentation>()
-    /// Whether what's open opened on a compact width, which keeps it a sheet, or a popover
-    /// pointing at what opened it, until it closes. Turning a phone or resizing a window would
-    /// otherwise ask for one while the other is still leaving, which never shows.
-    @State private var openedWidth = OpenedWidth()
+    /// Whether what's open opened as a sheet or a popover pointing at what opened it, which it
+    /// stays until it closes. Turning a phone or resizing a window would otherwise ask for one
+    /// while the other is still leaving, which never shows.
+    @State private var openedStyle = OpenedStyle()
     @State private var stripPosition: StripItem?
     /// The cell the photo picker fills, and the slide's other empty cells when it picks several.
     /// Kept apart from `presenter`, which the picker clears as it closes, possibly before it
@@ -88,7 +88,7 @@ struct ProjectScreen: View {
                 onDone: { selectLayer(nil) }
             ))
             .background {
-                SlideBackdrop(slide: frontSlide(of: project), projectID: projectID, aspectRatio: project.aspectRatio)
+                SlideBackdrop(slide: project.frontSlide(at: stripPosition), projectID: projectID, aspectRatio: project.aspectRatio)
             }
             .navigationTitle(nameBinding)
             .navigationBarTitleDisplayMode(.inline)
@@ -135,15 +135,15 @@ struct ProjectScreen: View {
         presenter.presentPending()
     }
 
-    /// The screen's sheet, which shows the layout sheet and a phone's export and layers sheets,
-    /// and the photo picker and the camera, which open over the screen.
+    /// The screen's sheet, which shows the layout sheet and the export and layers sheets wherever
+    /// they aren't popovers, and the photo picker and the camera, which open over the screen.
     private func presentations(over screen: some View, project: Project) -> some View {
         screen
             .sheet(item: sheetItem) { item in
                 sheetContent(for: item, in: project)
             }
             .onChange(of: presenter.current) { _, current in
-                openedWidth.isCompact = current.map { _ in horizontalSizeClass == .compact }
+                openedStyle.prefersSheets = current.map(prefersSheets(for:))
             }
             // The only presentation with no content to call `presentPending()` as it goes, which
             // it needn't, since it covers the screen and nothing can be asked for behind it.
@@ -176,15 +176,6 @@ struct ProjectScreen: View {
             #endif
     }
 
-    /// The slide in the middle of the strip, which lights the backdrop.
-    private func frontSlide(of project: Project) -> Slide? {
-        switch stripPosition {
-        case .slide(let slideID): project.slides.first { $0.id == slideID } ?? project.slides.first
-        case .add: project.slides.last
-        case nil: project.slides.first
-        }
-    }
-
     /// Whether `shown` is open, as a presentation modifier reads and dismisses it. A dismissal
     /// closes `shown` only while it's still open, never one opened since.
     private func isPresenting(_ shown: ProjectPresentation) -> Binding<Bool> {
@@ -200,7 +191,11 @@ struct ProjectScreen: View {
     /// Whether the export and layers sheets show as sheets, as on a compact width, or as popovers
     /// pointing at what opened them, held to how what's open opened.
     private var presentsAsSheets: Bool {
-        openedWidth.isCompact ?? (horizontalSizeClass == .compact)
+        openedStyle.prefersSheets ?? prefersSheets(for: presenter.current)
+    }
+
+    private func prefersSheets(for presentation: ProjectPresentation?) -> Bool {
+        openedStyle.prefersSheets(for: presentation, isCompact: horizontalSizeClass == .compact, in: library.project(projectID))
     }
 
     /// `shownSheet`, as the screen's sheet reads and dismisses it. A dismissal closes the item
@@ -219,7 +214,7 @@ struct ProjectScreen: View {
     /// What's open, when it opens as the screen's sheet. A layers sheet goes with its slide, should
     /// another window delete it, as the slide's own popover would.
     private var shownSheet: ProjectPresentation? {
-        guard let current = presenter.current, current.opensAsSheet(isCompact: presentsAsSheets) else {
+        guard let current = presenter.current, current.opensAsSheet(prefersSheets: presentsAsSheets) else {
             return nil
         }
         if case .layers(let slideID) = current, library.project(projectID)?.slides.contains(where: { $0.id == slideID }) != true {
@@ -269,6 +264,7 @@ struct ProjectScreen: View {
             layerSession: layerSession,
             layerActions: layerActions,
             layersSlideID: layersSlideID,
+            layersInSheet: presentsAsSheets,
             onBackgroundTap: { select(nil) },
             onAddSlide: { presenter.present(.layout(.newSlide)) },
             onChangeLayout: { presenter.present(.layout(.change($0))) },
@@ -294,6 +290,7 @@ struct ProjectScreen: View {
         )
         // Slides leave fixed room for their captions and buttons, which larger text overflows.
         return strip.dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .onGeometryChange(for: CGSize.self, of: \.size) { openedStyle.stripSize = $0 }
     }
 
     private var cellActions: CellActions {

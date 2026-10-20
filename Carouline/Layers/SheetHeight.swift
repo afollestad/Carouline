@@ -5,7 +5,7 @@
 
 import CoreGraphics
 
-/// The heights a phone's layers sheet sits at, and the room each leaves the slides above it.
+/// The heights the layers sheet sits at, and the room each leaves the slides above it.
 nonisolated enum SheetHeight: Hashable, Sendable {
     /// Just the text field, while a text layer is typed in or when the sheet is dragged down to it.
     case typing
@@ -14,8 +14,8 @@ nonisolated enum SheetHeight: Hashable, Sendable {
     case large
 
     /// The resting height on a strip `stripHeight` tall, or nil until the strip has measured
-    /// itself. Half the strip, which leaves the slide the top half, as an iPad's popover leaves it
-    /// at most, and never under `typingHeight`, so the two can't swap places on a short screen.
+    /// itself. Half the strip, which leaves the slide the top half, and never under
+    /// `typingHeight`, so the two can't swap places on a short screen.
     static func restingHeight(stripHeight: CGFloat, typingHeight: CGFloat) -> CGFloat? {
         guard stripHeight > 0 else {
             return nil
