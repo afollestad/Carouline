@@ -27,11 +27,8 @@ final class LayerSession {
     var livePlacement: LayerPlacement?
     /// The layers sheet's pages past its list, which its navigation stack shows.
     var sheetPath: [LayersPage] = []
-    /// The height the keyboard and the sheet over it cover while a text layer is typed, which the
-    /// strip makes room above under the sheet, so the slide stays in view.
-    var keyboardRoom: CGFloat = 0
-    /// The height the layers sheet covers wherever it is, as it's dragged too, which the strip
-    /// makes room above as for the keyboard, so the slide stays in view and in reach.
+    /// The height the layers sheet covers wherever it is, as it's dragged or rides the keyboard
+    /// too, which the strip makes room above, so the slide stays in view and in reach.
     var sheetRoom: CGFloat = 0
     /// The strip's unscaled height, which the layers sheet's resting height is a share of. Read
     /// from the strip's size rather than its frame on screen, which whatever moves the screen

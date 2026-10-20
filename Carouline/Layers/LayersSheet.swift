@@ -93,8 +93,9 @@ struct LayersSheet: View {
             }
         }
         .environment(\.isLayersSheetFull, height == .large)
-        // Measured on screen rather than taken from the detent, so the room includes any gap below
-        // a sheet that floats over the bottom safe area, and the slides follow a drag.
+        // Measured on screen rather than worked out from the detent and the keyboard's height, since
+        // the sheet floats over the bottom safe area and the keyboard by margins of its own, and so
+        // the slides follow a drag.
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.frame(in: .global).minY
         } action: { top in
@@ -140,8 +141,9 @@ struct LayersSheet: View {
                 return
             }
             if isTyping {
-                // No more than the resting room, which the keyboard's outgrows as it shows, rather
-                // than the large height's, which would keep the slide typed on tiny.
+                // No more than the resting room until the sheet rides the keyboard, rather than the
+                // large height's, which would keep the slide typed on tiny until then, or throughout
+                // if no keyboard shows.
                 session.sheetRoom = min(session.sheetRoom, restingHeight)
             } else if !isGone {
                 // Room for where it's headed, so slides typed on from another height go straight
@@ -163,7 +165,6 @@ struct LayersSheet: View {
         .onDisappear {
             isGone = true
             session.typingLayerID = nil
-            session.keyboardRoom = 0
             session.sheetRoom = 0
             session.saveDraft(to: library, projectID: projectID)
             session.endStyling(to: library, projectID: projectID)
@@ -232,15 +233,18 @@ struct LayersSheet: View {
         dismiss()
     }
 
-    /// Makes room for the sheet wherever its top is, so the slides grow and shrink as it's
-    /// dragged. Not riding the keyboard, whose room the strip takes from the keyboard's own, nor
-    /// on its way to resting after typing, until it gets there, since UIKit reports it at the
-    /// heights it passes as the keyboard goes.
+    /// Makes room for the sheet wherever its top is, so the slides grow and shrink as it's dragged
+    /// or rides the keyboard. Not while text is typed until the keyboard lifts it, nor on its way
+    /// to resting after typing, until it gets there, since UIKit reports it at the heights it
+    /// passes as the keyboard comes and goes.
     private func follow(_ top: CGFloat) {
-        guard !isTyping, !isGone else {
+        guard !isGone else {
             return
         }
         let room = SheetHeight.room(stripBottom: session.stripBottom, sheetTop: top)
+        if isTyping, !SheetHeight.ridesKeyboard(room: room, typingHeight: Self.typingHeight(at: dynamicTypeSize)) {
+            return
+        }
         if awaitsRest {
             if let restingHeight, abs(room - restingHeight) > SheetHeight.settlingSlack {
                 return

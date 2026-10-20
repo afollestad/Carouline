@@ -167,13 +167,12 @@ struct SlideStrip: View {
         guard sitsUnderSheet else {
             return .identity
         }
-        let sheetRoom = verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
         let span = project.slides.map(\.span).min() ?? 1
         return RoomFit(
             slideHeight: cardSize(span: span).height + Self.captionSpace,
             stripHeight: size.height,
             bottomReserve: SelectionBar.reservedHeight,
-            room: max(layerSession.keyboardRoom, sheetRoom)
+            room: verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
         )
     }
 

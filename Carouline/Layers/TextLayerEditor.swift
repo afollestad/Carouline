@@ -16,8 +16,6 @@ struct TextLayerEditor: View {
     let delete: (LayerAddress) -> Void
     let close: () -> Void
     @FocusState private var isTyping: Bool
-    @State private var keyboardHeight: CGFloat = 0
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         Form {
@@ -71,7 +69,6 @@ struct TextLayerEditor: View {
             // Only its own typing: the next layer's editor may have begun its own already.
             if session.typingLayerID == layerID {
                 session.typingLayerID = nil
-                session.keyboardRoom = 0
             }
         })
         .onAppear {
@@ -86,15 +83,6 @@ struct TextLayerEditor: View {
             } else if session.typingLayerID == layerID {
                 session.typingLayerID = nil
             }
-            updateKeyboardRoom()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
-            keyboardHeight = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect)?.height ?? 0
-            updateKeyboardRoom()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            keyboardHeight = 0
-            updateKeyboardRoom()
         }
     }
 
@@ -126,12 +114,6 @@ struct TextLayerEditor: View {
             text[keyPath: keyPath] = value
             session.draft?.content = .text(text)
         }
-    }
-
-    /// While typing, room for the keyboard and the short sheet over it, so the slide stays in
-    /// view above them.
-    private func updateKeyboardRoom() {
-        session.keyboardRoom = isTyping ? keyboardHeight + LayersSheet.typingHeight(at: dynamicTypeSize) : 0
     }
 
     /// Each typeface on offer, drawn in itself.

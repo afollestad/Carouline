@@ -10,9 +10,8 @@ import CoreGraphics
 nonisolated struct RoomFit: Equatable, Sendable {
     static let identity = RoomFit()
 
-    /// The least the slides shrink to. The keyboard and the sheet's typing height can outgrow a
-    /// strip in landscape, as the large sheet does in portrait, which would scale them to nothing
-    /// or flip them, though the sheet there covers them.
+    /// The least the slides shrink to. The large sheet can cover the whole strip, which would scale
+    /// them to nothing or flip them, though it covers them then.
     static let minimumScale: CGFloat = 0.2
     /// The room on screen above the slide and below its caption, which keeps them clear of the
     /// bar and the sheet, without the bands either side of a slide at full size.
