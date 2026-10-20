@@ -233,8 +233,9 @@ struct SlideStrip: View {
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
         // Cut off where the column starts, as the scroll view reaches on under it whatever its
-        // safe area.
+        // safe area, and kept from taking taps there, which a clip alone still lets through.
         .clipShape(TrailingClip(isClipping: barColumnWidth > 0))
+        .contentShape(TrailingClip(isClipping: barColumnWidth > 0))
     }
 
     private var isAnythingSelected: Bool {
