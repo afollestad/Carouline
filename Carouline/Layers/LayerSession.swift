@@ -38,6 +38,10 @@ final class LayerSession {
     /// from the strip's size rather than its frame on screen, which whatever moves the screen
     /// around it changes, so the sheet's heights change only with the strip.
     var stripHeight: CGFloat = 0
+    /// The layers sheet's layout margin as last read, which insets its pages and sizes its
+    /// heights. Kept here, past the sheet, so it opens at the right heights after its first time,
+    /// and 16, most devices', until then.
+    var sheetMargin: CGFloat = 16
     /// Where the strip's unscaled frame ends on screen, which the layers sheet measures its room
     /// up from. Read only by the sheet as it makes room, so it redraws nothing.
     @ObservationIgnored var stripBottom: CGFloat = 0

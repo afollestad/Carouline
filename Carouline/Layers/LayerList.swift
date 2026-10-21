@@ -19,6 +19,7 @@ struct LayerList: View {
     let close: () -> Void
 
     @State private var editMode = EditMode.inactive
+    @Environment(\.layersSheetMargin) private var margin
 
     private static let styleTitles = ["Spacing", "Border", "Blur"]
 
@@ -178,6 +179,9 @@ struct LayerList: View {
             LayerKindTiles(isAddingImage: library.importingLayers[slideID] != nil, onAdd: onAdd)
         }
         .listRowBackground(Color.clear)
+        // As far below the clear row's top as it's in from its sides, so the hint and tiles sit as
+        // far below the title bar's buttons as they're in from the sheet's sides.
+        .listRowInsets(.top, margin)
     }
 
     private func row(_ layer: Layer, isTop: Bool, isBottom: Bool) -> some View {

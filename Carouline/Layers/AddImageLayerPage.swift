@@ -17,6 +17,8 @@ struct AddImageLayerPage: View {
     let chooseFromLibrary: () -> Void
     let close: () -> Void
 
+    @Environment(\.layersSheetMargin) private var margin
+
     /// Large enough to tell photos apart, with three or four to a phone's row.
     private static let thumbnailHeight: CGFloat = 96
 
@@ -49,7 +51,8 @@ struct AddImageLayerPage: View {
                     }
                 }
             }
-            .padding()
+            // The top is `LayerPage`'s.
+            .padding([.horizontal, .bottom], margin)
         }
         .layerPage("Add Image", close: close)
     }

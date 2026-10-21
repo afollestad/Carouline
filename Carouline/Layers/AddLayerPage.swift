@@ -11,12 +11,14 @@ struct AddLayerPage: View {
     let slideID: UUID
     let onAdd: (LayerKind) -> Void
     let close: () -> Void
+    @Environment(\.layersSheetMargin) private var margin
 
     var body: some View {
         ScrollView {
             // Read here, so the page follows a picture on its way onto the slide.
             LayerKindTiles(isAddingImage: library.importingLayers[slideID] != nil, onAdd: onAdd)
-                .padding()
+                // The top is `LayerPage`'s.
+                .padding([.horizontal, .bottom], margin)
         }
         .layerPage("Add Layer", close: close)
     }

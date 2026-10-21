@@ -60,7 +60,7 @@ extension SnapshotTests {
     /// stays in view and in reach.
     @Test func slidesAboveRestingSheet() async {
         let session = LayerSession()
-        session.sheetRoom = 320
+        session.sheetRoom = SheetHeight.restingCap(margin: 16)
         await assertScreenSnapshot(of: projectScreen(layeredProject, layerSession: session))
     }
 

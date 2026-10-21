@@ -43,16 +43,18 @@ struct LayersSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Just the text field over the keyboard, so the slide stays in view while it's typed in: 90 pt
-    /// for the grabber and the title bar, and 60 for a line of the field, which grows with the text
-    /// size, since sheets aren't capped.
-    static func typingHeight(at size: DynamicTypeSize) -> CGFloat {
+    /// Just the text field over the keyboard, so the slide stays in view while it's typed in: the
+    /// title bar and the gap under it, and 45 pt for a line of the field and some room over the
+    /// keyboard, less the margin the sheet floats over the keyboard by. The line grows with the
+    /// text size, since sheets aren't capped.
+    static func typingHeight(at size: DynamicTypeSize, margin: CGFloat) -> CGFloat {
         let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(size))
-        return 90 + UIFontMetrics(forTextStyle: .title3).scaledValue(for: 60, compatibleWith: traits)
+        return SheetHeight.contentTop(margin: margin)
+            + UIFontMetrics(forTextStyle: .title3).scaledValue(for: 45, compatibleWith: traits)
     }
     /// An iPad popover's size: tall enough for the text editor's field, typefaces and colors
     /// without scrolling.
-    static let popoverSize = CGSize(width: 380, height: 480)
+    static let popoverSize = CGSize(width: 380, height: 451)
     /// More than a fast drag moves the sheet between two frames, and less than it jumps as it
     /// opens, closes or snaps to a height, so a drag's steps land at once and a jump animates.
     private static let dragStep: CGFloat = 30
@@ -117,6 +119,10 @@ struct LayersSheet: View {
             }
         }
         .environment(\.isLayersSheetFull, height == .large)
+        .environment(\.layersSheetMargin, session.sheetMargin)
+        .background {
+            LayoutMarginReader { session.sheetMargin = $0 }
+        }
         // Measured on screen rather than worked out from the detent and the keyboard's height, since
         // the sheet floats over the bottom safe area and the keyboard by margins of its own, and so
         // the slides follow a drag.
@@ -220,7 +226,7 @@ struct LayersSheet: View {
     }
 
     private var typingDetent: PresentationDetent {
-        .height(Self.typingHeight(at: dynamicTypeSize))
+        .height(Self.typingHeight(at: dynamicTypeSize, margin: session.sheetMargin))
     }
 
     /// A share of the strip, which the strip makes room above, or the system's half height until
@@ -230,7 +236,11 @@ struct LayersSheet: View {
     }
 
     private var restingHeight: CGFloat? {
-        SheetHeight.restingHeight(stripHeight: session.stripHeight, typingHeight: Self.typingHeight(at: dynamicTypeSize))
+        SheetHeight.restingHeight(
+            stripHeight: session.stripHeight,
+            typingHeight: Self.typingHeight(at: dynamicTypeSize, margin: session.sheetMargin),
+            margin: session.sheetMargin
+        )
     }
 
     /// Just the text field's height while it's typed in, since the keyboard grows a sheet to the
@@ -345,6 +355,63 @@ struct LayersSheet: View {
 /// The sheet's top, kept without redrawing the sheet as it changes, as it does each frame of a drag.
 private final class MeasuredTop {
     var value: CGFloat?
+}
+
+/// Reads the layout margin of the controller showing the sheet, which its lists inset their sections
+/// by: 16 on most devices and 20 on the largest phones. SwiftUI exposes no such margin.
+private struct LayoutMarginReader: UIViewRepresentable {
+    let onChange: (CGFloat) -> Void
+
+    func makeUIView(context: Context) -> ReaderView {
+        ReaderView(onChange: onChange)
+    }
+
+    func updateUIView(_ view: ReaderView, context: Context) {
+        view.onChange = onChange
+    }
+
+    final class ReaderView: UIView {
+        var onChange: (CGFloat) -> Void
+        private var reported: CGFloat?
+
+        init(onChange: @escaping (CGFloat) -> Void) {
+            self.onChange = onChange
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            report()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            report()
+        }
+
+        override func layoutMarginsDidChange() {
+            super.layoutMarginsDidChange()
+            report()
+        }
+
+        private func report() {
+            var responder = next
+            while let candidate = responder, !(candidate is UIViewController) {
+                responder = candidate.next
+            }
+            guard let controller = responder as? UIViewController else { return }
+            let margin = controller.systemMinimumLayoutMargins.leading
+            guard margin != reported else { return }
+            reported = margin
+            // After this layout pass, since the state it sets is read by the view being laid out.
+            DispatchQueue.main.async { [onChange] in onChange(margin) }
+        }
+    }
 }
 
 #Preview {

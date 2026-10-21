@@ -9,21 +9,34 @@ import Testing
 
 struct SheetHeightTests {
     @Test func restsAtItsShareOfAShortStrip() {
-        #expect(SheetHeight.restingHeight(stripHeight: 600, typingHeight: 150) == 270)
+        #expect(SheetHeight.restingHeight(stripHeight: 600, typingHeight: 150, margin: 16) == 270)
     }
 
     /// A tall strip, as an iPad's, keeps the slides the room past what the sheet shows at rest.
     @Test func restsNoTallerThanItsCap() {
-        #expect(SheetHeight.restingHeight(stripHeight: 1_000, typingHeight: 150) == 320)
+        #expect(SheetHeight.restingHeight(stripHeight: 1_000, typingHeight: 150, margin: 16) == 289)
+    }
+
+    /// A wider margin sets the buttons lower, the content further below them and the margin under
+    /// it wider, so the sheet rests taller by three times the difference.
+    @Test func capsItsRestingHeightByItsMargin() {
+        #expect(SheetHeight.restingCap(margin: 16) == 289)
+        #expect(SheetHeight.restingCap(margin: 20) == 301)
+    }
+
+    /// Content keeps clear of the title bar however narrow the margin.
+    @Test func startsContentBelowTheTitleBar() {
+        #expect(SheetHeight.topGap(margin: 16) == 16)
+        #expect(SheetHeight.topGap(margin: 4) == SheetHeight.titleBarBelowButtons)
     }
 
     /// On a short screen the resting height stays above the typing height, so the two never swap.
     @Test func neverRestsBelowTheTypingHeight() {
-        #expect(SheetHeight.restingHeight(stripHeight: 200, typingHeight: 150) == 150)
+        #expect(SheetHeight.restingHeight(stripHeight: 200, typingHeight: 150, margin: 16) == 150)
     }
 
     @Test func hasNoRestingHeightUntilTheStripHasMeasuredItself() {
-        #expect(SheetHeight.restingHeight(stripHeight: 0, typingHeight: 150) == nil)
+        #expect(SheetHeight.restingHeight(stripHeight: 0, typingHeight: 150, margin: 16) == nil)
     }
 
     @Test func coversTheStripFromItsTopDown() {
