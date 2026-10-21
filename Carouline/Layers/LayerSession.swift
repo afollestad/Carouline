@@ -42,6 +42,10 @@ final class LayerSession {
     /// heights. Kept here, past the sheet, so it opens at the right heights after its first time,
     /// and 16, most devices', until then.
     var sheetMargin: CGFloat = 16
+    /// The layers sheet's bottom safe area as last read: how far a phone's sheet reaches past its
+    /// height, over the home indicator, and none for an iPad's, which floats clear of it. Kept, as
+    /// `sheetMargin` is, and a phone's until first read.
+    var sheetBottomInset: CGFloat = 34
     /// Where the strip's unscaled frame ends on screen, which the layers sheet measures its room
     /// up from. Read only by the sheet as it makes room, so it redraws nothing.
     @ObservationIgnored var stripBottom: CGFloat = 0

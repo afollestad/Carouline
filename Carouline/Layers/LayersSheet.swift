@@ -44,13 +44,14 @@ struct LayersSheet: View {
     @Environment(\.scenePhase) private var scenePhase
 
     /// Just the text field over the keyboard, so the slide stays in view while it's typed in: the
-    /// title bar and the gap under it, and 45 pt for a line of the field and some room over the
-    /// keyboard, less the margin the sheet floats over the keyboard by. The line grows with the
-    /// text size, since sheets aren't capped.
-    static func typingHeight(at size: DynamicTypeSize, margin: CGFloat) -> CGFloat {
+    /// title bar and the gap under it, the field's row, 55 pt at the default text size and growing
+    /// with it, since sheets aren't capped, and a margin under it. Less however far the sheet
+    /// shows over the keyboard past its height, as a phone's does.
+    static func typingHeight(at size: DynamicTypeSize, margin: CGFloat, bottomInset: CGFloat) -> CGFloat {
         let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(size))
-        return SheetHeight.contentTop(margin: margin)
-            + UIFontMetrics(forTextStyle: .title3).scaledValue(for: 45, compatibleWith: traits)
+        let fieldRow = UIFontMetrics(forTextStyle: .title3).scaledValue(for: 55, compatibleWith: traits)
+        return SheetHeight.contentTop(margin: margin) + fieldRow + margin
+            - SheetHeight.reachOverKeyboard(bottomInset: bottomInset)
     }
     /// An iPad popover's size: tall enough for the text editor's field, typefaces and colors
     /// without scrolling.
@@ -121,7 +122,10 @@ struct LayersSheet: View {
         .environment(\.isLayersSheetFull, height == .large)
         .environment(\.layersSheetMargin, session.sheetMargin)
         .background {
-            LayoutMarginReader { session.sheetMargin = $0 }
+            SheetInsetsReader { insets in
+                session.sheetMargin = insets.margin
+                session.sheetBottomInset = insets.bottom
+            }
         }
         // Measured on screen rather than worked out from the detent and the keyboard's height, since
         // the sheet floats over the bottom safe area and the keyboard by margins of its own, and so
@@ -226,7 +230,11 @@ struct LayersSheet: View {
     }
 
     private var typingDetent: PresentationDetent {
-        .height(Self.typingHeight(at: dynamicTypeSize, margin: session.sheetMargin))
+        .height(typingSheetHeight)
+    }
+
+    private var typingSheetHeight: CGFloat {
+        Self.typingHeight(at: dynamicTypeSize, margin: session.sheetMargin, bottomInset: session.sheetBottomInset)
     }
 
     /// A share of the strip, which the strip makes room above, or the system's half height until
@@ -238,7 +246,7 @@ struct LayersSheet: View {
     private var restingHeight: CGFloat? {
         SheetHeight.restingHeight(
             stripHeight: session.stripHeight,
-            typingHeight: Self.typingHeight(at: dynamicTypeSize, margin: session.sheetMargin),
+            typingHeight: typingSheetHeight,
             margin: session.sheetMargin
         )
     }
@@ -357,10 +365,17 @@ private final class MeasuredTop {
     var value: CGFloat?
 }
 
-/// Reads the layout margin of the controller showing the sheet, which its lists inset their sections
-/// by: 16 on most devices and 20 on the largest phones. SwiftUI exposes no such margin.
-private struct LayoutMarginReader: UIViewRepresentable {
-    let onChange: (CGFloat) -> Void
+/// Reads two insets of the controller showing the sheet: its layout margin, which its lists inset
+/// their sections by, 16 on most devices and 20 on the largest phones, and its bottom safe area,
+/// which a phone's sheet reaches over past its height and an iPad's has none of. SwiftUI exposes no
+/// such margin, and its safe area takes the keyboard in.
+private struct SheetInsetsReader: UIViewRepresentable {
+    struct Insets: Equatable {
+        let margin: CGFloat
+        let bottom: CGFloat
+    }
+
+    let onChange: (Insets) -> Void
 
     func makeUIView(context: Context) -> ReaderView {
         ReaderView(onChange: onChange)
@@ -371,10 +386,10 @@ private struct LayoutMarginReader: UIViewRepresentable {
     }
 
     final class ReaderView: UIView {
-        var onChange: (CGFloat) -> Void
-        private var reported: CGFloat?
+        var onChange: (Insets) -> Void
+        private var reported: Insets?
 
-        init(onChange: @escaping (CGFloat) -> Void) {
+        init(onChange: @escaping (Insets) -> Void) {
             self.onChange = onChange
             super.init(frame: .zero)
             isUserInteractionEnabled = false
@@ -399,17 +414,22 @@ private struct LayoutMarginReader: UIViewRepresentable {
             report()
         }
 
+        override func safeAreaInsetsDidChange() {
+            super.safeAreaInsetsDidChange()
+            report()
+        }
+
         private func report() {
             var responder = next
             while let candidate = responder, !(candidate is UIViewController) {
                 responder = candidate.next
             }
-            guard let controller = responder as? UIViewController else { return }
-            let margin = controller.systemMinimumLayoutMargins.leading
-            guard margin != reported else { return }
-            reported = margin
+            guard let controller = responder as? UIViewController, let view = controller.view else { return }
+            let insets = Insets(margin: controller.systemMinimumLayoutMargins.leading, bottom: view.safeAreaInsets.bottom)
+            guard insets != reported else { return }
+            reported = insets
             // After this layout pass, since the state it sets is read by the view being laid out.
-            DispatchQueue.main.async { [onChange] in onChange(margin) }
+            DispatchQueue.main.async { [onChange] in onChange(insets) }
         }
     }
 }

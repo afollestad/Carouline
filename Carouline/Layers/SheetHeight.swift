@@ -19,6 +19,8 @@ nonisolated enum SheetHeight: Hashable, Sendable {
     static let titleBarButtonHeight: CGFloat = 44
     /// How far the title bar reaches below its buttons, measured, since no API exposes it.
     static let titleBarBelowButtons: CGFloat = 10
+    /// How far the keyboard's top overlaps a phone's sheet, which UIKit tucks under it, measured.
+    static let keyboardOverlap: CGFloat = 5
     /// The text editor's field through its row of typefaces, at the default text size: the most
     /// the sheet shows whole at rest, more than two layers' rows or an empty slide's tiles.
     static let restingContent: CGFloat = 197
@@ -36,6 +38,13 @@ nonisolated enum SheetHeight: Hashable, Sendable {
     /// Where a page's content starts below the sheet's top, under the title bar's buttons.
     static func contentTop(margin: CGFloat) -> CGFloat {
         margin + titleBarButtonHeight + topGap(margin: margin)
+    }
+
+    /// How much of the sheet shows above the keyboard past its height while text is typed: the
+    /// bottom safe area a phone's sheet reaches over, less the keyboard's overlap. None for an
+    /// iPad's, which has no such inset, floating clear of the home indicator and the keyboard.
+    static func reachOverKeyboard(bottomInset: CGFloat) -> CGFloat {
+        max(0, bottomInset - keyboardOverlap)
     }
 
     /// The resting height's most: the text editor's field and its row of typefaces, with a margin

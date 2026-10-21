@@ -30,6 +30,13 @@ struct SheetHeightTests {
         #expect(SheetHeight.topGap(margin: 4) == SheetHeight.titleBarBelowButtons)
     }
 
+    /// A phone's sheet shows past its height over the keyboard, by its bottom safe area less the
+    /// keyboard's overlap, and an iPad's, with no such inset, by none.
+    @Test func reachesOverTheKeyboardByItsBottomInset() {
+        #expect(SheetHeight.reachOverKeyboard(bottomInset: 34) == 34 - SheetHeight.keyboardOverlap)
+        #expect(SheetHeight.reachOverKeyboard(bottomInset: 0) == 0)
+    }
+
     /// On a short screen the resting height stays above the typing height, so the two never swap.
     @Test func neverRestsBelowTheTypingHeight() {
         #expect(SheetHeight.restingHeight(stripHeight: 200, typingHeight: 150, margin: 16) == 150)
