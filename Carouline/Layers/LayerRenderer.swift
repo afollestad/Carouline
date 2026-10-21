@@ -66,7 +66,7 @@ nonisolated enum LayerRenderer {
         let box = CGRect(x: -frame.width / 2, y: -frame.height / 2, width: frame.width, height: frame.height)
         switch layer.content {
         case .text(let text):
-            drawText(text, in: context, box: box)
+            drawText(text, seed: layer.id, in: context, box: box)
         case .image(let content):
             if let picture {
                 drawPicture(content, decoded: picture, seed: layer.id, in: context, box: box)
@@ -75,9 +75,10 @@ nonisolated enum LayerRenderer {
     }
 
     /// Draws `text`'s layout scaled into `box`, its frame in `context`'s coordinates, which run
-    /// down from the top as UIKit's do. The shadow is set in the layer's own space, so it turns
-    /// with the layer here and on screen alike.
-    static func drawText(_ text: TextLayer, in context: CGContext, box: CGRect) {
+    /// down from the top as UIKit's do, and a styled highlight's edge from `seed`'s randomness.
+    /// The shadow is set in the layer's own space, so it turns with the layer here and on screen
+    /// alike.
+    static func drawText(_ text: TextLayer, seed: UUID, in context: CGContext, box: CGRect) {
         let layout = TextLayerLayout.make(for: text)
         let reference = layout.boxSize(isHighlighted: text.isHighlighted)
         guard !layout.lines.isEmpty, reference.width > 0, box.width > 0 else {
@@ -99,10 +100,15 @@ nonisolated enum LayerRenderer {
         }
         var origin = CGPoint.zero
         if text.isHighlighted {
-            let radius = TextLayerLayout.highlightCornerRadius * layout.fontSize
-            context.setFillColor(text.color.uiColor.cgColor)
-            context.addPath(CGPath(roundedRect: CGRect(origin: .zero, size: reference), cornerWidth: radius, cornerHeight: radius, transform: nil))
-            context.fillPath()
+            let highlight = CGRect(origin: .zero, size: reference)
+            if let edge = BorderEdge.edge(forHighlightOf: text, size: reference, seed: seed) {
+                drawEdge(edge, color: text.color.uiColor.cgColor, in: context, box: highlight)
+            } else {
+                let radius = TextLayerLayout.highlightCornerRadius * layout.fontSize
+                context.setFillColor(text.color.uiColor.cgColor)
+                context.addPath(CGPath(roundedRect: highlight, cornerWidth: radius, cornerHeight: radius, transform: nil))
+                context.fillPath()
+            }
             origin = CGPoint(
                 x: TextLayerLayout.highlightPadding.width * layout.fontSize,
                 y: TextLayerLayout.highlightPadding.height * layout.fontSize

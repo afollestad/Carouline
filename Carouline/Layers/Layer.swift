@@ -149,9 +149,10 @@ nonisolated struct TextLayer: Codable, Hashable, Sendable {
     var color: RGBColor
     var alignment: TextLayerAlignment
     var hasShadow: Bool
-    /// Whether a rounded box in `color` sits behind the text, which turns black or white to
-    /// read on it.
+    /// Whether a box in `color` sits behind the text, which turns black or white to read on it:
+    /// rounded, or with its edge cut by `highlightStyle`.
     var isHighlighted: Bool
+    var highlightStyle: BorderStyle
 
     init(
         text: String = "",
@@ -159,7 +160,8 @@ nonisolated struct TextLayer: Codable, Hashable, Sendable {
         color: RGBColor = .white,
         alignment: TextLayerAlignment = .center,
         hasShadow: Bool = false,
-        isHighlighted: Bool = false
+        isHighlighted: Bool = false,
+        highlightStyle: BorderStyle = .plain
     ) {
         self.text = text
         self.font = font
@@ -167,6 +169,43 @@ nonisolated struct TextLayer: Codable, Hashable, Sendable {
         self.alignment = alignment
         self.hasShadow = hasShadow
         self.isHighlighted = isHighlighted
+        self.highlightStyle = highlightStyle
+    }
+
+    /// Reads a missing `highlightStyle` as plain, since highlights had none before it.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        text = try container.decode(String.self, forKey: .text)
+        font = try container.decode(LayerFont.self, forKey: .font)
+        color = try container.decode(RGBColor.self, forKey: .color)
+        alignment = try container.decode(TextLayerAlignment.self, forKey: .alignment)
+        hasShadow = try container.decode(Bool.self, forKey: .hasShadow)
+        isHighlighted = try container.decode(Bool.self, forKey: .isHighlighted)
+        highlightStyle = try container.decodeIfPresent(BorderStyle.self, forKey: .highlightStyle) ?? .plain
+    }
+
+    /// Leaves out a plain highlight's style, so text without one saves as it did before styles.
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(text, forKey: .text)
+        try container.encode(font, forKey: .font)
+        try container.encode(color, forKey: .color)
+        try container.encode(alignment, forKey: .alignment)
+        try container.encode(hasShadow, forKey: .hasShadow)
+        try container.encode(isHighlighted, forKey: .isHighlighted)
+        if highlightStyle != .plain {
+            try container.encode(highlightStyle, forKey: .highlightStyle)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case text
+        case font
+        case color
+        case alignment
+        case hasShadow
+        case isHighlighted
+        case highlightStyle
     }
 
     /// New text that reads on a slide of `background`: black on a light one, white on a dark one.

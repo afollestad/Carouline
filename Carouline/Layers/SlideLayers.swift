@@ -387,7 +387,7 @@ struct LayerContentView: View {
     var body: some View {
         switch layer.content {
         case .text(let text):
-            TextLayerView(text: text, size: size)
+            TextLayerView(text: text, seed: layer.id, size: size)
                 .accessibilityElement()
                 // New text has nothing to read out until it's typed.
                 .accessibilityLabel(text.isBlank ? "Text layer, empty" : "Text layer, “\(text.text)”")
@@ -398,9 +398,10 @@ struct LayerContentView: View {
 }
 
 /// Text drawn by the export's own code, scaled from the reference size, so it breaks and sizes
-/// exactly as the export does.
+/// exactly as the export does, and a styled highlight cuts its edge alike from `seed`.
 private struct TextLayerView: View {
     let text: TextLayer
+    let seed: UUID
     let size: CGSize
 
     var body: some View {
@@ -409,7 +410,7 @@ private struct TextLayerView: View {
         let overflow = (LayerRenderer.shadowOffset + 2 * LayerRenderer.shadowBlur) * fontSize
         Canvas { context, _ in
             context.withCGContext { cgContext in
-                LayerRenderer.drawText(text, in: cgContext, box: CGRect(origin: CGPoint(x: overflow, y: overflow), size: size))
+                LayerRenderer.drawText(text, seed: seed, in: cgContext, box: CGRect(origin: CGPoint(x: overflow, y: overflow), size: size))
             }
         }
         .frame(width: size.width + 2 * overflow, height: size.height + 2 * overflow)

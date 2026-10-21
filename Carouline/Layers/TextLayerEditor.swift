@@ -5,8 +5,9 @@
 
 import SwiftUI
 
-/// The layers sheet's page for a text layer: its words, typeface, color and style. It edits the
-/// session's draft, which the slide draws as it changes, and saves the draft once it closes.
+/// The layers sheet's page for a text layer: its words, typeface, color, style and highlight. It
+/// edits the session's draft, which the slide draws as it changes, and saves the draft once it
+/// closes.
 struct TextLayerEditor: View {
     let layerID: UUID
     let library: ProjectLibrary
@@ -41,7 +42,10 @@ struct TextLayerEditor: View {
                     .pickerStyle(.segmented)
                     .labelStyle(.iconOnly)
                     Toggle("Shadow", isOn: binding(\.hasShadow, shown: style))
+                }
+                Section {
                     Toggle("Highlight", isOn: binding(\.isHighlighted, shown: style))
+                    BorderStylePicker(surface: .highlight, selected: style.highlightStyle.drawn(on: .highlight), pick: pickHighlightStyle)
                 }
             }
         }
@@ -114,6 +118,17 @@ struct TextLayerEditor: View {
             text[keyPath: keyPath] = value
             session.draft?.content = .text(text)
         }
+    }
+
+    /// Sets the highlight's style, and highlights text that isn't, so picking a style shows it.
+    private func pickHighlightStyle(_ style: BorderStyle) {
+        guard session.draftLayerID == layerID, case .text = session.draft?.content else {
+            return
+        }
+        var text = text
+        text.highlightStyle = style
+        text.isHighlighted = true
+        session.draft?.content = .text(text)
     }
 
     /// Each typeface on offer, drawn in itself.

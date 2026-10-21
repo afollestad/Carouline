@@ -73,6 +73,23 @@ nonisolated enum BorderEdge {
         return edge
     }
 
+    /// `text`'s highlight, a box of `size` at the reference size, with its style cut in, or nil
+    /// when it's plain, which draws rounded as it always has.
+    static func edge(forHighlightOf text: TextLayer, size: CGSize, seed: UUID) -> StyledEdge? {
+        let style = text.highlightStyle.drawn(on: .highlight)
+        guard text.isHighlighted, style != .plain, size.width > 0, size.height > 0 else {
+            return nil
+        }
+        let key = "highlight-\(style.rawValue)-\(seed.uuidString)-\(size.width)x\(size.height)" as NSString
+        if let cached = cache.object(forKey: key) {
+            return cached
+        }
+        let edgeSize = TextLayerLayout.highlightEdge * TextLayerLayout.make(for: text).fontSize
+        let edge = edge(around: CGRect(origin: .zero, size: size), keeping: nil, style: style, size: edgeSize, seed: seed)
+        cache.setObject(edge, forKey: key)
+        return edge
+    }
+
     /// `rect` with `style`'s pattern cut into its edge, `size` the edge's size and its randomness
     /// from `seed`. A rubber stamp's specks leave `kept` alone, where a picture covers them.
     static func edge(around rect: CGRect, keeping kept: CGRect?, style: BorderStyle, size: CGFloat, seed: UUID) -> StyledEdge {

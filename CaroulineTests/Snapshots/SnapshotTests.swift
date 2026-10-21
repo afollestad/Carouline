@@ -303,6 +303,30 @@ extension ScreenSnapshotting {
         )
     }
 
+    /// A photo under a highlighted name for each highlight style, one above another.
+    var highlightStyleProject: Project {
+        let colors: [BorderStyle: RGBColor] = [
+            .burnt: RGBColor(red: 0.96, green: 0.91, blue: 0.8),
+            .rubberStamp: RGBColor(red: 0.78, green: 0.13, blue: 0.16),
+            .jagged: RGBColor(red: 0.99, green: 0.84, blue: 0.3),
+            .scalloped: violet
+        ]
+        let layers = BorderStyle.offered(on: .highlight).enumerated().map { index, style in
+            Layer(
+                id: fixtureID(233 + UInt8(index)),
+                content: .text(TextLayer(text: style.name, color: colors[style] ?? .white, isHighlighted: true, highlightStyle: style)),
+                placement: LayerPlacement(centerY: 0.08 + 0.12 * Double(index), scale: 0.6)
+            )
+        }
+        return Project(
+            id: fixtureID(16),
+            name: "Highlights",
+            aspectRatio: .portrait,
+            slides: [Slide(id: fixtureID(17), layout: .single, cells: [photo(199, 2048, 2560)], layers: layers)],
+            createdAt: created
+        )
+    }
+
     /// `project`'s first slide as the export draws it, filling the screen's width.
     func exportedSlide(_ project: Project) throws -> some View {
         var pieces: [UIImage] = []

@@ -5,18 +5,18 @@
 
 import SwiftUI
 
-/// The border styles on offer, each a small frame drawn with its own edge, in a row that scrolls
-/// across its form row.
+/// The border styles `surface` takes, each a small frame, or a highlight's box, drawn with its own
+/// edge, in a row that scrolls across its form row.
 struct BorderStylePicker: View {
-    let styles: [BorderStyle]
+    let surface: BorderStyle.Surface
     let selected: BorderStyle
     let pick: (BorderStyle) -> Void
 
     var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
-                ForEach(styles, id: \.self) { style in
-                    BorderStyleTile(style: style, isSelected: style == selected) {
+                ForEach(BorderStyle.offered(on: surface), id: \.self) { style in
+                    BorderStyleTile(style: style, isFilled: surface == .highlight, isSelected: style == selected) {
                         pick(style)
                     }
                 }
@@ -30,9 +30,10 @@ struct BorderStylePicker: View {
     }
 }
 
-/// A border style as a small framed picture, over its name.
+/// A border style as a small framed picture, or a filled box, over its name.
 private struct BorderStyleTile: View {
     let style: BorderStyle
+    let isFilled: Bool
     let isSelected: Bool
     let action: () -> Void
     /// The font tiles' size, which fits "Postage Stamp" too, growing with the text size, since
@@ -44,7 +45,7 @@ private struct BorderStyleTile: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                BorderStyleSample(style: style)
+                BorderStyleSample(style: style, isFilled: isFilled)
                     .frame(width: sampleHeight * 4 / 3, height: sampleHeight)
                 Text(style.name)
                     .font(.caption2)
@@ -68,9 +69,11 @@ private struct BorderStyleTile: View {
     }
 }
 
-/// A style's frame around an empty picture, drawn solid in the accent by the layers' own code.
+/// A style's frame around an empty picture, or filling a box, drawn solid in the accent by the
+/// layers' own code.
 private struct BorderStyleSample: View {
     let style: BorderStyle
+    let isFilled: Bool
 
     /// A border thicker than a picture's can be, so its edge shows at this size.
     private static let borderWidth = 0.14
@@ -88,12 +91,20 @@ private struct BorderStyleSample: View {
             let accent = Color.accentColor.resolve(in: context.environment).cgColor
             context.withCGContext { cgContext in
                 let box = CGRect(origin: .zero, size: size)
-                let edge = BorderEdge.edge(for: picture, seed: Self.seed)
-                    ?? BorderEdge.edge(around: box, keeping: nil, style: .plain, size: 0, seed: Self.seed)
-                LayerRenderer.drawEdge(edge, color: accent, in: cgContext, box: box)
+                if let edge = BorderEdge.edge(for: picture, seed: Self.seed) {
+                    LayerRenderer.drawEdge(edge, color: accent, in: cgContext, box: box)
+                } else {
+                    // Rounded for a plain highlight, as one draws.
+                    let radius = isFilled ? 0.2 * box.height : 0
+                    cgContext.addPath(CGPath(roundedRect: box, cornerWidth: radius, cornerHeight: radius, transform: nil))
+                    cgContext.setFillColor(accent)
+                    cgContext.fillPath()
+                }
                 // The picture punched out, so the tile shows through as it.
-                cgContext.setBlendMode(.clear)
-                cgContext.fill(LayerGeometry.pictureRect(of: picture, inFrame: box))
+                if !isFilled {
+                    cgContext.setBlendMode(.clear)
+                    cgContext.fill(LayerGeometry.pictureRect(of: picture, inFrame: box))
+                }
             }
         }
         .aspectRatio(frame, contentMode: .fit)
@@ -105,7 +116,12 @@ private struct BorderStyleSample: View {
     @Previewable @State var selected = BorderStyle.wavy
     Form {
         Section("Border") {
-            BorderStylePicker(styles: BorderStyle.allCases, selected: selected) { style in
+            BorderStylePicker(surface: .photo, selected: selected) { style in
+                selected = style
+            }
+        }
+        Section("Highlight") {
+            BorderStylePicker(surface: .highlight, selected: selected) { style in
                 selected = style
             }
         }

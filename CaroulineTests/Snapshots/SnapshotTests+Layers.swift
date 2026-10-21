@@ -118,6 +118,16 @@ extension SnapshotTests {
         try await assertScreenSnapshot(of: exportedSlide(borderStyleProject))
     }
 
+    /// Highlighted text in each highlight style.
+    @Test func highlightStyles() async {
+        await assertScreenSnapshot(of: projectScreen(highlightStyleProject))
+    }
+
+    /// The export cuts each highlight style's edge as the screen does, at the export's size.
+    @Test func exportedHighlightStyles() async throws {
+        try await assertScreenSnapshot(of: exportedSlide(highlightStyleProject))
+    }
+
     /// A blurred photo with sharp text over it.
     @Test func blurredSlideUnderText() async {
         await assertScreenSnapshot(of: projectScreen(blurredProject))

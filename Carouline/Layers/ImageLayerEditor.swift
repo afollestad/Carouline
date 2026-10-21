@@ -26,7 +26,7 @@ struct ImageLayerEditor: View {
         Form {
             Section("Border") {
                 BorderStylePicker(
-                    styles: BorderStyle.offered(on: picture?.image.fileFormat == .png ? .sticker : .photo),
+                    surface: picture?.image.fileFormat == .png ? .sticker : .photo,
                     selected: picture?.drawnBorderStyle ?? .plain,
                     pick: pickBorderStyle
                 )

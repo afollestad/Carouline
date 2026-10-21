@@ -51,6 +51,18 @@ struct LayerTests {
         #expect(try JSONDecoder().decode(Layer.self, from: Data(json(wavy).utf8)) == wavy)
     }
 
+    /// Text with a plain highlight saves its keys as it did before styles, and text saved then
+    /// reads as plain.
+    @Test func savesAHighlightStyleOnlyWhenItHasOne() throws {
+        let plain = TextLayer(text: "Hi", isHighlighted: true)
+        let torn = TextLayer(text: "Hi", isHighlighted: true, highlightStyle: .torn)
+        let object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(plain)) as? [String: Any])
+
+        #expect(Set(object.keys) == ["text", "font", "color", "alignment", "hasShadow", "isHighlighted"])
+        #expect(try json(Layer(content: .text(torn))).contains(#""highlightStyle":"torn""#))
+        #expect(try JSONDecoder().decode(TextLayer.self, from: JSONEncoder().encode(torn)) == torn)
+    }
+
     /// A newer build's border style draws plain here, but saves back as it was.
     @Test func keepsABorderStyleItDoesntOffer() throws {
         let image = PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10)

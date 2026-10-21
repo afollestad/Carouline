@@ -358,7 +358,7 @@ struct LayerRendererTests {
         let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
             background.setFill()
             context.fill(CGRect(origin: .zero, size: size))
-            LayerRenderer.drawText(text, in: context.cgContext, box: CGRect(origin: CGPoint(x: padding, y: padding), size: box))
+            LayerRenderer.drawText(text, seed: UUID(), in: context.cgContext, box: CGRect(origin: CGPoint(x: padding, y: padding), size: box))
         }
         return try #require(image.cgImage)
     }

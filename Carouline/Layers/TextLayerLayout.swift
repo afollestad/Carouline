@@ -24,6 +24,10 @@ nonisolated final class TextLayerLayout: @unchecked Sendable {
     /// enough to frame the letters without the box swallowing them.
     static let highlightPadding = CGSize(width: 0.35, height: 0.18)
     static let highlightCornerRadius: CGFloat = 0.28
+    /// A styled highlight's edge size, as a fraction of the type size: large enough for its
+    /// pattern to read beside the letters, while its deepest cut, `BorderEdge.maximumDepth` of it,
+    /// stays within the padding above and below them.
+    static let highlightEdge: CGFloat = 0.25
 
     private init(text: TextLayer) {
         fontSize = LayerGeometry.fontSize * LayerGeometry.referenceSlideWidth

@@ -44,8 +44,9 @@ nonisolated enum ProjectFile {
     /// Versions 1 to 3 kept one style on the project, which each slide takes. Otherwise
     /// `AspectRatio` reads versions 1 to 4's preset name, `Project` a missing tray as empty,
     /// `Slide` a missing `span` as 1, and missing layers and blur as none, `PlacedImage` a missing
-    /// `fileFormat` as JPEG and a missing `trayPhotoID` as none, and `ImageLayer` a missing
-    /// `borderStyle` as plain and a missing `hasShadow` as none.
+    /// `fileFormat` as JPEG and a missing `trayPhotoID` as none, `TextLayer` a missing
+    /// `highlightStyle` as plain, and `ImageLayer` a missing `borderStyle` as plain and a missing
+    /// `hasShadow` as none.
     static func decode(_ data: Data) throws -> Project {
         let decoder = makeDecoder()
         guard let probe = try? decoder.decode(Probe.self, from: data), probe.formatVersion >= 1 else {

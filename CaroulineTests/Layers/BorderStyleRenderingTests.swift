@@ -99,6 +99,70 @@ struct BorderStyleRenderingTests {
         #expect(picture.red > 230 && picture.green < 30)
     }
 
+    /// A styled highlight cuts into its edge, but not through the padding over the letters, and
+    /// leaves the rest of its box whole.
+    @Test func cutsAHighlightsEdge() throws {
+        let text = TextLayer(text: "HIGHLIGHTED", color: .black, isHighlighted: true, highlightStyle: .jagged)
+        let layer = Layer(id: UUID(uuid: (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)), content: .text(text))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = try #require(UIGraphicsImageRenderer(size: canvas, format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: canvas))
+            LayerRenderer.draw(layer, picture: nil, in: context.cgContext, canvas: canvas, span: 1)
+        }.cgImage)
+        // The padding above the letters, at the reference size, which fits a 1,080-pixel slide.
+        let padding = TextLayerLayout.highlightPadding.height * TextLayerLayout.make(for: text).fontSize
+        let box = box(of: layer)
+
+        let edge = try stride(from: box.minX + 3 * padding, through: box.maxX - 3 * padding, by: 2).map { x in
+            try #require(TestImages.pixel(of: image, at: CGPoint(x: x, y: box.minY + 0.12 * padding)))
+        }
+        let inside = try stride(from: box.minX + 3 * padding, through: box.maxX - 3 * padding, by: 2).map { x in
+            try #require(TestImages.pixel(of: image, at: CGPoint(x: x, y: box.minY + 0.9 * padding)))
+        }
+        #expect(edge.contains(where: isWhite))
+        #expect(edge.contains(where: isBlack))
+        #expect(inside.allSatisfy(isBlack))
+    }
+
+    /// The screen cuts a highlight's edge from the layer's own randomness, as the export does.
+    @Test func cutsAHighlightOnScreenAsTheExportDoes() throws {
+        let text = TextLayer(text: "Torn", color: .black, isHighlighted: true, highlightStyle: .torn)
+        let layer = Layer(content: .text(text))
+        let size = LayerGeometry.frame(of: layer, canvas: CGSize(width: 800, height: 800), span: 1).size
+        let view = LayerContentView(layer: layer, projectID: UUID(), background: .white, size: size)
+            .frame(width: size.width, height: size.height)
+            .background(Color.white)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1
+        let screen = try #require(renderer.cgImage)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let exported = try #require(UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            LayerRenderer.drawText(text, seed: layer.id, in: context.cgContext, box: CGRect(origin: .zero, size: size))
+        }.cgImage)
+
+        var compared = 0
+        var differing = 0
+        for y in stride(from: 1, to: size.height - 1, by: 2) {
+            for x in stride(from: 1, to: size.width - 1, by: 3) {
+                let onScreen = try #require(TestImages.pixel(of: screen, at: CGPoint(x: x, y: y)))
+                let inExport = try #require(TestImages.pixel(of: exported, at: CGPoint(x: x, y: y)))
+                compared += 1
+                if abs(onScreen.red - inExport.red) > 64 {
+                    differing += 1
+                }
+            }
+        }
+        // Pixels on a cut can be smoothed differently.
+        #expect(differing <= compared / 25, "\(differing) of \(compared)")
+    }
+
     /// A burnt border chars darker toward its edge, without cutting through to the slide there.
     @Test func charsABurntBorder() throws {
         let layer = layer(.burnt, color: .white)
