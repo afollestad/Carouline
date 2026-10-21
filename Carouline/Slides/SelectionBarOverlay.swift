@@ -14,6 +14,9 @@ struct SelectionBarOverlay: ViewModifier {
     let onChoosePhoto: (CellAddress) -> Void
     /// Replaces the photo at an address with a camera capture, once its zoom is saved.
     let onTakePhoto: (CellAddress) -> Void
+    /// Holds the photo at an address to put in whichever cell is tapped next, once its zoom is
+    /// saved.
+    let onMove: (CellAddress) -> Void
     let onRemove: (CellAddress) -> Void
     /// Saves the zoom slider's crop once it's let go.
     let onCommitZoom: () -> Void
@@ -50,6 +53,7 @@ struct SelectionBarOverlay: ViewModifier {
                 hasCamera: CameraPicker.isAvailable,
                 onChoosePhoto: { onChoosePhoto(selection) },
                 onTakePhoto: { onTakePhoto(selection) },
+                onMove: { onMove(selection) },
                 onReset: {
                     session.liveCrop = nil
                     library.setCrop(ImageCrop(), at: selection)

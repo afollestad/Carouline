@@ -366,4 +366,86 @@ extension ProjectFileTests {
           }
         }
         """
+
+    /// A project as version 6 saves it, with a tray of a library photo and a wide one with no
+    /// original, and a slide whose photo is a clone of the first. Every build must keep reading
+    /// it, and writes it back the same.
+    static let version6 = """
+        {
+          "formatVersion" : 6,
+          "project" : {
+            "aspectRatio" : {
+              "height" : 7,
+              "pixelHeight" : 2800,
+              "pixelWidth" : 2000,
+              "width" : 5
+            },
+            "createdAt" : "2026-10-12T15:00:00Z",
+            "id" : "6A1F2B3C-0000-4000-8000-000000000001",
+            "modifiedAt" : "2026-10-12T16:30:00Z",
+            "name" : "Lisbon",
+            "slides" : [
+              {
+                "cells" : [
+                  {
+                    "image" : {
+                      "assetIdentifier" : "ABC123/L0/001",
+                      "crop" : {
+                        "centerX" : 0.5,
+                        "centerY" : 0.4,
+                        "scale" : 1.5
+                      },
+                      "id" : "6A1F2B3C-0000-4000-8000-000000000003",
+                      "pixelHeight" : 3072,
+                      "pixelWidth" : 2304,
+                      "trayPhotoID" : "6A1F2B3C-0000-4000-8000-000000000010"
+                    }
+                  }
+                ],
+                "id" : "6A1F2B3C-0000-4000-8000-000000000002",
+                "layout" : "single",
+                "span" : 1,
+                "style" : {
+                  "background" : {
+                    "blue" : 1,
+                    "green" : 1,
+                    "red" : 1
+                  },
+                  "border" : 0,
+                  "spacing" : 0.01
+                }
+              }
+            ],
+            "tray" : [
+              {
+                "id" : "6A1F2B3C-0000-4000-8000-000000000010",
+                "image" : {
+                  "assetIdentifier" : "ABC123/L0/001",
+                  "crop" : {
+                    "centerX" : 0.5,
+                    "centerY" : 0.5,
+                    "scale" : 1
+                  },
+                  "id" : "6A1F2B3C-0000-4000-8000-000000000011",
+                  "pixelHeight" : 3072,
+                  "pixelWidth" : 2304
+                }
+              },
+              {
+                "id" : "6A1F2B3C-0000-4000-8000-000000000012",
+                "image" : {
+                  "crop" : {
+                    "centerX" : 0.5,
+                    "centerY" : 0.5,
+                    "scale" : 1
+                  },
+                  "id" : "6A1F2B3C-0000-4000-8000-000000000013",
+                  "pixelHeight" : 1024,
+                  "pixelWidth" : 4096
+                }
+              }
+            ]
+          }
+        }
+        """
 }

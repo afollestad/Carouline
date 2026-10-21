@@ -69,8 +69,24 @@ struct ProjectFileTests {
         let project = try ProjectFile.decode(Data(Self.version5.utf8))
         #expect(project.aspectRatio == AspectRatio(width: 5, height: 7, pixelWidth: 2000, pixelHeight: 2800))
         #expect(project.slides.map(\.style) == [.standard, SlideStyle(spacing: 0.02, border: 0.03, background: .black)])
-        // Writes back as read, with the style on every slide, even the standard one.
-        #expect(String(bytes: try ProjectFile.encode(project), encoding: .utf8) == Self.version5)
+        // Writes back as read, as the current version, with the style on every slide, even the
+        // standard one.
+        let current = Self.version5.replacingOccurrences(
+            of: "\"formatVersion\" : 5",
+            with: "\"formatVersion\" : \(ProjectFile.currentFormatVersion)"
+        )
+        #expect(String(bytes: try ProjectFile.encode(project), encoding: .utf8) == current)
+    }
+
+    @Test func readsVersion6() throws {
+        let project = try ProjectFile.decode(Data(Self.version6.utf8))
+        #expect(project.tray.map(\.image.assetIdentifier) == ["ABC123/L0/001", nil])
+        #expect(project.tray[1].image.pixelSize == CGSize(width: 4096, height: 1024))
+        let clone = try #require(project.slides.first?.cells.first?.image)
+        #expect(clone.trayPhotoID == project.tray[0].id)
+        #expect(project.slidesHoldingTrayPhotos == [project.tray[0].id: [0]])
+        #expect(project.images.map(\.id) == [clone.id] + project.tray.map(\.image.id))
+        #expect(String(bytes: try ProjectFile.encode(project), encoding: .utf8) == Self.version6)
     }
 
     /// Versions 1 to 4 saved only presets, by name.
@@ -162,7 +178,15 @@ struct ProjectFileTests {
     }
 
     @Test func roundTrips() throws {
-        let image = PlacedImage(assetIdentifier: "A/B/C", pixelWidth: 3072, pixelHeight: 2048, crop: ImageCrop(scale: 2, centerX: 0.4, centerY: 0.6))
+        let gathered = TrayPhoto(image: PlacedImage(assetIdentifier: "A/B/C", pixelWidth: 3072, pixelHeight: 2048))
+        let wide = TrayPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 4000, pixelHeight: 1000))
+        let image = PlacedImage(
+            assetIdentifier: "A/B/C",
+            pixelWidth: 3072,
+            pixelHeight: 2048,
+            crop: ImageCrop(scale: 2, centerX: 0.4, centerY: 0.6),
+            trayPhotoID: gathered.id
+        )
         let sticker = PlacedImage(assetIdentifier: nil, pixelWidth: 500, pixelHeight: 500, fileFormat: .png)
         let framed = SlideStyle(spacing: 0.03, border: 0.02, background: RGBColor(red: 0.1, green: 0.2, blue: 0.3))
         let flush = SlideStyle(spacing: 0, border: 0, background: .black)
@@ -182,6 +206,7 @@ struct ProjectFileTests {
                     style: flush
                 )
             ],
+            tray: [gathered, wide],
             createdAt: Date(timeIntervalSince1970: 1_800_000_000)
         )
         let data = try ProjectFile.encode(project)

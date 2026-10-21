@@ -46,4 +46,17 @@ struct PlacedImageTests {
         #expect(decoded == image)
         #expect(image.fileName == "6A1F2B3C-0000-4000-8000-000000000003.png")
     }
+
+    /// Only a clone of a tray photo names one, so other copies save as they did before trays.
+    @Test func keepsTheTrayPhotoItCameFrom() throws {
+        let trayPhotoID = UUID()
+        let clone = PlacedImage(id: Self.id, assetIdentifier: nil, pixelWidth: 400, pixelHeight: 300, trayPhotoID: trayPhotoID)
+
+        let json = try encoded(clone)
+        let decoded = try JSONDecoder().decode(PlacedImage.self, from: Data(json.utf8))
+
+        #expect(json.contains(#""trayPhotoID" : "\#(trayPhotoID.uuidString)""#))
+        #expect(decoded == clone)
+        #expect(try !encoded(PlacedImage(id: Self.id, assetIdentifier: nil, pixelWidth: 400, pixelHeight: 300)).contains("trayPhotoID"))
+    }
 }

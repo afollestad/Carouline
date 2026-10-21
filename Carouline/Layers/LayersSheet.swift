@@ -75,6 +75,20 @@ struct LayersSheet: View {
                 switch page {
                 case .add:
                     AddLayerPage(library: library, slideID: slideID, onAdd: add, close: close)
+                case .addImage:
+                    AddImageLayerPage(
+                        library: library,
+                        projectID: projectID,
+                        slideID: slideID,
+                        onAdd: { photo in
+                            let source = library.trayCopySource(of: photo, in: projectID)
+                            actions.importImage(slideID, photo.image.assetIdentifier) {
+                                try await source()
+                            }
+                        },
+                        chooseFromLibrary: { isPickingImage = true },
+                        close: close
+                    )
                 case .text(let layerID):
                     TextLayerEditor(
                         layerID: layerID,
@@ -185,6 +199,9 @@ struct LayersSheet: View {
         .onAppear {
             isGone = false
         }
+        .task {
+            addOnOpening()
+        }
         .onDisappear {
             isGone = true
             session.typingLayerID = nil
@@ -289,10 +306,21 @@ struct LayersSheet: View {
         }
     }
 
+    /// Starts adding the layer the sheet was opened to add, if any.
+    private func addOnOpening() {
+        guard let kind = session.addsOnOpening else {
+            return
+        }
+        session.addsOnOpening = nil
+        add(kind)
+    }
+
     /// Adds a layer of `kind`: new text starts as a draft in the middle of the slide, or of a
     /// panorama's middle slide, since its own middle can fall on a cut, and opens in its editor.
-    /// A picture is picked first, and lands there once it's copied. A color the picker left
-    /// unsaved is saved first, so new text reads on it.
+    /// A picture is picked first, on a page of the tray's photos with a way to the library's, and
+    /// lands there once it's copied. A page rather than the library's picker at once, which can't
+    /// show while the sheet that asks for it is still opening.
+    /// A color the picker left unsaved is saved first, so new text reads on it.
     private func add(_ kind: LayerKind) {
         session.endStyling(to: library, projectID: projectID)
         guard let project = library.project(projectID), let slide = project.slides.first(where: { $0.id == slideID }) else {
@@ -309,7 +337,7 @@ struct LayersSheet: View {
             actions.select(LayerAddress(projectID: projectID, slideID: slideID, layerID: layer.id))
             session.sheetPath = [.text(layer.id)]
         case .image:
-            isPickingImage = true
+            session.sheetPath.append(.addImage)
         }
     }
 }

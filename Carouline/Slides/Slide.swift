@@ -131,6 +131,11 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
         cells.indices.count { cells[$0].image == nil && !skipping.contains($0) }
     }
 
+    /// The first cell in reading order with no photo, leaving out those in `skipping`.
+    func firstEmptyCell(skipping: Set<Int> = []) -> Int? {
+        cells.indices.first { cells[$0].image == nil && !skipping.contains($0) }
+    }
+
     /// The cells `count` photos picked for cell `index` go in: it and the empty cells after it,
     /// wrapping round to those before it, in reading order. The photos then fill the slide top to
     /// bottom and left to right, and the cell they were picked for always gets one. A cell with a

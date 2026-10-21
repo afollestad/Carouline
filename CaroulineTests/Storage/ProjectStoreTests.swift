@@ -105,6 +105,79 @@ struct ProjectStoreTests {
         #expect(!exists(paths.imageFile(named: orphan, in: project.id)))
     }
 
+    /// A tray's photos are the project's too, though no slide holds them yet.
+    @Test func keepsTrayCopiesThroughTheSweep() async throws {
+        let store = ProjectStore(paths: paths)
+        let photo = TrayPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10))
+        let project = Project(name: "Tray", aspectRatio: .portrait, tray: [photo], createdAt: Self.created)
+        try await store.save(project)
+        _ = try await store.adoptImage(at: try writeImport(), as: photo.image.fileName, in: project.id)
+
+        let stored = await ProjectStore(paths: paths).loadAll()
+
+        #expect(stored.projects == [project])
+        #expect(exists(paths.imageFile(named: photo.image.fileName, in: project.id)))
+    }
+
+    /// A cell a tray photo fills holds a clone of its own, which outlives the tray's copy.
+    @Test func clonesACopyThatOutlivesItsOriginal() async throws {
+        let store = ProjectStore(paths: paths)
+        let project = Project(name: "Clones", aspectRatio: .portrait)
+        try await store.save(project)
+        let original = "\(UUID().uuidString).jpg"
+        let clone = "\(UUID().uuidString).jpg"
+        _ = try await store.adoptImage(at: try writeImport(), as: original, in: project.id)
+
+        let kept = try await store.cloneImage(named: original, from: project.id, as: clone, in: project.id)
+        await store.deleteImages([original], in: project.id)
+
+        #expect(kept)
+        #expect(try Data(contentsOf: paths.imageFile(named: clone, in: project.id)) == Self.importedBytes)
+    }
+
+    @Test func clonesBetweenProjects() async throws {
+        let store = ProjectStore(paths: paths)
+        let source = Project(name: "Source", aspectRatio: .portrait)
+        let destination = Project(name: "Destination", aspectRatio: .portrait)
+        try await store.save(source)
+        try await store.save(destination)
+        let original = "\(UUID().uuidString).jpg"
+        let clone = "\(UUID().uuidString).jpg"
+        _ = try await store.adoptImage(at: try writeImport(), as: original, in: source.id)
+
+        let kept = try await store.cloneImage(named: original, from: source.id, as: clone, in: destination.id)
+
+        #expect(kept)
+        #expect(exists(paths.imageFile(named: original, in: source.id)))
+        #expect(exists(paths.imageFile(named: clone, in: destination.id)))
+    }
+
+    @Test func clonesNothingIntoADeletedProject() async throws {
+        let store = ProjectStore(paths: paths)
+        let source = Project(name: "Source", aspectRatio: .portrait)
+        let gone = Project(name: "Gone", aspectRatio: .portrait)
+        try await store.save(source)
+        try await store.save(gone)
+        let original = "\(UUID().uuidString).jpg"
+        _ = try await store.adoptImage(at: try writeImport(), as: original, in: source.id)
+
+        try await store.delete(projectID: gone.id)
+        let kept = try await store.cloneImage(named: original, from: source.id, as: "\(UUID().uuidString).jpg", in: gone.id)
+
+        #expect(!kept)
+        #expect(!exists(paths.folder(for: gone.id)))
+    }
+
+    @Test func throwsCloningAMissingCopy() async throws {
+        let store = ProjectStore(paths: paths)
+        let project = Project(name: "Missing", aspectRatio: .portrait)
+        try await store.save(project)
+
+        await #expect(throws: (any Error).self) {
+            try await store.cloneImage(named: "\(UUID().uuidString).jpg", from: project.id, as: "\(UUID().uuidString).jpg", in: project.id)
+        }
+    }
+
     @Test func sweepsCrashLeftoversAndTemporaryFiles() async throws {
         let leftover = paths.folder(for: UUID())
         try FileManager.default.createDirectory(at: leftover.appending(path: "Images"), withIntermediateDirectories: true)
@@ -236,11 +309,14 @@ struct ProjectStoreTests {
 
     // MARK: Helpers
 
+    /// What `writeImport()` writes: a JPEG's first bytes.
+    private static let importedBytes = Data([0xFF, 0xD8])
+
     /// A file standing in for an image copy that finished importing.
     private func writeImport() throws -> URL {
         try FileManager.default.createDirectory(at: paths.imports, withIntermediateDirectories: true)
         let file = paths.imports.appending(path: "\(UUID().uuidString).jpg")
-        try Data([0xFF, 0xD8]).write(to: file)
+        try Self.importedBytes.write(to: file)
         return file
     }
 

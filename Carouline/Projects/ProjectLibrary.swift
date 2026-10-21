@@ -18,6 +18,8 @@ final class ProjectLibrary {
     var importingCells: Set<CellAddress> = []
     /// Slides with pictures on their way in as layers, and how many each.
     var importingLayers: [UUID: Int] = [:]
+    /// Projects with photos on their way into the tray, and how many each.
+    var importingTray: [UUID: Int] = [:]
     /// The last write or import that failed, until someone shows it.
     var failure: LibraryFailure?
 
@@ -205,7 +207,7 @@ struct LibraryFailure: Identifiable {
 }
 
 /// A cell in a slide of a project.
-nonisolated struct CellAddress: Hashable, Identifiable, Sendable {
+nonisolated struct CellAddress: Codable, Hashable, Identifiable, Sendable {
     let projectID: UUID
     let slideID: UUID
     let index: Int

@@ -69,6 +69,16 @@ nonisolated enum SelectionHit {
         }
         return CGPoint(x: point.x - frame.minX, y: point.y - frame.minY)
     }
+
+    /// The cell at `point`, in `canvas`'s coordinates: the one it's within, or else the first whose
+    /// fingertip's reach it's within, or nil when it's off every cell.
+    static func cell(at point: CGPoint, of slide: Slide, style: SlideStyle, on canvas: LayerCanvas) -> Int? {
+        let frames = SlideGeometry.cellFrames(for: slide.layout, in: canvas.size, style: style, span: slide.span)
+        if let index = frames.firstIndex(where: { $0.contains(point) }) {
+            return index
+        }
+        return frames.indices.first { cellPoint(point, cell: $0, of: slide, style: style, on: canvas) != nil }
+    }
 }
 
 /// Drags, pinches and twists that move the selected photo or layer. The strip's one gesture,

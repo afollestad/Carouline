@@ -51,7 +51,17 @@ final class DebugSettings {
     let selectedCell: (slide: Int, cell: Int)?
     /// A layer in the open project to select on launch, by slide and layer index from the bottom.
     let selectedLayer: (slide: Int, layer: Int)?
+    /// A photo in the open project to hold on launch, to place by tapping a cell.
+    let heldPhoto: Hold?
     let sheet: Sheet?
+
+    /// A photo to hold on launch.
+    enum Hold: Equatable {
+        /// A cell's, by slide and cell index.
+        case cell(slide: Int, cell: Int)
+        /// The tray's, by its place in the tray.
+        case tray(Int)
+    }
 
     /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects), `-DebugDemoProjects` (`YES`
     /// swaps in demo projects for screenshots, unless `-DebugSampleProjects` is on),
@@ -61,10 +71,12 @@ final class DebugSettings {
     /// tour, as a fresh install does, unless either of the others is on), `-DebugOpenProject` (a
     /// project's index in the list, from 0), `-DebugSelectCell` (a photo to frame in it, as slide
     /// and cell indexes like `2,0`), `-DebugSelectLayer` (a layer to move in it, as slide and
-    /// layer indexes like `2,0`, layers counted from the bottom) and `-DebugSheet` (`newProject`, or
-    /// `customRatio` for its custom page, on the list, or `layout`, `export`, `layers`, `addLayer`
-    /// or `editLayer` in the open project, the last three for `-DebugSelectLayer`'s slide or else
-    /// the first, and `editLayer` for its layer) from `arguments`, ignoring values it can't parse.
+    /// layer indexes like `2,0`, layers counted from the bottom), `-DebugHoldPhoto` (a photo in it
+    /// to hold for placing, as slide and cell indexes like `2,0`, or as `tray,` and its place in the
+    /// tray from 0, like `tray,1`) and `-DebugSheet` (`newProject`, or `customRatio` for its custom
+    /// page, on the list, or `layout`, `export`, `layers`, `addLayer` or `editLayer` in the open
+    /// project, the last three for `-DebugSelectLayer`'s slide or else the first, and `editLayer`
+    /// for its layer) from `arguments`, ignoring values it can't parse.
     init(arguments: [String: Any] = [:]) {
         func isOn(_ key: String) -> Bool {
             (arguments[key] as? String).map(Self.isTrue) ?? false
@@ -84,6 +96,7 @@ final class DebugSettings {
         selectedCell = cell.count == 2 ? (cell[0], cell[1]) : nil
         let layer = (arguments["DebugSelectLayer"] as? String)?.split(separator: ",").compactMap { Int($0) } ?? []
         selectedLayer = layer.count == 2 ? (layer[0], layer[1]) : nil
+        heldPhoto = (arguments["DebugHoldPhoto"] as? String).flatMap(Self.hold(from:))
         sheet = (arguments["DebugSheet"] as? String).flatMap(Sheet.init(rawValue:))
     }
 
@@ -91,6 +104,18 @@ final class DebugSettings {
     /// nothing a previous session wrote to `UserDefaults` can switch an override on.
     static func fromLaunchArguments() -> DebugSettings {
         DebugSettings(arguments: UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain))
+    }
+
+    /// `2,0` as slide 2's cell 0, or `tray,1` as the tray's second photo.
+    private nonisolated static func hold(from string: String) -> Hold? {
+        let parts = string.split(separator: ",")
+        guard parts.count == 2, let index = Int(parts[1]) else {
+            return nil
+        }
+        if parts[0] == "tray" {
+            return .tray(index)
+        }
+        return Int(parts[0]).map { .cell(slide: $0, cell: index) }
     }
 
     private nonisolated static func isTrue(_ string: String) -> Bool {

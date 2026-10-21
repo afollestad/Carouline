@@ -49,6 +49,12 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(styledProject))
     }
 
+    /// A photo held to move: its cell marked, the empty cell offering a place, and the bar asking
+    /// for a cell.
+    @Test func movingPhoto() async {
+        await assertScreenSnapshot(of: projectScreen(projects[1], held: heldFirstPhoto(of: projects[1])))
+    }
+
     @Test func exportSlides() async throws {
         try await assertScreenSnapshot(of: exportSheet(projects[0]))
     }

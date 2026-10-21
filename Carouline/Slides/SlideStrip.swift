@@ -60,6 +60,8 @@ struct SlideStrip: View {
     /// find a column of bar buttons beside it.
     @State private var safeFrame: CGRect = .zero
     @State private var screenFrame: CGRect = .zero
+    /// The slide a drop hovers over, which comes to the front once the drop rests there.
+    @State private var dropHoverSlideID: UUID?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -67,16 +69,21 @@ struct SlideStrip: View {
     private static let captionSpace: CGFloat = 56
     private static let spacing: CGFloat = 20
     private static let addButtonSize: CGFloat = 56
+    /// Long enough for a drag on its way past a slide not to bring it forward.
+    private static let dropHoverDelay = Duration.milliseconds(600)
 
     var body: some View {
         let fit = roomFit
         return Group {
             if project.slides.isEmpty {
-                GhostSlide(size: cardSize(span: 1), onAdd: onAddSlide)
+                GhostSlide(size: cardSize(span: 1), hasTrayPhotos: !project.tray.isEmpty, onAdd: onAddSlide)
                     .padding(.bottom, SelectionBar.reservedHeight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 strip(screenPoint: 1 / fit.scale)
+                    .task(id: dropHoverSlideID) {
+                        await bringDropHoverForward()
+                    }
             }
         }
         .onGeometryChange(for: CGSize.self) { proxy in
@@ -239,7 +246,16 @@ struct SlideStrip: View {
             onChangeLayout: { onChangeLayout(slide.id) },
             onMove: { onMove(slide.id, $0) },
             onDelete: { onDelete(slide.id) },
-            onSetSpan: { onSetSpan(slide.id, $0) }
+            onSetSpan: { onSetSpan(slide.id, $0) },
+            acceptsDrops: layersSlideID == nil && !isAnythingSelected && cellActions.held == nil,
+            onDropHover: { slideID, isOver in
+                // Left alone when a drop leaves a slide after entering the next.
+                if isOver {
+                    dropHoverSlideID = slideID
+                } else if dropHoverSlideID == slideID {
+                    dropHoverSlideID = nil
+                }
+            }
         )
         .id(StripItem.slide(slide.id))
         // The others hold still too while a slide's layers sheet is open, to fingers and
@@ -250,6 +266,21 @@ struct SlideStrip: View {
 
     private var isAnythingSelected: Bool {
         session.selection != nil || layerSession.selection != nil
+    }
+
+    /// Brings the slide a drop rests over to the front, since the strip doesn't scroll for a drag
+    /// along its edge. After a moment, so a drag passing over a neighbor on its way leaves it.
+    private func bringDropHoverForward() async {
+        guard let slideID = dropHoverSlideID, project.frontSlide(at: position)?.id != slideID else {
+            return
+        }
+        try? await Task.sleep(for: Self.dropHoverDelay)
+        guard !Task.isCancelled else {
+            return
+        }
+        withAnimation {
+            position = .slide(slideID)
+        }
     }
 
     /// Rests the strip with a slide, or the add button, in the middle of the screen. View-aligned
@@ -355,6 +386,8 @@ private struct AddSlideButton: View {
 /// Where the first slide will go, in the project's shape.
 private struct GhostSlide: View {
     let size: CGSize
+    /// Whether the tray below has photos to start a slide with.
+    let hasTrayPhotos: Bool
     let onAdd: () -> Void
 
     var body: some View {
@@ -373,11 +406,21 @@ private struct GhostSlide: View {
                     .buttonBorderShape(.circle)
                     .accessibilityHint("Choose a layout for the first slide")
                 }
-            Text("Add a slide to start your carousel.")
+            Text(caption)
                 .font(.subheadline)
                 .foregroundStyle(Color.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: size.width)
         }
         .padding(.bottom, 40)
+    }
+
+    private var caption: String {
+        if hasTrayPhotos {
+            "Add a slide, or tap a photo below to start one with it."
+        } else {
+            "Add a slide to start your carousel, or gather photos below first."
+        }
     }
 }
 

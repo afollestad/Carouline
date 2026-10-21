@@ -24,7 +24,7 @@ enum DemoProjects {
             slides: [
                 Slide(
                     layout: .single,
-                    cells: [photo(101, .sunset, 1600, 2000)],
+                    cells: [photo(101, .sunset, 1600, 2000, fromTray: 201)],
                     layers: [
                         text("Lisbon", font: .didot, centerY: 0.16, scale: 1.6),
                         text("A long weekend", font: .avenirNext, centerY: 0.25, scale: 0.55)
@@ -32,13 +32,16 @@ enum DemoProjects {
                 ),
                 Slide(
                     layout: .twoColumns,
-                    cells: [photo(102, .ember, 1200, 1600), photo(103, .sky, 1200, 1600, crop: ImageCrop(scale: 1.3, centerX: 0.6, centerY: 0.6))],
+                    cells: [
+                        photo(102, .ember, 1200, 1600, fromTray: 202),
+                        photo(103, .sky, 1200, 1600, crop: ImageCrop(scale: 1.3, centerX: 0.6, centerY: 0.6))
+                    ],
                     style: SlideStyle(spacing: 0.02, border: 0.03, background: cream)
                 ),
                 Slide(
                     layout: .grid,
                     cells: [
-                        photo(104, .lagoon, 1600, 1600),
+                        photo(104, .lagoon, 1600, 1600, fromTray: 204),
                         photo(105, .dusk, 1600, 1600),
                         photo(106, .sunset, 1600, 1200),
                         photo(107, .ember, 1200, 1600)
@@ -52,12 +55,12 @@ enum DemoProjects {
                 Slide(
                     layout: .panorama,
                     span: 3,
-                    cells: [photo(109, .dusk, 3840, 1600)],
+                    cells: [photo(109, .dusk, 3840, 1600, fromTray: 203)],
                     layers: [text("Alfama at dusk", font: .script, centerX: 1.5, centerY: 0.2, scale: 2.2)]
                 ),
                 Slide(
                     layout: .oneTopTwoBottom,
-                    cells: [photo(110, .sky, 1600, 1067), photo(111, .lagoon, 1200, 1600), photo(112, .sunset, 1200, 1600)]
+                    cells: [photo(110, .sky, 1600, 1067, fromTray: 205), photo(111, .lagoon, 1200, 1600), photo(112, .sunset, 1200, 1600)]
                 ),
                 Slide(
                     layout: .single,
@@ -65,6 +68,17 @@ enum DemoProjects {
                     layers: [text("Até já, Lisboa", font: .handwriting, centerY: 0.5, scale: 1.1)],
                     blur: 0.02
                 )
+            ],
+            // Most of the photos gathered for it on slides, and a few still to place.
+            tray: [
+                trayPhoto(201, .sunset, 1600, 2000),
+                trayPhoto(202, .ember, 1200, 1600),
+                trayPhoto(206, .sky, 1600, 1200),
+                trayPhoto(203, .dusk, 3840, 1600),
+                trayPhoto(204, .lagoon, 1600, 1600),
+                trayPhoto(207, .dusk, 1200, 1600),
+                trayPhoto(205, .sky, 1600, 1067),
+                trayPhoto(208, .dusk, 1600, 1067)
             ],
             createdAt: date(daysAgo: 0.1)
         )
@@ -372,14 +386,42 @@ enum DemoProjects {
 
     /// Photos are about 1,600 pixels on their longer side, sharp in a 13-inch iPad's strip, yet
     /// few enough that `SampleStore` draws the whole set in under a second at launch.
-    private static func photo(_ number: UInt16, _ palette: Palette, _ width: Int, _ height: Int, crop: ImageCrop = ImageCrop()) -> Cell {
+    /// `fromTray`, when given, is the tray photo the cell's photo was cloned from.
+    private static func photo(
+        _ number: UInt16,
+        _ palette: Palette,
+        _ width: Int,
+        _ height: Int,
+        crop: ImageCrop = ImageCrop(),
+        fromTray trayNumber: UInt16? = nil
+    ) -> Cell {
         var placed = image(number, palette, width, height)
         placed.crop = crop
+        placed.trayPhotoID = trayNumber.map { trayPhotoID($0) }
         return Cell(image: placed)
     }
 
-    private static func image(_ number: UInt16, _ palette: Palette, _ width: Int, _ height: Int, format: ImageFileFormat = .jpeg) -> PlacedImage {
-        let id = UUID(uuid: (0xDE, 0x30, 0xDE, 0x30, 0, 0, 0x40, 0, 0x80, 0, 0, 0, UInt8(number >> 8), UInt8(number & 0xFF), 0, palette.rawValue))
+    /// Tray photo `number`, in the palette and shape of the cell's photo cloned from it, so the two
+    /// match, and its copy, image `number` of the tray's own, which no cell's copy shares.
+    private static func trayPhoto(_ number: UInt16, _ palette: Palette, _ width: Int, _ height: Int) -> TrayPhoto {
+        TrayPhoto(id: trayPhotoID(number), image: image(number, palette, width, height, isTrays: true))
+    }
+
+    private static func trayPhotoID(_ number: UInt16) -> UUID {
+        UUID(uuid: (0xDE, 0x30, 0xDE, 0x30, 0, 0, 0x40, 0, 0x80, 0, 0, 0x01, UInt8(number >> 8), UInt8(number & 0xFF), 0, 0))
+    }
+
+    /// `isTrays` sets an ID byte of its own, since tray numbers overlap other projects' images'.
+    private static func image(
+        _ number: UInt16,
+        _ palette: Palette,
+        _ width: Int,
+        _ height: Int,
+        format: ImageFileFormat = .jpeg,
+        isTrays: Bool = false
+    ) -> PlacedImage {
+        let (high, low) = (UInt8(number >> 8), UInt8(number & 0xFF))
+        let id = UUID(uuid: (0xDE, 0x30, 0xDE, 0x30, 0, 0, 0x40, 0, 0x80, 0, 0, 0, high, low, isTrays ? 1 : 0, palette.rawValue))
         return PlacedImage(id: id, assetIdentifier: nil, pixelWidth: width, pixelHeight: height, fileFormat: format)
     }
 

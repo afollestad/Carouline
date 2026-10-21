@@ -17,6 +17,8 @@ struct SelectionBar: View {
     let hasCamera: Bool
     let onChoosePhoto: () -> Void
     let onTakePhoto: () -> Void
+    /// Holds the photo to put in whichever cell is tapped next.
+    let onMove: () -> Void
     let onReset: () -> Void
     let onRemove: () -> Void
     /// Saves the slider's crop once it's let go.
@@ -33,6 +35,7 @@ struct SelectionBar: View {
                             Button("Take Photo", systemImage: "camera", action: onTakePhoto)
                         }
                     }
+                    Button("Move Photo…", systemImage: "arrow.up.and.down.and.arrow.left.and.right", action: onMove)
                     Button("Remove Photo", systemImage: "trash", role: .destructive, action: onRemove)
                 } label: {
                     Label("Photo Options", systemImage: "photo")
@@ -95,6 +98,7 @@ struct SelectionBar: View {
             hasCamera: true,
             onChoosePhoto: {},
             onTakePhoto: {},
+            onMove: {},
             onReset: {},
             onRemove: {},
             onCommitZoom: {},

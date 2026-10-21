@@ -17,6 +17,9 @@ struct LayerActions {
     let edit: (LayerAddress) -> Void
     /// Opens the layers sheet for a slide, at its list or past it at the pages given.
     let openSheet: (UUID, [LayersPage]) -> Void
+    /// Opens the layers sheet for a slide to add a layer of a kind: a text layer's editor, or the
+    /// picker for a picture.
+    let addLayer: (UUID, LayerKind) -> Void
     /// Copies a picture onto a slide as a layer, with its library identifier, from what the
     /// picker hands over.
     let importImage: (UUID, String?, @escaping @Sendable () async throws -> PhotoSource?) -> Void
@@ -41,6 +44,7 @@ struct LayerActions {
         delete: { _ in },
         edit: { _ in },
         openSheet: { _, _ in },
+        addLayer: { _, _ in },
         importImage: { _, _, _ in },
         restoreImage: { _, _ in },
         restoreImageQuietly: { _, _ in },
@@ -65,6 +69,11 @@ struct LayerInteraction {
     /// How many of the slide's points a point on screen covers, which a fingertip's target grows by
     /// while the slides are scaled down.
     var screenPoint: CGFloat = 1
+    /// The photo held to put in whichever cell or picture is tapped next, if any. A picture layer
+    /// takes one from the tray; any other layer lets the tap through to the cell under it.
+    var heldPhoto: HeldPhoto?
+    /// Puts the held photo in the picture layer at an address.
+    var placeHeld: (LayerAddress) -> Void = { _ in }
 }
 
 /// A slide's layers over a canvas of `size` spanning `span` slides, each where the export draws
@@ -198,19 +207,32 @@ private struct PlacedLayer: View {
                 LayerHitShape(box: LayerGeometry.hitBox(of: placed, on: canvas), rotation: placement.rotation)
             )
             .onTapGesture {
-                if !isSelected {
+                if takesHeldPhoto {
+                    interaction?.placeHeld(slide.address(of: layer))
+                } else if !isSelected {
                     interaction?.actions.select(slide.address(of: layer))
                 } else {
                     interaction?.actions.edit(slide.address(of: layer))
                 }
             }
             // No menu while anything's selected, where a finger held down may start a drag or a
-            // pinch, and the bar below offers the same choices.
+            // pinch, and the bar below offers the same choices, nor while a photo is held.
             .contextMenu {
-                if let interaction, !interaction.isAnythingSelected {
+                if let interaction, !interaction.isAnythingSelected, interaction.heldPhoto == nil {
                     menu(interaction.actions)
                 }
             }
+            // While a photo is held, only a picture that takes it, so a tap on any other layer
+            // reaches the cell under it rather than selecting the layer and letting the photo go.
+            .allowsHitTesting(interaction?.heldPhoto == nil || takesHeldPhoto)
+    }
+
+    /// Whether a tap puts the held photo in the layer: a picture, with a photo from the tray held.
+    private var takesHeldPhoto: Bool {
+        guard case .tray = interaction?.heldPhoto, layer.image != nil else {
+            return false
+        }
+        return true
     }
 
     /// What the picture's placeholder offers, should its copy be missing.
@@ -257,14 +279,16 @@ private struct PlacedLayer: View {
         content
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
-            .accessibilityHint(isSelected || interaction == nil ? "" : "Selects the layer to move, resize and turn it")
+            .accessibilityHint(accessibilityHint(isSelected: isSelected))
             .accessibilityAction {
-                if !isSelected {
+                if takesHeldPhoto {
+                    interaction?.placeHeld(slide.address(of: layer))
+                } else if !isSelected, interaction?.heldPhoto == nil {
                     interaction?.actions.select(slide.address(of: layer))
                 }
             }
             .accessibilityActions {
-                if let interaction {
+                if let interaction, interaction.heldPhoto == nil {
                     if isSelected {
                         Button("Move Left") { nudge(interaction, x: -0.05) }
                         Button("Move Right") { nudge(interaction, x: 0.05) }
@@ -278,6 +302,16 @@ private struct PlacedLayer: View {
                     menu(interaction.actions)
                 }
             }
+    }
+
+    private func accessibilityHint(isSelected: Bool) -> String {
+        if takesHeldPhoto {
+            "Puts the held photo in the picture"
+        } else if isSelected || interaction == nil {
+            ""
+        } else {
+            "Selects the layer to move, resize and turn it"
+        }
     }
 
     /// Moves the layer a twentieth of its slide, sizes it by `scale`, or turns it by `rotation`,

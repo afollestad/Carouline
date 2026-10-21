@@ -3,13 +3,12 @@
 //  Carouline
 //
 
-import CoreGraphics
-import Foundation
+import SwiftUI
 
 /// What the project screen opens over itself.
 enum ProjectPresentation: Hashable, Identifiable {
     case layout(LayoutPurpose)
-    case photoPicker
+    case photoPicker(PickTarget)
     case camera(CellAddress)
     case export
     /// A slide's layers sheet.
@@ -59,5 +58,90 @@ final class OpenedStyle {
             return false
         }
         return !SlideStrip.layersPopoverFits(span: slide.span, aspectRatio: project.aspectRatio, in: stripSize)
+    }
+}
+
+/// What's open over the project screen, as its presentation modifiers read and close it, and
+/// whether it shows as a sheet or a popover.
+struct ProjectPresenting {
+    @Binding var presenter: PresentationQueue<ProjectPresentation>
+    let openedStyle: OpenedStyle
+    let isCompact: Bool
+    /// The screen's project, which a slide's layers sheet goes with.
+    let project: Project?
+
+    /// Whether `shown` is open, as a presentation modifier reads and dismisses it. A dismissal
+    /// closes `shown` only while it's still open, never one opened since.
+    func isPresenting(_ shown: ProjectPresentation) -> Binding<Bool> {
+        Binding {
+            presenter.current == shown
+        } set: { isPresented in
+            if !isPresented {
+                presenter.dismiss(shown)
+            }
+        }
+    }
+
+    /// Whether the export and layers sheets show as sheets, as on a compact width, or as popovers
+    /// pointing at what opened them, held to how what's open opened.
+    var presentsAsSheets: Bool {
+        openedStyle.prefersSheets ?? prefersSheets(for: presenter.current)
+    }
+
+    func prefersSheets(for presentation: ProjectPresentation?) -> Bool {
+        openedStyle.prefersSheets(for: presentation, isCompact: isCompact, in: project)
+    }
+
+    /// `shownSheet`, as the screen's sheet reads and dismisses it. A dismissal closes the item
+    /// shown only while it's still open, never one opened since.
+    var sheetItem: Binding<ProjectPresentation?> {
+        let shown = shownSheet
+        return Binding {
+            shownSheet
+        } set: { item in
+            if item == nil, let shown {
+                presenter.dismiss(shown)
+            }
+        }
+    }
+
+    /// What's open, when it opens as the screen's sheet. A layers sheet goes with its slide, should
+    /// another window delete it, as the slide's own popover would.
+    var shownSheet: ProjectPresentation? {
+        guard let current = presenter.current, current.opensAsSheet(prefersSheets: presentsAsSheets) else {
+            return nil
+        }
+        if case .layers(let slideID) = current, project?.slides.contains(where: { $0.id == slideID }) != true {
+            return nil
+        }
+        return current
+    }
+
+    /// The pick open, as the photo picker reads and closes it.
+    var pickTarget: Binding<PickTarget?> {
+        Binding {
+            guard case .photoPicker(let target) = presenter.current else {
+                return nil
+            }
+            return target
+        } set: { target in
+            if target == nil {
+                presenter.dismiss { if case .photoPicker = $0 { true } else { false } }
+            }
+        }
+    }
+
+    /// The cell the camera is open for, as its cover reads and closes it.
+    var cameraTarget: Binding<CellAddress?> {
+        Binding {
+            guard case .camera(let target) = presenter.current else {
+                return nil
+            }
+            return target
+        } set: { target in
+            if target == nil {
+                presenter.dismiss { if case .camera = $0 { true } else { false } }
+            }
+        }
     }
 }

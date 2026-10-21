@@ -34,6 +34,10 @@ extension WideSnapshotTests {
         await assertScreenSnapshot(of: projectScreen(styledProject), on: .wide)
     }
 
+    @Test func movingPhoto() async {
+        await assertScreenSnapshot(of: projectScreen(projects[1], held: heldFirstPhoto(of: projects[1])), on: .wide)
+    }
+
     @Test func exportSlides() async throws {
         try await assertScreenSnapshot(of: exportSheet(projects[0]), on: .wide)
     }

@@ -15,6 +15,8 @@ struct ProjectTourHost: ViewModifier {
     let presenter: PresentationQueue<ProjectPresentation>
     let photoSelection: CellAddress?
     let layerSelection: LayerAddress?
+    /// Whether a photo is held to place, which the tips wait out, as they do a selection.
+    let isHoldingPhoto: Bool
     /// Whether an alert is up, which the tips wait out.
     let isFailing: Bool
     @State private var tour: ProjectTour?
@@ -113,7 +115,7 @@ struct ProjectTourHost: ViewModifier {
         return Gate(
             hasTour: tour != nil,
             isPresenting: isPresenting,
-            isIdle: !isPresenting && !isFailing && photoSelection == nil && layerSelection == nil,
+            isIdle: !isPresenting && !isFailing && photoSelection == nil && layerSelection == nil && !isHoldingPhoto,
             frontSlideID: frontSlide?.id
         )
     }

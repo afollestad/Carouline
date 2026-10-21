@@ -20,11 +20,12 @@ enum TourStep: Int, CaseIterable {
     case share
 }
 
-/// The slide menu's choices: a slide's layout, and its layers.
+/// The choices under a slide: its layout and its layers, from their buttons, and the rest from its
+/// menu.
 nonisolated struct SlideMenuTip: Tip {
     var title: Text { Text("Slide Options") }
     var message: Text? {
-        Text("Change a slide's layout, or add and edit its layers, from the menu under it.").foregroundStyle(Color.primary)
+        Text("Change a slide's layout, or add and edit its layers, with the buttons under it.").foregroundStyle(Color.primary)
     }
     var image: Image? { Image(systemName: "ellipsis.circle") }
     var actions: [Action] { [nextAction()] }

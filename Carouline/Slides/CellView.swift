@@ -5,32 +5,6 @@
 
 import SwiftUI
 
-/// What a cell can ask its screen to do.
-struct CellActions {
-    let choosePhoto: (CellAddress) -> Void
-    /// Nil without a camera, as in the simulator.
-    let takePhoto: ((CellAddress) -> Void)?
-    let removePhoto: (CellAddress) -> Void
-    /// Selects the photo to frame it.
-    let select: (CellAddress) -> Void
-    let setCrop: (ImageCrop, CellAddress) -> Void
-    /// Brings a missing photo back from the library, asking for access if need be.
-    let restorePhoto: (CellAddress) -> Void
-    /// Brings a missing photo back from the library if that needs no asking, as when one is
-    /// found missing.
-    let restorePhotoQuietly: (CellAddress) -> Void
-
-    static let preview = CellActions(
-        choosePhoto: { _ in },
-        takePhoto: { _ in },
-        removePhoto: { _ in },
-        select: { _ in },
-        setCrop: { _, _ in },
-        restorePhoto: { _ in },
-        restorePhotoQuietly: { _ in }
-    )
-}
-
 /// One cell of a slide on the project screen: a button to fill it, its photo, or what's left
 /// when the photo's copy is gone.
 struct CellView: View {
@@ -51,9 +25,12 @@ struct CellView: View {
     var isAnythingSelected = false
     /// The photo's blur, as a Gaussian's sigma in points.
     var blur: CGFloat = 0
+    /// Whether a drop over the slide would land here.
+    var isDropTarget = false
     @State private var size: CGSize = .zero
     @State private var isMissing = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.imageLoader) private var loader
 
     var body: some View {
         ZStack {
@@ -64,7 +41,11 @@ struct CellView: View {
                 // cell reads as a space to fill rather than part of the slide.
                 Color.clear
                     .glassEffect(.regular, in: .rect)
-                if !isImporting {
+                if !isImporting, let held = actions.held {
+                    PlaceHereButton(position: position, held: held) {
+                        actions.land(address)
+                    }
+                } else if !isImporting {
                     AddPhotoButton(
                         position: position,
                         emptyCellCount: emptyCellCount,
@@ -75,10 +56,18 @@ struct CellView: View {
                     } choose: {
                         actions.choosePhoto(address)
                     }
+                    .accessibilityDropPoint(.center, description: "Into \(position)", isEnabled: true)
                 }
             }
             if isImporting {
                 importingSpinner
+            }
+        }
+        .overlay {
+            if isDropTarget {
+                Rectangle()
+                    .strokeBorder(.tint, lineWidth: 3)
+                    .accessibilityHidden(true)
             }
         }
         .controlSize(isCompact ? .small : .regular)
@@ -168,18 +157,32 @@ struct CellView: View {
             }
         }
         .id(image.id)
+        // Over the photo, rather than a modifier on it, so turning dragging off and on leaves the
+        // photo and what it has loaded alone.
+        .overlay {
+            if canDrag {
+                dragSurface(image)
+            }
+        }
         .overlay {
             if isSelected {
                 Rectangle()
                     .strokeBorder(.tint, lineWidth: 3)
+                    .accessibilityHidden(true)
+            } else if isHeldHere {
+                // Marching round the photo on its way out, as a cut or a move marks its source.
+                Rectangle()
+                    .strokeBorder(.tint, style: StrokeStyle(lineWidth: 3, dash: [8, 6]))
                     .accessibilityHidden(true)
             }
         }
         // Dragged and pinched by the strip's selection gesture, rather than one of its own, which
         // would claim a pinch's first finger. Its tap still keeps a tap on it from finishing.
         .onTapGesture {
-            // A missing photo has nothing to frame; its own menu offers what can be done.
-            if !isSelected, !isMissing {
+            if actions.held != nil {
+                actions.land(address)
+            } else if !isSelected, !isMissing {
+                // A missing photo has nothing to frame; its own menu offers what can be done.
                 select()
             }
         }
@@ -193,14 +196,20 @@ struct CellView: View {
             .accessibilityElement()
             .accessibilityLabel(isMissing ? "\(position.capitalizingFirstLetter), unavailable" : position.capitalizingFirstLetter)
             .accessibilityAddTraits(isMissing ? [] : isSelected ? [.isImage, .isSelected] : [.isImage])
-            .accessibilityHint(isSelected || isMissing ? "" : "Selects the photo to move and zoom it")
+            .accessibilityHint(hint)
+            .accessibilityDragPoint(.center, description: "Photo", isEnabled: canDrag)
+            .accessibilityDropPoint(.center, description: "In place of \(position)", isEnabled: true)
             .accessibilityAction {
-                if !isMissing {
+                if actions.held != nil {
+                    actions.land(address)
+                } else if !isMissing {
                     select()
                 }
             }
             .accessibilityActions {
-                if isMissing {
+                if actions.held != nil {
+                    EmptyView()
+                } else if isMissing {
                     missingMenu(image)
                 } else {
                     if isSelected {
@@ -209,17 +218,20 @@ struct CellView: View {
                         Button("Move Photo Up") { nudge(image, x: 0, y: -1) }
                         Button("Move Photo Down") { nudge(image, x: 0, y: 1) }
                     }
+                    moveButton(image)
                     photoMenu
                 }
             }
             // No menu while framing a photo or moving a layer, where a finger held down may start a
-            // drag or a pinch, and the bar below offers the same choices.
+            // drag or a pinch, and the bar below offers the same choices, nor while a photo is held,
+            // when a tap on the cell puts it here.
             .contextMenu {
-                if isAnythingSelected {
+                if isAnythingSelected || actions.held != nil {
                     EmptyView()
                 } else if isMissing {
                     missingMenu(image)
                 } else {
+                    moveButton(image)
                     photoMenu
                 }
             }
@@ -228,6 +240,44 @@ struct CellView: View {
     private func select() {
         session.cellSize = size
         actions.select(address)
+    }
+
+    /// Whether the photo can be dragged to another cell: not while anything is selected or held,
+    /// nor while its copy is missing or another is on its way in, where the strip's own gestures,
+    /// a tap, or the cell's menu take a finger held down.
+    private var canDrag: Bool {
+        !isAnythingSelected && actions.held == nil && !isMissing && !isImporting
+    }
+
+    /// A clear surface a long press lifts the photo from, to drop on another cell.
+    private func dragSurface(_ image: PlacedImage) -> some View {
+        Color.clear
+            .contentShape(.rect)
+            .draggable(HeldPhoto.cell(address, imageID: image.id)) {
+                PhotoDragPreview(image: image, projectID: address.projectID, loader: loader)
+            }
+    }
+
+    /// Whether the held photo is this cell's own, on its way to another.
+    private var isHeldHere: Bool {
+        if case .cell(let source, _) = actions.held { source == address } else { false }
+    }
+
+    /// What a tap on the photo does, for VoiceOver.
+    private var hint: String {
+        switch actions.held {
+        case .cell where isHeldHere: "Keeps the photo here"
+        case .cell: "Swaps the photo being moved with this one"
+        case .tray: "Puts the held photo here in place of this one"
+        case nil: isSelected || isMissing ? "" : "Selects the photo to move and zoom it"
+        }
+    }
+
+    /// Holds the photo to put in whichever cell is tapped next.
+    private func moveButton(_ image: PlacedImage) -> some View {
+        Button("Move Photo…", systemImage: "arrow.up.and.down.and.arrow.left.and.right") {
+            actions.hold(.cell(address, imageID: image.id))
+        }
     }
 
     /// Moves the photo a tenth of the cell, for VoiceOver, which can't drag.
@@ -325,6 +375,29 @@ private struct AddPhotoButton<Sources: View>: View {
     }
 }
 
+/// What fills an empty cell while a photo is held: a button that puts it there.
+private struct PlaceHereButton: View {
+    let position: String
+    let held: HeldPhoto
+    let place: () -> Void
+    @Environment(\.controlSize) private var controlSize
+
+    var body: some View {
+        Button(action: place) {
+            Image(systemName: "square.and.arrow.down")
+                .font(controlSize == .small ? .body.weight(.semibold) : .title2.weight(.semibold))
+                .foregroundStyle(Color.primary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(.rect)
+        }
+        // Plain, as the add button is, since the cell's own glass is behind it.
+        .buttonStyle(.plain)
+        .hoverEffect(.highlight)
+        .accessibilityLabel("Place in \(position)")
+        .accessibilityHint(held.isFromCell ? "Moves the photo here" : "Puts the held photo here")
+    }
+}
+
 /// What a cell shows when its photo's copy can't be read: a warning, and the ways to fill it
 /// again. VoiceOver reads the cell's own label and actions instead.
 private struct MissingPhoto<MenuContent: View>: View {
@@ -355,7 +428,8 @@ private struct MissingPhoto<MenuContent: View>: View {
     }
 }
 
-private extension String {
+extension String {
+    /// The string with its first letter uppercased, for a label that starts with a position.
     var capitalizingFirstLetter: String {
         prefix(1).uppercased() + dropFirst()
     }

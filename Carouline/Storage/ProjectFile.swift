@@ -16,12 +16,14 @@ nonisolated enum ProjectFile {
     /// can't read.
     /// Version 5 saved the aspect ratio's terms and export size, for shapes of the user's own,
     /// rather than a preset's name, which a version 4 build can't read.
-    static let currentFormatVersion = customShapeVersion
+    /// Version 6 added the tray, which a version 5 build would drop when it saved, and whose
+    /// copies its launch sweep would delete.
+    static let currentFormatVersion = trayVersion
 
     /// The first version to keep a style on each slide rather than one on the project.
     private static let slideStyleVersion = 4
-    /// The first version to save an aspect ratio as its terms and size rather than by name.
-    private static let customShapeVersion = 5
+    /// The first version with a tray.
+    private static let trayVersion = 6
 
     enum ReadError: Error, Hashable, Sendable {
         /// Not a project this build understands: unparseable, unversioned, or with a shape out of
@@ -40,9 +42,10 @@ nonisolated enum ProjectFile {
     }
 
     /// Versions 1 to 3 kept one style on the project, which each slide takes. Otherwise
-    /// `AspectRatio` reads versions 1 to 4's preset name, `Slide` a missing `span` as 1, and
-    /// missing layers and blur as none, `PlacedImage` a missing `fileFormat` as JPEG, and
-    /// `ImageLayer` a missing `hasShadow` as none.
+    /// `AspectRatio` reads versions 1 to 4's preset name, `Project` a missing tray as empty,
+    /// `Slide` a missing `span` as 1, and missing layers and blur as none, `PlacedImage` a missing
+    /// `fileFormat` as JPEG and a missing `trayPhotoID` as none, and `ImageLayer` a missing
+    /// `hasShadow` as none.
     static func decode(_ data: Data) throws -> Project {
         let decoder = makeDecoder()
         guard let probe = try? decoder.decode(Probe.self, from: data), probe.formatVersion >= 1 else {

@@ -13,6 +13,8 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
     /// In carousel order. A panorama is one item that posts as `span` slides, so count and
     /// number the carousel with `carouselSlideCount` and `slideNumbers`.
     var slides: [Slide]
+    /// Photos gathered to see before they go on a slide, in the order they were added.
+    var tray: [TrayPhoto]
     let createdAt: Date
     var modifiedAt: Date
 
@@ -21,6 +23,7 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
         name: String,
         aspectRatio: AspectRatio,
         slides: [Slide] = [],
+        tray: [TrayPhoto] = [],
         createdAt: Date = .now,
         modifiedAt: Date? = nil
     ) {
@@ -28,8 +31,45 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
         self.name = name
         self.aspectRatio = aspectRatio
         self.slides = slides
+        self.tray = tray
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt ?? createdAt
+    }
+
+    /// Reads a missing tray as empty, as every project before trays was.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        aspectRatio = try container.decode(AspectRatio.self, forKey: .aspectRatio)
+        slides = try container.decode([Slide].self, forKey: .slides)
+        tray = try container.decodeIfPresent([TrayPhoto].self, forKey: .tray) ?? []
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        modifiedAt = try container.decode(Date.self, forKey: .modifiedAt)
+    }
+
+    /// Leaves out an empty tray, so a project without one saves as it did before trays.
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(aspectRatio, forKey: .aspectRatio)
+        try container.encode(slides, forKey: .slides)
+        if !tray.isEmpty {
+            try container.encode(tray, forKey: .tray)
+        }
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(modifiedAt, forKey: .modifiedAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case aspectRatio
+        case slides
+        case tray
+        case createdAt
+        case modifiedAt
     }
 
     /// How many images the carousel posts as, counting every slide a panorama spans.
@@ -53,9 +93,25 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
         slides.allSatisfy { $0.id == slideID || $0.style == style }
     }
 
-    /// Every image the project's cells and layers hold, which are the only files its folder
+    /// Every image the project's cells, layers and tray hold, which are the only files its folder
     /// should keep.
     var images: [PlacedImage] {
-        slides.flatMap(\.images)
+        slides.flatMap(\.images) + tray.map(\.image)
+    }
+
+    /// The slides, by index, that each tray photo on a slide is on: those with a cell's photo
+    /// cloned from it, or from the same library photo, as a photo picked straight into a cell is.
+    /// Pictures in layers don't count, since they're decoration rather than the carousel's photos.
+    var slidesHoldingTrayPhotos: [UUID: [Int]] {
+        var holding: [UUID: [Int]] = [:]
+        for (index, slide) in slides.enumerated() {
+            let placed = slide.cells.compactMap(\.image)
+            let clonedFrom = Set(placed.compactMap(\.trayPhotoID))
+            let originals = Set(placed.compactMap(\.assetIdentifier))
+            for photo in tray where clonedFrom.contains(photo.id) || photo.image.assetIdentifier.map(originals.contains) == true {
+                holding[photo.id, default: []].append(index)
+            }
+        }
+        return holding
     }
 }

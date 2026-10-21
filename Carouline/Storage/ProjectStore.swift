@@ -33,6 +33,10 @@ nonisolated protocol ProjectStoring: Sendable {
     /// `PlacedImage.fileName`. Returns false, having deleted the copy, when the project was
     /// deleted while it imported.
     func adoptImage(at source: URL, as fileName: String, in projectID: UUID) async throws -> Bool
+    /// Clones project `sourceProjectID`'s copy named `fileName` into `projectID`'s folder as
+    /// `newFileName`, each a `PlacedImage.fileName`. Returns false, writing nothing, when
+    /// `projectID` was deleted, and throws when the copy is gone.
+    func cloneImage(named fileName: String, from sourceProjectID: UUID, as newFileName: String, in projectID: UUID) async throws -> Bool
     /// Deletes the copies named `fileNames`, each a `PlacedImage.fileName`.
     func deleteImages(_ fileNames: [String], in projectID: UUID) async
 }
@@ -159,6 +163,20 @@ actor ProjectStore: ProjectStoring {
         return true
     }
 
+    /// Copies with `FileManager`, which on APFS makes a clone: it shares the original's storage
+    /// until either changes, so it takes no room, and deleting either leaves the other whole.
+    func cloneImage(named fileName: String, from sourceProjectID: UUID, as newFileName: String, in projectID: UUID) throws -> Bool {
+        guard !deleted.contains(projectID) else {
+            return false
+        }
+        try FileManager.default.createDirectory(at: paths.imagesFolder(for: projectID), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(
+            at: paths.imageFile(named: fileName, in: sourceProjectID),
+            to: paths.imageFile(named: newFileName, in: projectID)
+        )
+        return true
+    }
+
     func deleteImages(_ fileNames: [String], in projectID: UUID) {
         for fileName in fileNames {
             try? FileManager.default.removeItem(at: paths.imageFile(named: fileName, in: projectID))
@@ -242,6 +260,10 @@ actor MockProjectStore: ProjectStoring {
     func delete(_ unreadable: UnreadableProject) {}
 
     func adoptImage(at source: URL, as fileName: String, in projectID: UUID) -> Bool {
+        projects[projectID] != nil
+    }
+
+    func cloneImage(named fileName: String, from sourceProjectID: UUID, as newFileName: String, in projectID: UUID) -> Bool {
         projects[projectID] != nil
     }
 

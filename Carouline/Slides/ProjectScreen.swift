@@ -3,7 +3,6 @@
 //  Carouline
 //
 
-import PhotosUI
 import SwiftUI
 
 /// A project's slides, where they're added, arranged and filled.
@@ -18,31 +17,37 @@ struct ProjectScreen: View {
     /// while the other is still leaving, which never shows.
     @State private var openedStyle = OpenedStyle()
     @State private var stripPosition: StripItem?
-    /// The cell the photo picker fills, and the slide's other empty cells when it picks several.
-    /// Kept apart from `presenter`, which the picker clears as it closes, possibly before it
-    /// hands over the pick.
-    @State private var pickTarget: CellAddress?
-    @State private var pickLimit = 1
-    @State private var pickedItems: [PhotosPickerItem] = []
     @State private var session: CropSession
     @State private var layerSession: LayerSession
+    /// The photo held to put in whichever cell is tapped next, as moving one without a drag does.
+    @State private var held: HeldPhoto?
+    /// A held photo waiting for the slide the layout sheet adds, which takes it in its first cell.
+    @State private var heldForNewSlide: HeldPhoto?
+    @State private var trayRemovals: TrayRemovals
     /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
     @State private var quietRestores: Set<UUID> = []
     @Environment(\.photoLibrary) private var photoLibrary
     /// The text size outside the strip, which caps its own, for the layers sheet it presents.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #if DEBUG
-    @Environment(DebugSettings.self) private var debug: DebugSettings?
-    #endif
 
-    /// `selection`, when given, opens with that photo selected to frame, and `layerSession`
-    /// with its layer selected, as snapshots need.
-    init(library: ProjectLibrary, projectID: UUID, selection: CellAddress? = nil, layerSession: LayerSession = LayerSession()) {
+    /// `selection`, when given, opens with that photo selected to frame, `layerSession` with its
+    /// layer selected, `held` with that photo held to place, and `trayRemoval` asking about removing
+    /// those tray photos, as snapshots need.
+    init(
+        library: ProjectLibrary,
+        projectID: UUID,
+        selection: CellAddress? = nil,
+        layerSession: LayerSession = LayerSession(),
+        held: HeldPhoto? = nil,
+        trayRemoval: TrayRemoval? = nil
+    ) {
         self.library = library
         self.projectID = projectID
         _session = State(initialValue: CropSession(selection: selection))
         _layerSession = State(initialValue: layerSession)
+        _held = State(initialValue: held)
+        _trayRemovals = State(initialValue: TrayRemovals(pending: trayRemoval))
     }
 
     var body: some View {
@@ -59,33 +64,21 @@ struct ProjectScreen: View {
 
     private func content(_ project: Project) -> some View {
         let screen = strip(project)
-            .modifier(SelectionBarOverlay(
-                library: library,
-                session: session,
-                onChoosePhoto: { selection in
-                    // Saved first, so the replacement doesn't inherit an unsaved zoom.
-                    saveLiveCrop()
-                    choosePhotos(for: selection)
-                },
-                onTakePhoto: { selection in
-                    saveLiveCrop()
-                    presenter.present(.camera(selection))
-                },
-                onRemove: { selection in
-                    select(nil)
-                    withAnimation {
-                        library.removePhoto(at: selection)
-                    }
-                },
-                onCommitZoom: saveLiveCrop,
-                onDone: { select(nil) }
-            ))
+            .modifier(selectionBar)
             .modifier(LayerBarOverlay(
                 project: project,
                 session: layerSession,
                 actions: layerActions,
                 onCommitSize: saveLivePlacement,
                 onDone: { selectLayer(nil) }
+            ))
+            .modifier(PlacementBarOverlay(library: library, held: $held, onNewSlide: addSlide))
+            .modifier(PhotoTrayOverlay(
+                library: library,
+                project: project,
+                removals: trayRemovals,
+                isShown: isTrayShown,
+                actions: trayActions(project)
             ))
             .background {
                 SlideBackdrop(slide: project.frontSlide(at: stripPosition), projectID: projectID, aspectRatio: project.aspectRatio)
@@ -105,9 +98,41 @@ struct ProjectScreen: View {
                 presenter: presenter,
                 photoSelection: session.selection,
                 layerSelection: layerSession.selection,
+                isHoldingPhoto: held != nil,
                 isFailing: library.failure != nil
             ))
         return presentations(over: screen, project: project)
+    }
+
+    /// The bar along the bottom while a photo is selected.
+    private var selectionBar: SelectionBarOverlay {
+        SelectionBarOverlay(
+            library: library,
+            session: session,
+            onChoosePhoto: { selection in
+                // Saved first, so the replacement doesn't inherit an unsaved zoom.
+                saveLiveCrop()
+                choosePhotos(for: selection)
+            },
+            onTakePhoto: { selection in
+                saveLiveCrop()
+                presenter.present(.camera(selection))
+            },
+            onMove: { selection in
+                saveLiveCrop()
+                if let imageID = library.photo(at: selection)?.id {
+                    hold(.cell(selection, imageID: imageID))
+                }
+            },
+            onRemove: { selection in
+                select(nil)
+                withAnimation {
+                    library.removePhoto(at: selection)
+                }
+            },
+            onCommitZoom: saveLiveCrop,
+            onDone: { select(nil) }
+        )
     }
 
     private func toolbar(_ project: Project) -> ProjectToolbar {
@@ -115,7 +140,7 @@ struct ProjectScreen: View {
             project: project,
             exporter: exporter,
             // On a compact width it comes from the screen's sheet.
-            isExporting: presentsAsSheets ? .constant(false) : isPresenting(.export),
+            isExporting: presenting.presentsAsSheets ? .constant(false) : presenting.isPresenting(.export),
             onShare: {
                 select(nil)
                 presenter.present(.export)
@@ -139,28 +164,18 @@ struct ProjectScreen: View {
     /// they aren't popovers, and the photo picker and the camera, which open over the screen.
     private func presentations(over screen: some View, project: Project) -> some View {
         screen
-            .sheet(item: sheetItem) { item in
+            .sheet(item: presenting.sheetItem) { item in
                 sheetContent(for: item, in: project)
             }
             .onChange(of: presenter.current) { _, current in
-                openedStyle.prefersSheets = current.map(prefersSheets(for:))
+                openedStyle.prefersSheets = current.map(presenting.prefersSheets(for:))
+                // A slide's layers cover the bar that shows a photo is held, and take its taps.
+                if case .layers = current {
+                    held = nil
+                }
             }
-            // The only presentation with no content to call `presentPending()` as it goes, which
-            // it needn't, since it covers the screen and nothing can be asked for behind it.
-            .photosPicker(
-                isPresented: isPresenting(.photoPicker),
-                selection: $pickedItems,
-                maxSelectionCount: pickLimit,
-                // Numbered in the order they're picked, which is the order they fill the cells.
-                selectionBehavior: .ordered,
-                matching: .images,
-                preferredItemEncoding: .current,
-                photoLibrary: .shared()
-            )
-            .onChange(of: pickedItems) { _, items in
-                importPicked(items)
-            }
-            .fullScreenCover(item: cameraTarget) { target in
+            .modifier(PhotoPickerHost(library: library, removals: trayRemovals, presented: presenting.pickTarget))
+            .fullScreenCover(item: presenting.cameraTarget) { target in
                 CameraPicker { image in
                     Task {
                         await library.importPhoto(into: target, assetIdentifier: nil) { .image(image) }
@@ -170,57 +185,17 @@ struct ProjectScreen: View {
                 .onDisappear { presenter.presentPending() }
             }
             #if DEBUG
-            .task {
-                await openDebugSheet()
-            }
+            .modifier(ProjectDebugLaunch(
+                library: library,
+                projectID: projectID,
+                layerActions: layerActions,
+                selectCell: { select($0) },
+                selectLayer: { selectLayer($0) },
+                selectedLayer: { layerSession.selection },
+                present: { presenter.present($0) },
+                hold: hold
+            ))
             #endif
-    }
-
-    /// Whether `shown` is open, as a presentation modifier reads and dismisses it. A dismissal
-    /// closes `shown` only while it's still open, never one opened since.
-    private func isPresenting(_ shown: ProjectPresentation) -> Binding<Bool> {
-        Binding {
-            presenter.current == shown
-        } set: { isPresented in
-            if !isPresented {
-                presenter.dismiss(shown)
-            }
-        }
-    }
-
-    /// Whether the export and layers sheets show as sheets, as on a compact width, or as popovers
-    /// pointing at what opened them, held to how what's open opened.
-    private var presentsAsSheets: Bool {
-        openedStyle.prefersSheets ?? prefersSheets(for: presenter.current)
-    }
-
-    private func prefersSheets(for presentation: ProjectPresentation?) -> Bool {
-        openedStyle.prefersSheets(for: presentation, isCompact: horizontalSizeClass == .compact, in: library.project(projectID))
-    }
-
-    /// `shownSheet`, as the screen's sheet reads and dismisses it. A dismissal closes the item
-    /// shown only while it's still open, never one opened since.
-    private var sheetItem: Binding<ProjectPresentation?> {
-        let shown = shownSheet
-        return Binding {
-            shownSheet
-        } set: { item in
-            if item == nil, let shown {
-                presenter.dismiss(shown)
-            }
-        }
-    }
-
-    /// What's open, when it opens as the screen's sheet. A layers sheet goes with its slide, should
-    /// another window delete it, as the slide's own popover would.
-    private var shownSheet: ProjectPresentation? {
-        guard let current = presenter.current, current.opensAsSheet(prefersSheets: presentsAsSheets) else {
-            return nil
-        }
-        if case .layers(let slideID) = current, library.project(projectID)?.slides.contains(where: { $0.id == slideID }) != true {
-            return nil
-        }
-        return current
     }
 
     @ViewBuilder
@@ -228,7 +203,11 @@ struct ProjectScreen: View {
         switch item {
         case .layout(let purpose):
             layoutSheet(for: purpose, in: project)
-                .onDisappear { presenter.presentPending() }
+                .onDisappear {
+                    // Let go of when the sheet closes without a new slide to take it.
+                    heldForNewSlide = nil
+                    presenter.presentPending()
+                }
         case .export:
             ExportSheet(project: project, exporter: exporter)
                 .onDisappear(perform: exportGone)
@@ -240,17 +219,14 @@ struct ProjectScreen: View {
         }
     }
 
-    private var cameraTarget: Binding<CellAddress?> {
-        Binding {
-            guard case .camera(let target) = presenter.current else {
-                return nil
-            }
-            return target
-        } set: { target in
-            if target == nil {
-                presenter.dismiss { if case .camera = $0 { true } else { false } }
-            }
-        }
+    /// What's open over the screen, as its presentations read and close it.
+    private var presenting: ProjectPresenting {
+        ProjectPresenting(
+            presenter: $presenter,
+            openedStyle: openedStyle,
+            isCompact: horizontalSizeClass == .compact,
+            project: library.project(projectID)
+        )
     }
 
     private func strip(_ project: Project) -> some View {
@@ -264,13 +240,17 @@ struct ProjectScreen: View {
             layerSession: layerSession,
             layerActions: layerActions,
             layersSlideID: layersSlideID,
-            layersInSheet: presentsAsSheets,
+            layersInSheet: presenting.presentsAsSheets,
             onBackgroundTap: {
-                if !presenter.dismiss(where: { $0.closesOnBackgroundTap }) {
+                if presenter.dismiss(where: { $0.closesOnBackgroundTap }) {
+                    return
+                } else if held != nil {
+                    held = nil
+                } else {
                     select(nil)
                 }
             },
-            onAddSlide: { presenter.present(.layout(.newSlide)) },
+            onAddSlide: addSlide,
             onChangeLayout: { presenter.present(.layout(.change($0))) },
             onMove: { slideID, offset in
                 withAnimation {
@@ -294,37 +274,88 @@ struct ProjectScreen: View {
         )
         // Slides leave fixed room for their captions and buttons, which larger text overflows.
         return strip.dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .environment(\.screenDynamicTypeSize, dynamicTypeSize)
             .onGeometryChange(for: CGSize.self, of: \.size) { openedStyle.stripSize = $0 }
     }
 
     private var cellActions: CellActions {
-        CellActions(
-            choosePhoto: { choosePhotos(for: $0) },
+        ProjectCellActions(
+            library: library,
+            photoLibrary: photoLibrary,
+            choosePhotos: { choosePhotos(for: $0) },
             takePhoto: CameraPicker.isAvailable ? { presenter.present(.camera($0)) } : nil,
-            removePhoto: { address in
-                withAnimation {
-                    library.removePhoto(at: address)
-                }
-            },
             select: { select($0) },
-            setCrop: { crop, address in
-                library.setCrop(crop, at: address)
-            },
-            restorePhoto: { address in
-                Task {
-                    await library.restorePhoto(at: address, from: photoLibrary, asking: true)
-                }
-            },
-            restorePhotoQuietly: { address in
-                guard let imageID = library.photo(at: address)?.id, !quietRestores.contains(imageID) else {
-                    return
-                }
-                quietRestores.insert(imageID)
-                Task {
-                    await library.restorePhoto(at: address, from: photoLibrary, asking: false)
-                }
-            }
+            restoresQuietly: { quietRestores.insert($0).inserted },
+            held: held,
+            hold: hold,
+            land: land,
+            landInLayer: land(inLayer:)
         )
+        .actions
+    }
+
+    /// Holds `photo` to put in whichever cell is tapped next, letting go of any selection.
+    private func hold(_ photo: HeldPhoto) {
+        select(nil)
+        held = photo
+    }
+
+    /// Puts the held photo in the cell at `address`, or lets it go there when that's its own. A
+    /// cell with a photo on its way in takes none, and leaves it held for another.
+    private func land(at address: CellAddress) {
+        guard let photo = held, !library.importingCells.contains(address) else {
+            return
+        }
+        held = nil
+        Task {
+            await library.land(photo, at: address)
+        }
+    }
+
+    /// Puts the held photo, one from the tray, in the picture layer at `address`.
+    private func land(inLayer address: LayerAddress) {
+        guard case .tray(let projectID, let photoID) = held, projectID == address.projectID else {
+            return
+        }
+        held = nil
+        Task {
+            await library.replaceLayerImage(at: address, withTrayPhoto: photoID)
+        }
+    }
+
+    /// Opens the layout sheet for a new slide, which takes any held photo in its first cell.
+    private func addSlide() {
+        if let held {
+            startSlide(with: held)
+        } else {
+            presenter.present(.layout(.newSlide))
+        }
+    }
+
+    /// Opens the layout sheet for a new slide that takes `photo` in its first cell.
+    private func startSlide(with photo: HeldPhoto) {
+        held = nil
+        heldForNewSlide = photo
+        presenter.present(.layout(.newSlide))
+    }
+
+    /// Whether the tray shows: while nothing else takes the bottom of the screen.
+    private var isTrayShown: Bool {
+        session.selection == nil && layerSession.selection == nil && held == nil && layersSlideID == nil && layerSession.sheetRoom == 0
+    }
+
+    private func trayActions(_ project: Project) -> TrayActions {
+        ProjectTrayActions(
+            library: library,
+            project: project,
+            frontSlide: stripPosition == .add ? nil : project.frontSlide(at: stripPosition),
+            photoLibrary: photoLibrary,
+            presenter: $presenter,
+            hold: hold,
+            startSlide: { startSlide(with: $0) },
+            restoresQuietly: { quietRestores.insert($0).inserted }
+        )
+        .actions
     }
 
     /// Selects the photo at `address` to frame, or nothing, saving whatever the last photo or
@@ -333,6 +364,7 @@ struct ProjectScreen: View {
         saveLiveCrop()
         saveLivePlacement()
         if let address {
+            held = nil
             followSelection(on: address.slideID, to: nil)
         }
         layerSession.selection = nil
@@ -350,6 +382,7 @@ struct ProjectScreen: View {
         saveLiveCrop()
         saveLivePlacement()
         if let address {
+            held = nil
             followSelection(on: address.slideID, to: address)
         }
         session.selection = nil
@@ -393,7 +426,7 @@ struct ProjectScreen: View {
             projectID: projectID,
             session: layerSession,
             presenter: $presenter,
-            showsPopovers: !presentsAsSheets,
+            showsPopovers: !presenting.presentsAsSheets,
             dynamicTypeSize: dynamicTypeSize,
             select: selectLayer,
             photoSelection: { session.selection },
@@ -415,27 +448,7 @@ struct ProjectScreen: View {
     /// Opens the picker for the cell at `address`, taking as many photos as its slide has empty
     /// cells when it's empty, or one to replace its photo.
     private func choosePhotos(for address: CellAddress) {
-        pickTarget = address
-        pickLimit = library.pickLimit(for: address)
-        presenter.present(.photoPicker)
-    }
-
-    /// Copies the picker's photos into the cell it was opened for and, when there are several, the
-    /// slide's other empty cells, keeping each photo's library identifier so its copy can be
-    /// restored from it.
-    private func importPicked(_ items: [PhotosPickerItem]) {
-        guard !items.isEmpty, let target = pickTarget else {
-            return
-        }
-        pickedItems = []
-        pickTarget = nil
-        for (item, address) in zip(items, library.cellsToFill(from: target, count: items.count)) {
-            Task {
-                await library.importPhoto(into: address, assetIdentifier: item.itemIdentifier) {
-                    try await item.loadTransferable(type: PickedPhoto.self).map { .file($0.url) }
-                }
-            }
-        }
+        presenter.present(.photoPicker(.cells(address, limit: library.pickLimit(for: address))))
     }
 
     private var nameBinding: Binding<String> {
@@ -448,6 +461,12 @@ struct ProjectScreen: View {
 
     private func layoutSheet(for purpose: LayoutPurpose, in project: Project) -> some View {
         SlideLayoutSheet(library: library, project: project, purpose: purpose) { slideID, isFirst in
+            if let photo = heldForNewSlide {
+                heldForNewSlide = nil
+                Task {
+                    await library.land(photo, at: CellAddress(projectID: projectID, slideID: slideID, index: 0))
+                }
+            }
             if isFirst {
                 // The strip appears with its first slide in the middle already, and a scroll as
                 // it appears would push the slides down until the next scroll.
@@ -459,34 +478,6 @@ struct ProjectScreen: View {
             }
         }
     }
-
-    #if DEBUG
-    /// Selects `-DebugSelectCell`'s photo or `-DebugSelectLayer`'s layer, and opens
-    /// `-DebugSheet`'s sheet, after a moment, since a presentation on the first frame doesn't
-    /// render, and the strip can't scroll to a slide before it has measured the slides.
-    private func openDebugSheet() async {
-        guard debug?.selectedCell != nil || debug?.selectedLayer != nil || (debug?.sheet?.opensInProject) == true else {
-            return
-        }
-        try? await Task.sleep(for: .milliseconds(500))
-        let slides = library.project(projectID)?.slides ?? []
-        if let (slide, cell) = debug?.selectedCell, slides.indices.contains(slide) {
-            select(CellAddress(projectID: projectID, slideID: slides[slide].id, index: cell))
-        }
-        if let (slide, layer) = debug?.selectedLayer, slides.indices.contains(slide), slides[slide].layers.indices.contains(layer) {
-            selectLayer(LayerAddress(projectID: projectID, slideID: slides[slide].id, layerID: slides[slide].layers[layer].id))
-        }
-        let layerSlideID = layerSession.selection?.slideID ?? slides.first?.id
-        switch debug?.sheet {
-        case .export: presenter.present(.export)
-        case .layout: presenter.present(.layout(.newSlide))
-        case .layers: layerSlideID.map { layerActions.openSheet($0, []) }
-        case .addLayer: layerSlideID.map { layerActions.openSheet($0, [.add]) }
-        case .editLayer: layerSession.selection.map { layerActions.edit($0) }
-        case .newProject, .customRatio, nil: break
-        }
-    }
-    #endif
 }
 
 #Preview {

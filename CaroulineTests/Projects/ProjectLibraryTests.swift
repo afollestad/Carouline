@@ -214,5 +214,9 @@ private actor FailingStore: ProjectStoring {
         throw Failure()
     }
 
+    func cloneImage(named fileName: String, from sourceProjectID: UUID, as newFileName: String, in projectID: UUID) throws -> Bool {
+        throw Failure()
+    }
+
     func deleteImages(_ fileNames: [String], in projectID: UUID) {}
 }

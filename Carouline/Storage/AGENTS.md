@@ -7,3 +7,4 @@
 - Never delete a project folder whose `project.json` failed to decode or has a newer `formatVersion`; list it as unreadable so the user decides.
 - Bump `ProjectFile.currentFormatVersion` only for a change an older build would misread, migrate the previous shape in `decode(_:)`, and keep a golden JSON test for every version.
 - Bump `CustomPresetsFile.currentFormatVersion` with `ProjectFile`'s whenever `AspectRatio`'s shape changes, and never save over a newer presets file, which would drop every preset an older build can't read.
+- Give every `PlacedImage` a file of its own, cloning with `ProjectStore.cloneImage` where two hold the same photo, since a copy is deleted with whatever stops referring to it.

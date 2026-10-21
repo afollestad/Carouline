@@ -48,6 +48,10 @@ struct ProjectLayerActions {
                 open(address.slideID, at: [.editor(for: layer)])
             },
             openSheet: open,
+            addLayer: { slideID, kind in
+                open(slideID, at: [])
+                session.addsOnOpening = kind
+            },
             importImage: { slideID, assetIdentifier, source in
                 Task {
                     await importImage(into: slideID, assetIdentifier: assetIdentifier, from: source)
@@ -82,6 +86,8 @@ struct ProjectLayerActions {
 
     /// Opens slide `slideID`'s layers sheet at `path`, past its list.
     private func open(_ slideID: UUID, at path: [LayersPage]) {
+        // Clears an add asked for by a sheet that something else opened in place of.
+        session.addsOnOpening = nil
         session.sheetPath = path
         presenter.present(.layers(slideID))
     }

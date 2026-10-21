@@ -37,5 +37,9 @@ actor CountingStore: ProjectStoring {
         true
     }
 
+    func cloneImage(named fileName: String, from sourceProjectID: UUID, as newFileName: String, in projectID: UUID) -> Bool {
+        true
+    }
+
     func deleteImages(_ fileNames: [String], in projectID: UUID) {}
 }

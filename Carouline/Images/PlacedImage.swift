@@ -20,6 +20,9 @@ nonisolated struct PlacedImage: Codable, Hashable, Identifiable, Sendable {
     var crop: ImageCrop
     /// How the copy is encoded, which names its file.
     var fileFormat: ImageFileFormat
+    /// The tray photo a cell's copy was cloned from, which marks that photo as on a slide even
+    /// when it has no library original to match by, and can stand in for a lost copy.
+    var trayPhotoID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -27,7 +30,8 @@ nonisolated struct PlacedImage: Codable, Hashable, Identifiable, Sendable {
         pixelWidth: Int,
         pixelHeight: Int,
         crop: ImageCrop = ImageCrop(),
-        fileFormat: ImageFileFormat = .jpeg
+        fileFormat: ImageFileFormat = .jpeg,
+        trayPhotoID: UUID? = nil
     ) {
         self.id = id
         self.assetIdentifier = assetIdentifier
@@ -35,9 +39,11 @@ nonisolated struct PlacedImage: Codable, Hashable, Identifiable, Sendable {
         self.pixelHeight = pixelHeight
         self.crop = crop
         self.fileFormat = fileFormat
+        self.trayPhotoID = trayPhotoID
     }
 
-    /// Reads a missing `fileFormat` as JPEG, which every copy was before transparent ones.
+    /// Reads a missing `fileFormat` as JPEG, which every copy was before transparent ones, and a
+    /// missing `trayPhotoID` as none, as every copy was before trays.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -46,9 +52,11 @@ nonisolated struct PlacedImage: Codable, Hashable, Identifiable, Sendable {
         pixelHeight = try container.decode(Int.self, forKey: .pixelHeight)
         crop = try container.decode(ImageCrop.self, forKey: .crop)
         fileFormat = try container.decodeIfPresent(ImageFileFormat.self, forKey: .fileFormat) ?? .jpeg
+        trayPhotoID = try container.decodeIfPresent(UUID.self, forKey: .trayPhotoID)
     }
 
-    /// Leaves out a JPEG's `fileFormat`, so a project of JPEG copies saves as it always has.
+    /// Leaves out a JPEG's `fileFormat`, so a project of JPEG copies saves as it always has, and
+    /// a copy's `trayPhotoID` unless it came from the tray.
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -59,6 +67,7 @@ nonisolated struct PlacedImage: Codable, Hashable, Identifiable, Sendable {
         if fileFormat != .jpeg {
             try container.encode(fileFormat, forKey: .fileFormat)
         }
+        try container.encodeIfPresent(trayPhotoID, forKey: .trayPhotoID)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -68,6 +77,7 @@ nonisolated struct PlacedImage: Codable, Hashable, Identifiable, Sendable {
         case pixelHeight
         case crop
         case fileFormat
+        case trayPhotoID
     }
 
     var pixelSize: CGSize {

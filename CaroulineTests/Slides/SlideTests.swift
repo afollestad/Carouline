@@ -23,6 +23,13 @@ struct SlideTests {
         #expect(grid(filled: [0]).emptyCellCount(skipping: [1]) == 2)
     }
 
+    @Test func findsTheFirstEmptyCell() {
+        #expect(grid().firstEmptyCell() == 0)
+        #expect(grid(filled: [0, 1]).firstEmptyCell() == 2)
+        #expect(grid(filled: [0]).firstEmptyCell(skipping: [1, 2]) == 3)
+        #expect(grid(filled: [0, 1, 2, 3]).firstEmptyCell() == nil)
+    }
+
     /// Photos picked for cell `from` of a grid with photos at `filled`, and the cells they fill.
     struct Fill: Sendable, CustomTestStringConvertible {
         let filled: Set<Int>

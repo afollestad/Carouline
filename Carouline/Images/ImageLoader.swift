@@ -42,6 +42,16 @@ nonisolated protocol ImageLoading: Sendable {
     func image(_ request: ImageRequest) async -> CGImage?
 }
 
+extension ImageLoading {
+    /// The largest decode of `image` already in memory, at any of the sizes a request rounds to,
+    /// for a view that must show the photo on its first frame and can't wait for a decode at its
+    /// own size, as a drag's preview can't.
+    func anyCachedImage(of image: PlacedImage, in projectID: UUID) -> CGImage? {
+        let sizes = [ImageImporter.maximumPixelSize, 2048, 1024, 512, 256]
+        return sizes.lazy.compactMap { cachedImage(ImageRequest(projectID: projectID, image: image, displayedPixels: CGFloat($0))) }.first
+    }
+}
+
 /// Decodes copies from a store's folders, keeping recent decodes in memory.
 nonisolated final class DiskImageLoader: ImageLoading, @unchecked Sendable {
     private let paths: ProjectPaths

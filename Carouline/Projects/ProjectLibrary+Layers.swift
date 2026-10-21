@@ -83,6 +83,39 @@ extension ProjectLibrary {
         return address
     }
 
+    /// Gives the picture layer at `address` tray photo `photoID` as its picture, as a held photo
+    /// tapped onto it does, keeping its border, blur and shadow and where it sits. Its old copy goes
+    /// once that's saved. A layer that's gone, or isn't a picture, is left as it is.
+    func replaceLayerImage(at address: LayerAddress, withTrayPhoto photoID: UUID) async {
+        guard let photo = trayPhoto(photoID, in: address.projectID), layer(at: address)?.image != nil else {
+            return
+        }
+        importingLayers[address.slideID, default: 0] += 1
+        defer {
+            let remaining = (importingLayers[address.slideID] ?? 1) - 1
+            importingLayers[address.slideID] = remaining > 0 ? remaining : nil
+        }
+        let slideWidth = project(address.projectID)?.aspectRatio.pixelWidth ?? 0
+        let original = photo.image.assetIdentifier
+        let request = CopyRequest(projectID: address.projectID, assetIdentifier: original, crop: ImageCrop()) { source, destination in
+            try await ImageImporter.makeLayerCopy(of: source, at: destination, slideWidth: slideWidth)
+        }
+        do {
+            try await adoptCopy(request, from: trayCopySource(of: photo, in: address.projectID)) {
+                true
+            } place: { image in
+                guard var layer = layer(at: address), case .image(var picture) = layer.content else {
+                    return false
+                }
+                picture.image = image
+                layer.content = .image(picture)
+                return saveLayer(layer, in: address.slideID, of: address.projectID)
+            }
+        } catch {
+            failure = LibraryFailure(kind: .importPhoto, error: error)
+        }
+    }
+
     /// Copies the picture of the layer at `address` in again from its library original, when its
     /// copy `missingID` went missing, keeping its transparency, its border and blur, and where it
     /// sits. Asks for access to the library only when `asking`, so a restore on sight never

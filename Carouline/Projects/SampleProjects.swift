@@ -16,7 +16,12 @@ nonisolated enum SampleProjects {
                 name: "Lisbon",
                 aspectRatio: .portrait,
                 slides: [
-                    Slide(id: sampleID(11), layout: .single, cells: [photo(101, 2048, 2730)], layers: [title(201, "Lisbon", scale: 1.4)]),
+                    Slide(
+                        id: sampleID(11),
+                        layout: .single,
+                        cells: [photo(101, 2048, 2730, trayPhotoID: sampleID(301))],
+                        layers: [title(201, "Lisbon", scale: 1.4)]
+                    ),
                     Slide(id: sampleID(12), layout: .twoColumns, cells: [photo(102, 2048, 1536), Cell()]),
                     Slide(
                         id: sampleID(13),
@@ -29,7 +34,23 @@ nonisolated enum SampleProjects {
                         ],
                         layers: [framedPhoto(202, image: 107), sticker(203, image: 108)]
                     ),
-                    Slide(id: sampleID(14), layout: .panorama, span: 5, cells: [photo(106, 4096, 1024)], layers: [swipeHint(204)])
+                    Slide(
+                        id: sampleID(14),
+                        layout: .panorama,
+                        span: 5,
+                        cells: [photo(106, 4096, 1024, trayPhotoID: sampleID(303))],
+                        layers: [swipeHint(204)]
+                    )
+                ],
+                // Two on slides by the tray photo they were cloned from, one by its library original,
+                // and three still to place, one of them missing its copy under -DebugMissingImages.
+                tray: [
+                    trayPhoto(301, image: 312, 2048, 2730),
+                    trayPhoto(302, image: 315, 1536, 2048, assetIdentifier: "5E7A5E70-0000-4000-8000-000000000104/L0/001"),
+                    trayPhoto(303, image: 317, 4096, 1024),
+                    trayPhoto(304, image: 318, 2048, 1536),
+                    trayPhoto(305, image: 319, 2048, 2048),
+                    trayPhoto(306, image: 320, 1536, 2048)
                 ],
                 createdAt: date(daysAgo: 3)
             ),
@@ -44,7 +65,20 @@ nonisolated enum SampleProjects {
                 ],
                 createdAt: date(daysAgo: 5)
             ),
-            Project(id: sampleID(3), name: "Coastline", aspectRatio: .landscape, createdAt: date(daysAgo: 8))
+            // Photos gathered before any slide.
+            Project(
+                id: sampleID(3),
+                name: "Coastline",
+                aspectRatio: .landscape,
+                tray: [
+                    trayPhoto(321, image: 331, 2048, 1365),
+                    trayPhoto(322, image: 332, 2048, 1365),
+                    trayPhoto(323, image: 333, 1536, 2048),
+                    trayPhoto(324, image: 334, 4096, 1024),
+                    trayPhoto(325, image: 335, 2048, 1536)
+                ],
+                createdAt: date(daysAgo: 8)
+            )
         ]
     }
 
@@ -77,8 +111,9 @@ nonisolated enum SampleProjects {
     static let firstLaunchID = sampleID(4)
 
     /// The photo `-DebugMissingImages` leaves without a copy, which names a library original
-    /// that doesn't exist, so restoring it shows how a missing original reads, and the sticker.
-    static let missingImageIDs: Set<UUID> = [sampleID(104), sampleID(108)]
+    /// that doesn't exist, so restoring it shows how a missing original reads, the sticker, and a
+    /// tray photo.
+    static let missingImageIDs: Set<UUID> = [sampleID(104), sampleID(108), sampleID(320)]
 
     /// A title along the top of the first slide, lifted off the photo by a shadow.
     private static func title(_ number: UInt16, _ text: String, scale: Double) -> Layer {
@@ -130,8 +165,23 @@ nonisolated enum SampleProjects {
         UUID(uuid: (0x5E, 0x7A, 0x5E, 0x70, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, UInt8(number >> 8), UInt8(number & 0xFF)))
     }
 
-    private static func photo(_ number: UInt16, _ width: Int, _ height: Int, assetIdentifier: String? = nil) -> Cell {
-        Cell(image: PlacedImage(id: sampleID(number), assetIdentifier: assetIdentifier, pixelWidth: width, pixelHeight: height))
+    private static func photo(_ number: UInt16, _ width: Int, _ height: Int, assetIdentifier: String? = nil, trayPhotoID: UUID? = nil) -> Cell {
+        Cell(image: PlacedImage(
+            id: sampleID(number),
+            assetIdentifier: assetIdentifier,
+            pixelWidth: width,
+            pixelHeight: height,
+            trayPhotoID: trayPhotoID
+        ))
+    }
+
+    /// Tray photo `number`, whose copy is image `image`, which picks its palette as a cell's photo
+    /// does, so one standing for a cell's photo matches it.
+    private static func trayPhoto(_ number: UInt16, image: UInt16, _ width: Int, _ height: Int, assetIdentifier: String? = nil) -> TrayPhoto {
+        TrayPhoto(
+            id: sampleID(number),
+            image: PlacedImage(id: sampleID(image), assetIdentifier: assetIdentifier, pixelWidth: width, pixelHeight: height)
+        )
     }
 
     private static func date(daysAgo: Double) -> Date {

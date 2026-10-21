@@ -106,12 +106,21 @@ extension ScreenSnapshotting {
         selection: CellAddress? = nil,
         layerSession: LayerSession? = nil,
         missing: Set<UUID>? = nil,
-        loading: Set<UUID> = []
+        loading: Set<UUID> = [],
+        held: HeldPhoto? = nil,
+        trayRemoval: TrayRemoval? = nil
     ) -> some View {
         var loader = missing.map { MockImageLoader(missing: $0) } ?? imageLoader
         loader.loading = loading
         return NavigationStack {
-            ProjectScreen(library: library([project]), projectID: project.id, selection: selection, layerSession: layerSession ?? LayerSession())
+            ProjectScreen(
+                library: library([project]),
+                projectID: project.id,
+                selection: selection,
+                layerSession: layerSession ?? LayerSession(),
+                held: held,
+                trayRemoval: trayRemoval
+            )
         }
         .environment(\.imageLoader, loader)
     }
@@ -268,6 +277,72 @@ extension ScreenSnapshotting {
 
     private var violet: RGBColor {
         RGBColor(red: 0.47, green: 0.34, blue: 0.91)
+    }
+
+    /// Lisbon with a tray: one photo on a slide as a clone of its tray photo, one by its library
+    /// original, and four still to place, among them a panorama's.
+    var trayProject: Project {
+        Project(
+            id: fixtureID(30),
+            name: "Lisbon",
+            aspectRatio: .portrait,
+            slides: [
+                Slide(id: fixtureID(31), layout: .single, cells: [
+                    Cell(image: PlacedImage(
+                        id: fixtureID(141),
+                        assetIdentifier: nil,
+                        pixelWidth: 2048,
+                        pixelHeight: 2730,
+                        trayPhotoID: fixtureID(40)
+                    ))
+                ]),
+                Slide(id: fixtureID(32), layout: .twoColumns, cells: [
+                    Cell(image: PlacedImage(id: fixtureID(142), assetIdentifier: "SNAP/L0/001", pixelWidth: 1536, pixelHeight: 2048)),
+                    Cell()
+                ])
+            ],
+            // Each copy's number picks the palette its cell's photo has, so a used one matches it.
+            tray: [
+                trayPhoto(40, image: 146, 2048, 2730),
+                trayPhoto(41, image: 147, 1536, 2048, assetIdentifier: "SNAP/L0/001"),
+                trayPhoto(42, image: 148, 4096, 1024),
+                trayPhoto(43, image: 149, 2048, 1536),
+                trayPhoto(44, image: 150, 2048, 2048),
+                trayPhoto(45, image: 151, 1536, 2048)
+            ],
+            createdAt: created
+        )
+    }
+
+    /// A landscape project with photos gathered before any slide.
+    var trayOnlyProject: Project {
+        Project(
+            id: fixtureID(33),
+            name: "Coastline",
+            aspectRatio: .landscape,
+            tray: [
+                trayPhoto(46, image: 152, 2048, 1365),
+                trayPhoto(47, image: 153, 1536, 2048),
+                trayPhoto(48, image: 154, 4096, 1024),
+                trayPhoto(49, image: 155, 2048, 1536)
+            ],
+            createdAt: created
+        )
+    }
+
+    private func trayPhoto(_ number: UInt8, image: UInt8, _ width: Int, _ height: Int, assetIdentifier: String? = nil) -> TrayPhoto {
+        TrayPhoto(
+            id: fixtureID(number),
+            image: PlacedImage(id: fixtureID(image), assetIdentifier: assetIdentifier, pixelWidth: width, pixelHeight: height)
+        )
+    }
+
+    /// The first photo of `project`'s first slide, held to move.
+    func heldFirstPhoto(of project: Project) -> HeldPhoto? {
+        guard let slide = project.slides.first, let image = slide.cells.first?.image else {
+            return nil
+        }
+        return .cell(CellAddress(projectID: project.id, slideID: slide.id, index: 0), imageID: image.id)
     }
 
     /// Lisbon with its grid first, filled, empty and missing cells side by side.

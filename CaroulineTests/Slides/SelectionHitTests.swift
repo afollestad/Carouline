@@ -29,6 +29,17 @@ struct SelectionHitTests {
         #expect(SelectionHit.cellPoint(CGPoint(x: 30, y: 30), cell: 0, of: slide, style: spaced, on: canvas) == CGPoint(x: 10, y: 10))
     }
 
+    /// A drop over the gap between cells goes to neither, and one within a cell to that one.
+    @Test func findsTheCellUnderADrop() {
+        let spaced = SlideStyle(spacing: 0.05, border: 0.05, background: .white)
+        let slide = Slide(layout: .twoColumns)
+
+        #expect(SelectionHit.cell(at: CGPoint(x: 100, y: 100), of: slide, style: spaced, on: canvas) == 0)
+        #expect(SelectionHit.cell(at: CGPoint(x: 300, y: 400), of: slide, style: spaced, on: canvas) == 1)
+        #expect(SelectionHit.cell(at: CGPoint(x: 200, y: 100), of: slide, style: spaced, on: canvas) == nil)
+        #expect(SelectionHit.cell(at: CGPoint(x: 5, y: 100), of: slide, style: spaced, on: canvas) == nil)
+    }
+
     @Test func spansAPanoramasSlides() {
         let panorama = LayerCanvas(size: CGSize(width: 900, height: 400), span: 3)
         let slide = Slide(layout: .panorama, span: 3)

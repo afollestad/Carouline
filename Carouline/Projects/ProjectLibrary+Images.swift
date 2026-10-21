@@ -29,18 +29,48 @@ extension ProjectLibrary {
     }
 
     /// Copies the photo `source` produces into the cell at `address`, replacing any photo there,
-    /// framed by `crop`. `source` runs first, so a slow load from the picker shows as importing
-    /// too, and a nil from it, as from a picker that hands back nothing, leaves the cell as it was.
-    /// A failure shows as `failureKind`, or not at all when that's nil, and `replacing`, when
-    /// given, is the only photo the copy may take the place of.
+    /// framed by `crop`, and naming the tray photo it stands for, if any. `source` runs first, so
+    /// a slow load from the picker shows as importing too, and a nil from it, as from a picker
+    /// that hands back nothing, leaves the cell as it was. A failure shows as `failureKind`, or not
+    /// at all when that's nil, and `replacing`, when given, is the only photo the copy may take
+    /// the place of.
     func importPhoto(
         into address: CellAddress,
         assetIdentifier: String?,
         crop: ImageCrop = ImageCrop(),
+        trayPhotoID: UUID? = nil,
         failingAs failureKind: LibraryFailure.Kind? = .importPhoto,
         replacing expectedImageID: UUID? = nil,
         from source: @escaping @Sendable () async throws -> PhotoSource?
     ) async {
+        await trackingImport(into: address) { isCurrent in
+            let limit = copyLimit(for: address)
+            let request = CopyRequest(
+                projectID: address.projectID,
+                assetIdentifier: assetIdentifier,
+                crop: crop,
+                trayPhotoID: trayPhotoID
+            ) { photo, destination in
+                try await ImageImporter.makeCopy(of: photo, at: destination, limit: limit)
+            }
+            do {
+                // The cell may go, a newer pick replace this one, or the photo it's meant for be
+                // removed or replaced, while the copy is written.
+                try await adoptCopy(request, from: source, isCurrent: isCurrent) { image in
+                    (expectedImageID == nil || self.photo(at: address)?.id == expectedImageID) && place(image, at: address)
+                }
+            } catch {
+                if let failureKind {
+                    failure = LibraryFailure(kind: failureKind, error: error)
+                }
+            }
+        }
+    }
+
+    /// Runs `body` as the latest change to the photo in the cell at `address`, which shows as
+    /// importing until it ends. `isCurrent` turns false once a newer one starts, so the last
+    /// photo picked or placed wins however long each takes.
+    func trackingImport(into address: CellAddress, _ body: (_ isCurrent: () -> Bool) async -> Void) async {
         let token = UUID()
         importTokens[address] = token
         importingCells.insert(address)
@@ -50,24 +80,7 @@ extension ProjectLibrary {
                 importingCells.remove(address)
             }
         }
-
-        let limit = copyLimit(for: address)
-        let request = CopyRequest(projectID: address.projectID, assetIdentifier: assetIdentifier, crop: crop) { photo, destination in
-            try await ImageImporter.makeCopy(of: photo, at: destination, limit: limit)
-        }
-        do {
-            // The cell may go, a newer pick replace this one, or the photo it's meant for be removed
-            // or replaced, while the copy is written.
-            try await adoptCopy(request, from: source) {
-                importTokens[address] == token
-            } place: { image in
-                (expectedImageID == nil || self.photo(at: address)?.id == expectedImageID) && place(image, at: address)
-            }
-        } catch {
-            if let failureKind {
-                failure = LibraryFailure(kind: failureKind, error: error)
-            }
-        }
+        await body { importTokens[address] == token }
     }
 
     /// A copy for `adoptCopy`: the project it joins, what it keeps of its photo, and how it's made.
@@ -75,6 +88,7 @@ extension ProjectLibrary {
         let projectID: UUID
         let assetIdentifier: String?
         let crop: ImageCrop
+        var trayPhotoID: UUID?
         let make: @Sendable (PhotoSource, URL) async throws -> ImageImporter.Copy
     }
 
@@ -111,7 +125,8 @@ extension ProjectLibrary {
             pixelWidth: Int(copy.size.width),
             pixelHeight: Int(copy.size.height),
             crop: request.crop,
-            fileFormat: copy.format
+            fileFormat: copy.format,
+            trayPhotoID: request.trayPhotoID
         )
         guard isCurrent(), try await store.adoptImage(at: staging, as: image.fileName, in: request.projectID) else {
             return
@@ -132,12 +147,33 @@ extension ProjectLibrary {
         case unavailable
     }
 
-    /// Copies the photo at `address` in again from its library original, keeping its framing,
-    /// when its own copy went missing. Asks for access to the library only when `asking`, so a
+    /// Copies the photo at `address` in again, keeping its framing, when its own copy went
+    /// missing: from the tray photo it was cloned from, which needs no access to the library, or
+    /// else from its library original. Asks for access to the library only when `asking`, so a
     /// restore on sight never prompts; one that asks reports what went wrong.
     @discardableResult
     func restorePhoto(at address: CellAddress, from photos: any PhotoLibrarySource, asking: Bool) async -> RestoreOutcome {
-        guard let image = photo(at: address), let assetIdentifier = image.assetIdentifier else {
+        guard let image = photo(at: address) else {
+            return .unavailable
+        }
+        if let trayPhoto = trayPhoto(standingFor: image, in: address.projectID) {
+            if await placeClone(
+                of: trayPhoto.image,
+                from: address.projectID,
+                trayPhotoID: trayPhoto.id,
+                at: address,
+                crop: image.crop,
+                replacing: image.id,
+                failingAs: nil
+            ) {
+                return .restored
+            }
+            // A newer change to the cell took over, which a restore from the library would undo.
+            guard photo(at: address)?.id == image.id, !importingCells.contains(address) else {
+                return photo(at: address)?.id == image.id ? .unavailable : .restored
+            }
+        }
+        guard let assetIdentifier = image.assetIdentifier else {
             return .unavailable
         }
         if let refused = await readAccess(to: photos, asking: asking) {
@@ -150,6 +186,7 @@ extension ProjectLibrary {
             into: address,
             assetIdentifier: assetIdentifier,
             crop: image.crop,
+            trayPhotoID: image.trayPhotoID,
             failingAs: asking ? .restorePhoto : nil,
             replacing: image.id
         ) {
@@ -159,6 +196,18 @@ extension ProjectLibrary {
             return .image(original)
         }
         return photo(at: address)?.id == image.id ? .unavailable : .restored
+    }
+
+    /// The tray photo that can stand in for `image`'s copy: the one it was cloned from, or else one
+    /// from the same library original.
+    private func trayPhoto(standingFor image: PlacedImage, in projectID: UUID) -> TrayPhoto? {
+        if let photo = image.trayPhotoID.flatMap({ trayPhoto($0, in: projectID) }) {
+            return photo
+        }
+        guard let original = image.assetIdentifier else {
+            return nil
+        }
+        return project(projectID)?.tray.first { $0.image.assetIdentifier == original }
     }
 
     /// Why `photos` can't be read for a restore, or nil when it can: asking for access only when
@@ -215,14 +264,14 @@ extension ProjectLibrary {
         return true
     }
 
-    private func cell(at address: CellAddress) -> Cell? {
+    func cell(at address: CellAddress) -> Cell? {
         guard let slide = slide(containing: address), slide.cells.indices.contains(address.index) else {
             return nil
         }
         return slide.cells[address.index]
     }
 
-    private func slide(containing address: CellAddress) -> Slide? {
+    func slide(containing address: CellAddress) -> Slide? {
         project(address.projectID)?.slides.first { $0.id == address.slideID }
     }
 
@@ -237,7 +286,7 @@ extension ProjectLibrary {
     }
 
     /// The cells of `address`'s slide with a photo on its way in.
-    private func importingIndexes(in address: CellAddress) -> Set<Int> {
+    func importingIndexes(in address: CellAddress) -> Set<Int> {
         Set(importingCells.filter { $0.projectID == address.projectID && $0.slideID == address.slideID }.map(\.index))
     }
 }

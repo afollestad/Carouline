@@ -27,6 +27,10 @@ final class LayerSession {
     var livePlacement: LayerPlacement?
     /// The layers sheet's pages past its list, which its navigation stack shows.
     var sheetPath: [LayersPage] = []
+    /// A kind of layer for the layers sheet to start adding as it opens, as a slide's layers button
+    /// asks: a text layer's editor, or the picker for a picture, which only the sheet can show
+    /// over itself.
+    var addsOnOpening: LayerKind?
     /// The height the layers sheet covers wherever it is, as it's dragged or rides the keyboard
     /// too, which the strip makes room above, so the slide stays in view and in reach.
     var sheetRoom: CGFloat = 0
@@ -278,6 +282,8 @@ struct LayerDrag {
 enum LayersPage: Hashable {
     /// Picks the kind of layer to add.
     case add
+    /// Picks a picture to add: one of the tray's photos, or one from the library.
+    case addImage
     /// Edits a text layer.
     case text(UUID)
     /// Edits a picture layer.

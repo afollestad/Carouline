@@ -31,7 +31,21 @@ struct SlideCard: View {
     let onMove: (Int) -> Void
     let onDelete: () -> Void
     let onSetSpan: (Int) -> Void
+    /// Whether the slide takes photos dropped on it: not while anything is selected or held, nor
+    /// while a slide's layers are open.
+    var acceptsDrops = false
+    /// Tells the strip whether a drop hovers over the slide.
+    var onDropHover: (_ slideID: UUID, _ isOver: Bool) -> Void = { _, _ in }
     @State private var isConfirmingDelete = false
+    /// Which of the caption's popovers is open, if either.
+    @State private var openPopover: CaptionPopoverKind?
+    /// What a choice in the caption's popover does once the popover has gone.
+    @State private var afterPopover: (() -> Void)?
+    /// The cell a drop over the slide would land in.
+    @State private var dropTarget: Int?
+    /// An icon button's glyph frame, which with a glass button's padding stands its circle as tall
+    /// as the options capsule beside it, where the glyph alone falls a little short.
+    @ScaledMetric(relativeTo: .subheadline) private var iconSide: CGFloat = 18
     @Environment(ProjectTour.self) private var tour: ProjectTour?
 
     /// The tour's tips' room from the slide's sides, and their widest, which keeps one to a phone's
@@ -41,6 +55,8 @@ struct SlideCard: View {
     /// The room between the slide and its caption, which the menu tip's arrow reaches across, to
     /// the top of the caption's frame, just above its glass.
     private static let captionSpacing: CGFloat = 12
+    /// A fingertip's target, which the caption's row holds whatever its glass's height.
+    private static let captionHeight: CGFloat = 44
 
     var body: some View {
         // Measured only while the slide holds the selection, so a scroll measures nothing.
@@ -55,7 +71,8 @@ struct SlideCard: View {
                 cellActions: cellActions,
                 session: session,
                 layerSession: layerSession,
-                isAnythingSelected: isAnythingSelected
+                isAnythingSelected: isAnythingSelected,
+                dropTarget: dropTarget
             )
             .frame(width: size.width, height: size.height)
             .onGeometryChange(for: CGRect?.self) { proxy in
@@ -80,7 +97,9 @@ struct SlideCard: View {
                         selectedLayerID: layerSession.selection?.slideID == slide.id ? layerSession.selection?.layerID : nil,
                         isAnythingSelected: isAnythingSelected,
                         isDrafting: layerSession.draftSlideID == slide.id,
-                        screenPoint: screenPoint
+                        screenPoint: screenPoint,
+                        heldPhoto: cellActions.held,
+                        placeHeld: cellActions.landInLayer
                     )
                 )
             }
@@ -118,26 +137,21 @@ struct SlideCard: View {
                     // From the slide, as glass over a slide takes its scheme.
                     .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
             }
+            // Over the layers, which would otherwise take a drop on the cell under them.
+            .onDrop(of: SlideDrop.types, delegate: SlideDrop(
+                slide: slide,
+                projectID: projectID,
+                canvas: LayerCanvas(size: size, span: slide.span, screenPoint: screenPoint),
+                isEnabled: acceptsDrops,
+                importing: importingIndexes,
+                targetedCell: $dropTarget,
+                onHover: onDropHover,
+                actions: cellActions
+            ))
             .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(spokenNumbers) of \(count), \(slide.layout.name)\(spokenLayers)")
-            Menu {
-                options
-            } label: {
-                HStack(spacing: 8) {
-                    Text(numbersText)
-                    Image(systemName: "ellipsis")
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(Color.primary)
-            }
-            .buttonStyle(.glass)
-            // Not while the slide's layers sheet is open: the delete confirmation can't show while
-            // it's up, and moving or resizing the slide would close an iPad's popover, which this
-            // card presents.
-            .disabled(layerActions.isShowingSheet(slide.id).wrappedValue)
-            .accessibilityLabel("\(spokenNumbers) Options")
-            .frame(height: 44)
+            caption
         }
         // A wide screen's popover pointing at its slide, from the card, not its caption's glass
         // button, whose style the popover would take on. A sheet comes from the screen.
@@ -152,44 +166,155 @@ struct SlideCard: View {
         }
     }
 
-    @ViewBuilder
-    private var options: some View {
-        Button("Change Layout…", systemImage: "rectangle.split.2x2") {
-            choose(onChangeLayout)
-        }
-        Button("Add Layer…", systemImage: "square.2.layers.3d.top.filled") {
-            choose { layerActions.openSheet(slide.id, [.add]) }
-        }
-        Button("Edit Layers…", systemImage: "square.3.layers.3d") {
-            choose { layerActions.openSheet(slide.id, []) }
-        }
-        // Once there's a photo, since the first one sets the width to fit it.
-        if slide.layout == .panorama, slide.cells.first?.image != nil {
-            Picker(selection: Binding { slide.span } set: { span in choose { onSetSpan(span) } }) {
-                ForEach(Slide.panoramaSpans, id: \.self) { span in
-                    Text("\(span) Slides").tag(span)
+    /// The slide's layout button, its options and its layers, side by side under it. The layout and
+    /// layers have buttons of their own, since they're what a slide is changed for most.
+    private var caption: some View {
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                Button {
+                    choose(onChangeLayout)
+                } label: {
+                    Label("Change Layout", systemImage: "rectangle.split.2x2")
+                        .labelStyle(.iconOnly)
+                        .frame(width: iconSide, height: iconSide)
                 }
-            } label: {
-                Label("Width", systemImage: "arrow.left.and.right")
+                .buttonBorderShape(.circle)
+                .accessibilityLabel("\(spokenNumbers) Layout")
+                .accessibilityValue(slide.layout.name)
+                .accessibilityHint("Chooses another layout for the slide")
+                Button {
+                    openPopover = .options
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(numbersText)
+                        Image(systemName: "ellipsis")
+                    }
+                }
+                .accessibilityLabel("\(spokenNumbers) Options")
+                .popover(isPresented: isShowing(.options), arrowEdge: .bottom) {
+                    CaptionPopover(groups: optionGroups, header: { widthChoice }, onGone: popoverGone)
+                }
+                Button {
+                    openPopover = .layers
+                } label: {
+                    Label("Layers", systemImage: "square.3.layers.3d")
+                        .labelStyle(.iconOnly)
+                        .frame(width: iconSide, height: iconSide)
+                }
+                .buttonBorderShape(.circle)
+                .accessibilityLabel("\(spokenNumbers) Layers")
+                .accessibilityHint("Adds a layer to the slide, or edits its layers")
+                .popover(isPresented: isShowing(.layers), arrowEdge: .bottom) {
+                    CaptionPopover(groups: [layerChoices], header: { EmptyView() }, onGone: popoverGone)
+                }
             }
-            .pickerStyle(.menu)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(Color.primary)
+            .buttonStyle(.glass)
         }
-        Button("Move Left", systemImage: "arrow.left") {
-            choose { onMove(-1) }
-        }
-        .disabled(!canMoveLeft)
-        Button("Move Right", systemImage: "arrow.right") {
-            choose { onMove(1) }
-        }
-        .disabled(!canMoveRight)
-        Divider()
-        Button(deleteTitle, systemImage: "trash", role: .destructive) {
-            choose { isConfirmingDelete = true }
+        // Not while the slide's layers sheet is open: the delete confirmation can't show while it's
+        // up, and moving or resizing the slide would close an iPad's popover, which this card
+        // presents. Nor the layout, which the sheet would have to close for.
+        .disabled(layerActions.isShowingSheet(slide.id).wrappedValue)
+        .frame(height: Self.captionHeight)
+    }
+
+    /// Which of the caption's popovers is open, if either.
+    private enum CaptionPopoverKind {
+        case options
+        case layers
+    }
+
+    private func isShowing(_ kind: CaptionPopoverKind) -> Binding<Bool> {
+        Binding {
+            openPopover == kind
+        } set: { isShowing in
+            if !isShowing, openPopover == kind {
+                openPopover = nil
+            }
         }
     }
 
-    /// Does what the slide's menu offers, which finishes the tour's tip about the menu. Opening the
-    /// menu would be sooner, but SwiftUI hands it to UIKit, which reports no opening.
+    private var layerChoices: [CaptionChoice] {
+        [
+            CaptionChoice(title: "Add Text Layer…", systemImage: LayerKind.text.systemImage) {
+                chooseInPopover { layerActions.addLayer(slide.id, .text) }
+            },
+            CaptionChoice(title: "Add Image Layer…", systemImage: LayerKind.image.systemImage) {
+                chooseInPopover { layerActions.addLayer(slide.id, .image) }
+            },
+            CaptionChoice(title: "Edit Layers…", systemImage: "square.3.layers.3d") {
+                chooseInPopover { layerActions.openSheet(slide.id, []) }
+            }
+        ]
+    }
+
+    private var optionGroups: [[CaptionChoice]] {
+        [
+            [
+                CaptionChoice(title: "Move Left", systemImage: "arrow.left", isEnabled: canMoveLeft) {
+                    chooseInPopover { onMove(-1) }
+                },
+                CaptionChoice(title: "Move Right", systemImage: "arrow.right", isEnabled: canMoveRight) {
+                    chooseInPopover { onMove(1) }
+                }
+            ],
+            [
+                CaptionChoice(title: deleteTitle, systemImage: "trash", isDestructive: true) {
+                    chooseInPopover { isConfirmingDelete = true }
+                }
+            ]
+        ]
+    }
+
+    /// A panorama's width, once it has a photo, since the first one sets the width to fit it.
+    @ViewBuilder
+    private var widthChoice: some View {
+        if slide.layout == .panorama, slide.cells.first?.image != nil {
+            Menu {
+                Picker("Width", selection: Binding { slide.span } set: { span in chooseInPopover { onSetSpan(span) } }) {
+                    ForEach(Slide.panoramaSpans, id: \.self) { span in
+                        Text("\(span) Slides").tag(span)
+                    }
+                }
+            } label: {
+                CaptionRow(title: "Width", systemImage: "arrow.left.and.right") {
+                    Text("\(slide.span) Slides")
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.footnote)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityLabel("Width")
+            .accessibilityValue("\(slide.span) slides")
+            Divider()
+                .padding(.vertical, 4)
+        }
+    }
+
+    /// Closes the caption's popover and does `action` once it has gone, since a sheet, a popover or
+    /// a confirmation asked for as it goes never shows, and moving the slide would move the popover.
+    private func chooseInPopover(_ action: @escaping () -> Void) {
+        choose {
+            afterPopover = action
+            // At once rather than animated, since the choice waits for the popover to go, and its
+            // fade would hold a sheet back by half a second.
+            var closing = Transaction()
+            closing.disablesAnimations = true
+            withTransaction(closing) {
+                openPopover = nil
+            }
+        }
+    }
+
+    /// Does what the popover that just closed was closed for, if anything.
+    private func popoverGone() {
+        let action = afterPopover
+        afterPopover = nil
+        action?()
+    }
+
+    /// Does what the slide's buttons or popovers offer, which finishes the tour's tip about them.
     private func choose(_ action: () -> Void) {
         tour?.finish(through: .slideMenu)
         action()
@@ -201,8 +326,8 @@ struct SlideCard: View {
         session.selection != nil || layerSession.selection != nil
     }
 
-    /// The tour's tips on the slide in front: one along its foot pointing down at its menu, its
-    /// arrow past the slide, or one pointing at its top layer, below a layer in the slide's upper
+    /// The tour's tips on the slide in front: one along its foot pointing down at its buttons and
+    /// menu, its arrow past the slide, or one pointing at its top layer, below a layer in the slide's upper
     /// half and above one in its lower half, so it never covers the layer it asks the user to tap.
     /// Inline rather than popovers, which TipKit leaves on screen while a sheet opens, and after
     /// which the strip presents no popover again.
@@ -235,6 +360,11 @@ struct SlideCard: View {
         }
     }
 
+    /// The cells with a photo on its way in, which take no drop.
+    private var importingIndexes: Set<Int> {
+        Set(slide.cells.indices.filter { importingCells.contains(CellAddress(projectID: projectID, slideID: slide.id, index: $0)) })
+    }
+
     /// The slide's layers, as VoiceOver adds them to its label.
     private var spokenLayers: String {
         switch slide.layers.count {
@@ -246,7 +376,7 @@ struct SlideCard: View {
 
     /// "Slide 3", or a panorama's "Slides 2–4".
     private var numbersText: String {
-        numbers.count == 1 ? "Slide \(numbers.lowerBound)" : "Slides \(numbers.lowerBound)–\(numbers.upperBound)"
+        numbers.slidesName
     }
 
     /// `numbersText` as VoiceOver should read it, rather than trusting it to read the dash.
@@ -291,6 +421,8 @@ private struct CardPhotos: View {
     let session: CropSession
     let layerSession: LayerSession
     let isAnythingSelected: Bool
+    /// The cell a drop over the slide would land in.
+    let dropTarget: Int?
 
     var body: some View {
         let isStyling = layerSession.stylingSlideID == slide.id
@@ -309,7 +441,8 @@ private struct CardPhotos: View {
                 session: session,
                 isPanorama: slide.layout == .panorama,
                 isAnythingSelected: isAnythingSelected,
-                blur: blur
+                blur: blur,
+                isDropTarget: dropTarget == index
             )
         }
     }
