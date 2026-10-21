@@ -39,7 +39,7 @@ struct LayerBarOverlay: ViewModifier {
             // the hint. Another layer selected, or none, isn't a move.
             .onChange(of: selectedPlacement) { old, new in
                 if let old, let new, old.layerID == new.layerID, old != new, tour?.visit.hasShownMoveTip == true {
-                    tour?.finish(through: .moveLayer)
+                    tour?.finish(.moveLayer)
                 }
             }
     }
@@ -57,22 +57,39 @@ struct LayerBarOverlay: ViewModifier {
     @ViewBuilder
     private var bar: some View {
         if let selection = session.selection, let selected = selectedLayer {
-            let layer = selected.layer
-            VStack(spacing: 0) {
-                if let moveTip = tour?.moveTip(isCompactHeight: verticalSizeClass == .compact) {
-                    TipView(moveTip, arrowEdge: .bottom)
+            layerBar(selection: selection, selected: selected, layer: selected.layer)
+                .overlayPreferenceValue(TourTargetBounds.self) { targets in
+                    moveTip(at: targets)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    /// The move hint, above the bar, pointing down at Done, which it ends on, rather than the bar's
+    /// middle, its size slider.
+    @ViewBuilder
+    private func moveTip(at targets: [TourAnchor.Target: Anchor<CGRect>]) -> some View {
+        if let tour, let tip = tour.moveTip(isCompactHeight: verticalSizeClass == .compact), let bounds = targets[.layerDone] {
+            GeometryReader { proxy in
+                let anchor = tour.anchor(.layerDone)
+                ZStack(alignment: .bottom) {
+                    anchor.standIn(at: proxy[bounds])
+                    TipView(tip, arrowEdge: .bottom, anchorID: anchor)
                         .tourTipStyle()
+                        .barTipCorners(pointingAt: proxy[bounds], inBarOf: proxy.size.width, inset: 16)
                         .padding(.horizontal, 16)
-                        .frame(maxWidth: 560)
-                        // Sized with the bar, so it leaves the slide above as much room.
-                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, proxy.size.height)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .onAppear {
-                            tour?.visit.hasShownMoveTip = true
+                            tour.visit.hasShownMoveTip = true
                         }
                 }
-                layerBar(selection: selection, selected: selected, layer: layer)
+                // Growing up from the bar, with its stand-in still over Done.
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
             }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            // Sized with the bar, so it leaves the slide above as much room.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
     }
 

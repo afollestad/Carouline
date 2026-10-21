@@ -99,6 +99,7 @@ struct ProjectScreen: View {
                 photoSelection: session.selection,
                 layerSelection: layerSession.selection,
                 isHoldingPhoto: held != nil,
+                isImportingToTray: library.importingTray[project.id] != nil,
                 isFailing: library.failure != nil
             ))
         return presentations(over: screen, project: project)

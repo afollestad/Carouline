@@ -59,6 +59,7 @@ struct PhotoTray: View {
             dropHighlight(in: Capsule())
         }
         .accessibilityHint("Gathers photos to see here before they go on a slide")
+        .tourTarget(.addPhotos)
     }
 
     private var addButton: some View {
@@ -73,6 +74,7 @@ struct PhotoTray: View {
         .glassEffect(.regular.interactive(), in: .circle)
         .accessibilityLabel("Add Photos")
         .accessibilityHint("Gathers more photos into the tray")
+        .tourTarget(.addPhotos)
     }
 
     private var photos: some View {
@@ -112,6 +114,7 @@ struct PhotoTray: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tray")
+        .tourTarget(.trayPhotos)
     }
 }
 

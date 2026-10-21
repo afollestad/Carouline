@@ -46,17 +46,13 @@ struct SlideCard: View {
     /// An icon button's glyph frame, which with a glass button's padding stands its circle as tall
     /// as the options capsule beside it, where the glyph alone falls a little short.
     @ScaledMetric(relativeTo: .subheadline) private var iconSide: CGFloat = 18
-    @Environment(ProjectTour.self) private var tour: ProjectTour?
+    @Environment(ProjectTour.self) var tour: ProjectTour?
 
-    /// The tour's tips' room from the slide's sides, and their widest, which keeps one to a phone's
-    /// width over an iPad's or a panorama's wider slide.
-    private static let tipInset: CGFloat = 12
-    private static let tipMaxWidth: CGFloat = 400
-    /// The room between the slide and its caption, which the menu tip's arrow reaches across, to
+    /// The room between the slide and its caption, which a caption tip's arrow reaches across, to
     /// the top of the caption's frame, just above its glass.
     private static let captionSpacing: CGFloat = 12
     /// A fingertip's target, which the caption's row holds whatever its glass's height.
-    private static let captionHeight: CGFloat = 44
+    static let captionHeight: CGFloat = 44
 
     var body: some View {
         // Measured only while the slide holds the selection, so a scroll measures nothing.
@@ -151,7 +147,19 @@ struct SlideCard: View {
             .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(spokenNumbers) of \(count), \(slide.layout.name)\(spokenLayers)")
+            // Over the caption, which comes after it, so a tip grown past a short slide still shows
+            // and takes its taps.
+            .zIndex(1)
             caption
+        }
+        // Over the slide and its caption, where the tip finds the caption's buttons. Not while
+        // one of their popovers is open over it.
+        .overlayPreferenceValue(TourTargetBounds.self) { targets in
+            if openPopover == nil {
+                captionTip(at: targets)
+                    // From the slide, as glass over a slide takes its scheme.
+                    .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
+            }
         }
         // A wide screen's popover pointing at its slide, from the card, not its caption's glass
         // button, whose style the popover would take on. A sheet comes from the screen.
@@ -172,7 +180,8 @@ struct SlideCard: View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
                 Button {
-                    choose(onChangeLayout)
+                    tour?.finish(.changeLayout)
+                    onChangeLayout()
                 } label: {
                     Label("Change Layout", systemImage: "rectangle.split.2x2")
                         .labelStyle(.iconOnly)
@@ -182,6 +191,7 @@ struct SlideCard: View {
                 .accessibilityLabel("\(spokenNumbers) Layout")
                 .accessibilityValue(slide.layout.name)
                 .accessibilityHint("Chooses another layout for the slide")
+                .tourTarget(.layoutButton)
                 Button {
                     openPopover = .options
                 } label: {
@@ -191,8 +201,9 @@ struct SlideCard: View {
                     }
                 }
                 .accessibilityLabel("\(spokenNumbers) Options")
+                .tourTarget(.optionsButton)
                 .popover(isPresented: isShowing(.options), arrowEdge: .bottom) {
-                    CaptionPopover(groups: optionGroups, header: { widthChoice }, onGone: popoverGone)
+                    CaptionPopover(groups: optionGroups, header: { widthChoice }, onGone: { popoverGone(finishing: .slideMenu) })
                 }
                 Button {
                     openPopover = .layers
@@ -204,8 +215,9 @@ struct SlideCard: View {
                 .buttonBorderShape(.circle)
                 .accessibilityLabel("\(spokenNumbers) Layers")
                 .accessibilityHint("Adds a layer to the slide, or edits its layers")
+                .tourTarget(.layersButton)
                 .popover(isPresented: isShowing(.layers), arrowEdge: .bottom) {
-                    CaptionPopover(groups: [layerChoices], header: { EmptyView() }, onGone: popoverGone)
+                    CaptionPopover(groups: [layerChoices], header: { EmptyView() }, onGone: { popoverGone(finishing: .layers) })
                 }
             }
             .font(.subheadline.weight(.medium))
@@ -295,69 +307,29 @@ struct SlideCard: View {
     /// Closes the caption's popover and does `action` once it has gone, since a sheet, a popover or
     /// a confirmation asked for as it goes never shows, and moving the slide would move the popover.
     private func chooseInPopover(_ action: @escaping () -> Void) {
-        choose {
-            afterPopover = action
-            // At once rather than animated, since the choice waits for the popover to go, and its
-            // fade would hold a sheet back by half a second.
-            var closing = Transaction()
-            closing.disablesAnimations = true
-            withTransaction(closing) {
-                openPopover = nil
-            }
+        afterPopover = action
+        // At once rather than animated, since the choice waits for the popover to go, and its
+        // fade would hold a sheet back by half a second.
+        var closing = Transaction()
+        closing.disablesAnimations = true
+        withTransaction(closing) {
+            openPopover = nil
         }
     }
 
-    /// Does what the popover that just closed was closed for, if anything.
-    private func popoverGone() {
+    /// Finishes the tour's tip about the popover that just closed, now that the next can't come on
+    /// under it, then does what it was closed for, if anything.
+    private func popoverGone(finishing step: TourStep) {
+        tour?.finish(step)
         let action = afterPopover
         afterPopover = nil
         action?()
-    }
-
-    /// Does what the slide's buttons or popovers offer, which finishes the tour's tip about them.
-    private func choose(_ action: () -> Void) {
-        tour?.finish(through: .slideMenu)
-        action()
     }
 
     /// A photo or a layer selected anywhere on the strip, while which a finger held down may start
     /// a drag on the selection or a pinch anywhere, rather than a menu.
     private var isAnythingSelected: Bool {
         session.selection != nil || layerSession.selection != nil
-    }
-
-    /// The tour's tips on the slide in front: one along its foot pointing down at its buttons and
-    /// menu, its arrow past the slide, or one pointing at its top layer, below a layer in the slide's upper
-    /// half and above one in its lower half, so it never covers the layer it asks the user to tap.
-    /// Inline rather than popovers, which TipKit leaves on screen while a sheet opens, and after
-    /// which the strip presents no popover again.
-    @ViewBuilder
-    private var tourTips: some View {
-        if let tip = tour?.menuTip(on: slide.id) {
-            TipView(tip, arrowEdge: .bottom)
-                .tourTipStyle()
-                .frame(maxWidth: Self.tipMaxWidth)
-                .padding([.horizontal, .top], Self.tipInset)
-                .padding(.bottom, -Self.captionSpacing)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-        } else if let tip = tour?.layerTip(on: slide.id), let layer = slide.layers.last {
-            let frame = LayerGeometry.frame(of: layer, canvas: size, span: slide.span)
-            let isBelow = frame.midY < size.height / 2
-            ZStack {
-                Color.clear
-                    .frame(width: frame.width, height: frame.height)
-                    .tipAnchor(TourAnchor.layer)
-                    .position(x: frame.midX, y: frame.midY)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-                TipView(tip, arrowEdge: isBelow ? .top : .bottom, anchorID: TourAnchor.layer)
-                    .tourTipStyle()
-                    .frame(maxWidth: Self.tipMaxWidth)
-                    .padding(.horizontal, Self.tipInset)
-                    .padding(isBelow ? .top : .bottom, isBelow ? frame.maxY : size.height - frame.minY)
-                    .frame(maxHeight: .infinity, alignment: isBelow ? .top : .bottom)
-            }
-        }
     }
 
     /// The cells with a photo on its way in, which take no drop.

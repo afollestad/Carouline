@@ -32,12 +32,12 @@ final class DebugSettings {
 
     /// Projects to swap in for the real ones, in a store of their own, leaving the real ones alone.
     enum Store {
-        /// `SampleProjects.all`, with something left to fill in each.
+        /// `SampleProjects.all`, with something left to fill in each, and no tour.
         case samples
-        /// `DemoProjects.all`, finished for screenshots.
+        /// `DemoProjects.all`, finished for screenshots, and no tour.
         case demo
         /// An empty store, which adds the sample a fresh install's first launch does, and
-        /// TipKit's datastore for one, so its tour starts over.
+        /// TipKit's datastore for one, so the tour starts over.
         case firstLaunch
     }
 
@@ -63,20 +63,21 @@ final class DebugSettings {
         case tray(Int)
     }
 
-    /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects), `-DebugDemoProjects` (`YES`
-    /// swaps in demo projects for screenshots, unless `-DebugSampleProjects` is on),
-    /// `-DebugMissingImages` (`YES` leaves a sample photo's copy and the sample sticker's out, so
-    /// they show as missing, with `-DebugSampleProjects`), `-DebugFirstLaunch` (`YES` swaps in an
-    /// empty store that adds the first-launch sample, and an empty tips datastore that starts its
-    /// tour, as a fresh install does, unless either of the others is on), `-DebugOpenProject` (a
-    /// project's index in the list, from 0), `-DebugSelectCell` (a photo to frame in it, as slide
-    /// and cell indexes like `2,0`), `-DebugSelectLayer` (a layer to move in it, as slide and
-    /// layer indexes like `2,0`, layers counted from the bottom), `-DebugHoldPhoto` (a photo in it
-    /// to hold for placing, as slide and cell indexes like `2,0`, or as `tray,` and its place in the
-    /// tray from 0, like `tray,1`) and `-DebugSheet` (`newProject`, or `customRatio` for its custom
-    /// page, on the list, or `layout`, `export`, `layers`, `addLayer` or `editLayer` in the open
-    /// project, the last three for `-DebugSelectLayer`'s slide or else the first, and `editLayer`
-    /// for its layer) from `arguments`, ignoring values it can't parse.
+    /// Reads `-DebugSampleProjects` (`YES` swaps in sample projects, without the tour),
+    /// `-DebugDemoProjects` (`YES` swaps in demo projects for screenshots, without the tour, unless
+    /// `-DebugSampleProjects` is on), `-DebugMissingImages` (`YES` leaves a sample photo's copy and
+    /// the sample sticker's out, so they show as missing, with `-DebugSampleProjects`),
+    /// `-DebugFirstLaunch` (`YES` swaps in an empty store that adds the first-launch sample, and an
+    /// empty tips datastore that starts the tour, as a fresh install does, unless either of the
+    /// others is on), `-DebugOpenProject` (a project's index in the list, from 0),
+    /// `-DebugSelectCell` (a photo to frame in it, as slide and cell indexes like `2,0`),
+    /// `-DebugSelectLayer` (a layer to move in it, as slide and layer indexes like `2,0`, layers
+    /// counted from the bottom), `-DebugHoldPhoto` (a photo in it to hold for placing, as slide and
+    /// cell indexes like `2,0`, or as `tray,` and its place in the tray from 0, like `tray,1`) and
+    /// `-DebugSheet` (`newProject`, or `customRatio` for its custom page, on the list, or `layout`,
+    /// `export`, `layers`, `addLayer` or `editLayer` in the open project, the last three for
+    /// `-DebugSelectLayer`'s slide or else the first, and `editLayer` for its layer) from
+    /// `arguments`, ignoring values it can't parse.
     init(arguments: [String: Any] = [:]) {
         func isOn(_ key: String) -> Bool {
             (arguments[key] as? String).map(Self.isTrue) ?? false

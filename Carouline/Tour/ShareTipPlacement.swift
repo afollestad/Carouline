@@ -34,6 +34,13 @@ nonisolated struct ShareTipPlacement: Equatable {
     /// reaches past.
     static let buttonGap: CGFloat = 12
 
+    /// The corner radius that lets a tip's arrow reach a button whose middle sits `reach` in from
+    /// the tip's edge, nearer than TipKit's corners let the arrow come, tightened until it does, or
+    /// none where TipKit's own leave it room.
+    static func cornerRadius(reaching reach: CGFloat) -> CGFloat? {
+        reach < arrowCornerInset ? max(minimumCornerRadius, reach - arrowCornerMargin) : nil
+    }
+
     /// `button` is the Share button's frame in the screen's space, which starts at the screen's top
     /// leading corner, so a button in a bar above the screen sits above zero.
     init(button: CGRect, in size: CGSize) {
@@ -44,10 +51,7 @@ nonisolated struct ShareTipPlacement: Equatable {
             // the screen's edge than a phone's, so the arrow has as far to reach on each.
             let trailing = max(0, size.width - button.maxX - Self.glassOutset)
             padding = EdgeInsets(top: 0, leading: Self.inset, bottom: 0, trailing: trailing)
-            // The button's middle then sits nearer the tip's edge than TipKit's corners let the
-            // arrow come, so the corners tighten until the arrow reaches it.
-            let reach = size.width - trailing - button.midX
-            cornerRadius = reach < Self.arrowCornerInset ? max(Self.minimumCornerRadius, reach - Self.arrowCornerMargin) : nil
+            cornerRadius = Self.cornerRadius(reaching: size.width - trailing - button.midX)
             return
         }
         cornerRadius = nil

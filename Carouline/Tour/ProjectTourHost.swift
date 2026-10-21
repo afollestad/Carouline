@@ -6,9 +6,10 @@
 import SwiftUI
 import TipKit
 
-/// Runs the sample project's tour on its screen: makes the tour on a visit to the sample, tells it
-/// when the screen has settled, finishes the steps the user's own actions cover, hands it to the
-/// slides and the layer bar through the environment, and shows the Share tip by the Share button.
+/// Runs the tour on a project's screen: makes the tour on a visit, tells it when the screen has
+/// settled and what's on it, finishes the steps the user's own actions cover, hands it to the
+/// slides, the tray and the layer bar through the environment, and shows the Share tip by the Share
+/// button.
 struct ProjectTourHost: ViewModifier {
     let project: Project
     let stripPosition: StripItem?
@@ -17,6 +18,9 @@ struct ProjectTourHost: ViewModifier {
     let layerSelection: LayerAddress?
     /// Whether a photo is held to place, which the tips wait out, as they do a selection.
     let isHoldingPhoto: Bool
+    /// Whether photos are on their way into the tray, which the tips wait out, so the tray's tip
+    /// doesn't show again between the picker closing and the first photo landing.
+    let isImportingToTray: Bool
     /// Whether an alert is up, which the tips wait out.
     let isFailing: Bool
     @State private var tour: ProjectTour?
@@ -31,11 +35,11 @@ struct ProjectTourHost: ViewModifier {
     private static let settleDelay = Duration.milliseconds(600)
 
     func body(content: Content) -> some View {
-        content
+        let hosted = content
             .overlay {
-                if let shareTip = tour?.shareTip, let shareFrame {
+                if let tour, let shareTip = tour.shareTip, let shareFrame {
                     GeometryReader { proxy in
-                        shareTipView(shareTip, pointingAt: shareFrame, in: proxy.size)
+                        shareTipView(shareTip, anchor: tour.anchor(.share), pointingAt: shareFrame, in: proxy.size)
                     }
                 }
             }
@@ -50,24 +54,48 @@ struct ProjectTourHost: ViewModifier {
             .environment(tour)
             .task {
                 // Once a visit, though a cover over the screen, as the camera's, appears it again.
-                if tour == nil, offersTours, project.id == SampleProjects.firstLaunchID {
+                if tour == nil, offersTours {
                     tour = ProjectTour()
                 }
             }
             .task(id: gate) {
                 await settle(gate)
             }
+        return finishingSteps(on: hosted)
+    }
+
+    /// Finishes the steps the user's own actions cover, and skips those the tour reaches with
+    /// nothing to show them on.
+    private func finishingSteps(on view: some View) -> some View {
+        view
             .onChange(of: presenter.current) { _, current in
                 if current == .export {
-                    tour?.finish(through: .share)
+                    tour?.finish(.share)
+                }
+            }
+            .onChange(of: project.tray.count) { old, new in
+                if new > old {
+                    tour?.finish(.addPhotos)
+                }
+            }
+            .onChange(of: trayPlacements) { old, new in
+                if new.contains(where: { photoID, count in count > old[photoID, default: 0] }) {
+                    tour?.finish(.addPhotos)
+                    tour?.finish(.placePhoto)
+                }
+            }
+            .onChange(of: photoSelection) { old, new in
+                if old == nil, new != nil, !gate.isPresenting {
+                    tour?.finish(.framePhoto)
                 }
             }
             .onChange(of: layerSelection) { old, new in
                 finishLayerSteps(from: old, to: new)
             }
             .onChange(of: tour?.step) { _, step in
-                if let step = TourVisit.stepSkipped(at: step, isLayerSelected: layerSelection != nil) {
-                    tour?.finish(through: step)
+                let targets = TourTargets(project: project, frontSlide: frontSlide)
+                if let step = TourVisit.stepSkipped(at: step, isLayerSelected: layerSelection != nil, targets: targets) {
+                    tour?.finish(step)
                 }
             }
     }
@@ -75,9 +103,9 @@ struct ProjectTourHost: ViewModifier {
     /// The Share tip, pointing at the Share button at `button`, in the screen's space, wherever its
     /// bar puts it. TipKit shows no popover from a toolbar item, and can't point at one, which
     /// measures outside the screen's space, so the tip points at a stand-in over the button.
-    private func shareTipView(_ tip: any Tip, pointingAt button: CGRect, in size: CGSize) -> some View {
+    private func shareTipView(_ tip: any Tip, anchor: TourAnchor, pointingAt button: CGRect, in size: CGSize) -> some View {
         let placement = ShareTipPlacement(button: button, in: size)
-        let tipView = TipView(tip, arrowEdge: placement.arrowEdge, anchorID: TourAnchor.share)
+        let tipView = TipView(tip, arrowEdge: placement.arrowEdge, anchorID: anchor)
             .tourTipStyle()
             // As the tour's other tips are, so one beside a bar down the screen's side, which
             // starts level with the button, still fits below it.
@@ -85,7 +113,7 @@ struct ProjectTourHost: ViewModifier {
         return ZStack {
             Color.clear
                 .frame(width: button.width, height: button.height)
-                .tipAnchor(TourAnchor.share)
+                .tipAnchor(anchor)
                 .position(x: button.midX, y: button.midY)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
@@ -107,7 +135,9 @@ struct ProjectTourHost: ViewModifier {
         let hasTour: Bool
         let isPresenting: Bool
         let isIdle: Bool
-        let frontSlideID: UUID?
+        /// What the tips point at, which shows them afresh as it changes, as when a tray photo
+        /// lands on a slide with nothing opening.
+        let targets: TourTargets
     }
 
     private var gate: Gate {
@@ -115,8 +145,9 @@ struct ProjectTourHost: ViewModifier {
         return Gate(
             hasTour: tour != nil,
             isPresenting: isPresenting,
-            isIdle: !isPresenting && !isFailing && photoSelection == nil && layerSelection == nil && !isHoldingPhoto,
-            frontSlideID: frontSlide?.id
+            isIdle: !isPresenting && !isFailing && photoSelection == nil && layerSelection == nil && !isHoldingPhoto
+                && !isImportingToTray,
+            targets: TourTargets(project: project, frontSlide: frontSlide)
         )
     }
 
@@ -129,23 +160,31 @@ struct ProjectTourHost: ViewModifier {
         }
     }
 
+    /// How many cells hold a photo from each tray photo, which grows as one is placed. Counted
+    /// rather than told apart by the cells' image IDs, since a photo restored on sight takes a new
+    /// ID in the same cell, and a move or a swap keeps every count.
+    private var trayPlacements: [UUID: Int] {
+        project.slides.flatMap(\.cells).compactMap(\.image?.trayPhotoID).reduce(into: [:]) { counts, photoID in
+            counts[photoID, default: 0] += 1
+        }
+    }
+
     /// Hides the tips that wait for the screen at once for any change, and offers them again once
-    /// it has rested idle with a slide in front, pointing at the slide then in front.
+    /// it has rested idle, pointing at what's then on it.
     private func settle(_ gate: Gate) async {
         guard let tour else {
             return
         }
         tour.isPresenting = gate.isPresenting
         tour.visit.isSettled = false
-        guard gate.isIdle, let frontSlide else {
+        guard gate.isIdle else {
             return
         }
         try? await Task.sleep(for: Self.settleDelay)
         guard !Task.isCancelled else {
             return
         }
-        tour.visit.frontSlideID = frontSlide.id
-        tour.visit.canPointAtLayer = !frontSlide.layers.isEmpty && frontSlide.span == 1
+        tour.visit.targets = gate.targets
         tour.visit.isSettled = true
     }
 
@@ -158,9 +197,9 @@ struct ProjectTourHost: ViewModifier {
             return
         }
         if old == nil, new != nil {
-            tour.finish(through: .selectLayer)
+            tour.finish(.selectLayer)
         } else if old != nil, new == nil, tour.step == .moveLayer {
-            tour.finish(through: .moveLayer)
+            tour.finish(.moveLayer)
         }
     }
 }

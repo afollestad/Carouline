@@ -16,8 +16,8 @@ enum SampleStore {
         root: .temporaryDirectory.appending(path: "DebugFirstLaunch", directoryHint: .isDirectory),
         temporary: .temporaryDirectory.appending(path: "DebugFirstLaunchTemporary", directoryHint: .isDirectory)
     )
-    /// TipKit's datastore for a first launch, reset with its store, so the sample's tour starts
-    /// over too, leaving the real datastore alone.
+    /// TipKit's datastore for a first launch, reset with its store, so the tour starts over too,
+    /// leaving the real datastore alone.
     static let firstLaunchTips = firstLaunchPaths.root.appending(path: "Tips", directoryHint: .isDirectory)
 
     /// A store refilled with fresh `projects`, so every launch starts from the same ones. It

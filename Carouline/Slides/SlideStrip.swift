@@ -258,6 +258,9 @@ struct SlideStrip: View {
             }
         )
         .id(StripItem.slide(slide.id))
+        // Over its neighbors, which come later or earlier in the stack, so a tour tip grown past a
+        // narrow slide still shows and takes its taps.
+        .zIndex(project.frontSlide(at: position)?.id == slide.id ? 1 : 0)
         // The others hold still too while a slide's layers sheet is open, to fingers and
         // VoiceOver alike, so nothing on them is selected or edited out from under it.
         .allowsHitTesting(layersSlideID == nil || layersSlideID == slide.id)

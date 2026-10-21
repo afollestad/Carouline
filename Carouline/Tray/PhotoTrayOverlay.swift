@@ -4,11 +4,13 @@
 //
 
 import SwiftUI
+import TipKit
 import UIKit
 
 /// The tray along the bottom of the project screen while nothing else is there: no photo or layer
-/// selected, no photo held to place, no slide's layers open, and no keyboard up. In its place, the
-/// question about tray photos a pick left out, until it's answered.
+/// selected, no photo held to place, no slide's layers open, and no keyboard up, with the tour's tip
+/// about it above. In its place, the question about tray photos a pick left out, until it's
+/// answered.
 struct PhotoTrayOverlay: ViewModifier {
     let library: ProjectLibrary
     let project: Project
@@ -19,6 +21,7 @@ struct PhotoTrayOverlay: ViewModifier {
     /// on it over the slides, which stay where they are. Read from where the keyboard is headed,
     /// which UIKit reports for every change, docked, floating or gone.
     @State private var isKeyboardUp = false
+    @Environment(ProjectTour.self) private var tour: ProjectTour?
 
     func body(content: Content) -> some View {
         content
@@ -51,6 +54,9 @@ struct PhotoTrayOverlay: ViewModifier {
         let photos = removalPhotos
         if photos.isEmpty {
             PhotoTray(project: project, importingCount: library.importingTray[project.id] ?? 0, actions: actions)
+                .overlayPreferenceValue(TourTargetBounds.self) { targets in
+                    tourTip(at: targets)
+                }
         } else {
             TrayRemovalBar(photos: photos, projectID: project.id) {
                 removals.keep()
@@ -58,6 +64,33 @@ struct PhotoTrayOverlay: ViewModifier {
                 withAnimation {
                     removals.remove(from: library)
                 }
+            }
+        }
+    }
+
+    /// The tour's tip about the tray, above it, pointing down at its add button or its photos.
+    @ViewBuilder
+    private func tourTip(at targets: [TourAnchor.Target: Anchor<CGRect>]) -> some View {
+        if let tour, let tip = tour.trayTip {
+            let target: TourAnchor.Target = tour.step == .placePhoto ? .trayPhotos : .addPhotos
+            if let bounds = targets[target] {
+                GeometryReader { proxy in
+                    let anchor = tour.anchor(target)
+                    ZStack(alignment: .bottom) {
+                        anchor.standIn(at: proxy[bounds])
+                        TipView(tip, arrowEdge: .bottom, anchorID: anchor)
+                            .tourTipStyle()
+                            .barTipCorners(pointingAt: proxy[bounds], inBarOf: proxy.size.width, inset: 16)
+                            .padding(.horizontal, 16)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, proxy.size.height)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    }
+                    // Growing up from the tray, with its stand-in still over the button.
+                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+                }
+                // Sized with the tray, so it leaves the slides above as much room.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             }
         }
     }

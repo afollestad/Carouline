@@ -44,6 +44,7 @@ struct LayerBar: View {
                 Button("Done", systemImage: "checkmark", action: onDone)
                     .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
+                    .tourTarget(.layerDone)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.glass)
