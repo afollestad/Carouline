@@ -138,13 +138,16 @@ struct BorderEdgeTests {
         #expect(darkness == darkness.sorted())
     }
 
-    /// A plain border, or one with no width, draws as it always has; an instant photo's frame is
-    /// a plain card.
+    /// A plain border, or one with no width, draws as it always has, and an instant photo's frame
+    /// is a plain card.
     @Test func leavesAPlainBorderAlone() throws {
         let image = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 300)
 
         #expect(BorderEdge.edge(for: ImageLayer(image: image, borderWidth: 0.04), seed: seed) == nil)
         #expect(BorderEdge.edge(for: ImageLayer(image: image, borderStyle: .wavy), seed: seed) == nil)
+        // A sticker's styled outline is cut along its shape, never a frame.
+        let sticker = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 300, fileFormat: .png)
+        #expect(BorderEdge.edge(for: ImageLayer(image: sticker, borderWidth: 0.04, borderStyle: .wavy), seed: seed) == nil)
         let instant = try #require(BorderEdge.edge(for: ImageLayer(image: image, borderWidth: 0.04, borderStyle: .instant), seed: seed))
         #expect(instant.fill == CGPath(rect: instant.bounds, transform: nil))
     }

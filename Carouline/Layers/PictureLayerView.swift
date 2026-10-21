@@ -6,7 +6,7 @@
 import SwiftUI
 
 /// A picture in its frame, inside its border: a ring of its border color around an opaque
-/// picture, and an outline tracing a transparent one's shape, or either's styled edge, from
+/// picture, and an outline tracing a transparent one's shape, either cut by its style, from
 /// `seed`'s randomness. An opaque picture's blur stays in its frame, and a transparent one's
 /// spreads past its edges, and its shadow falls past them, as they do in the export.
 struct PictureLayerView: View {
@@ -54,7 +54,11 @@ struct PictureLayerView: View {
             } else if picture.image.fileFormat == .jpeg {
                 picture.borderColor.color
             } else if border > 0, !isMissing {
-                PictureOutline(picture: picture, projectID: projectID, size: size)
+                if picture.hasStyledOutline {
+                    StyledOutline(picture: picture, seed: seed, projectID: projectID)
+                } else {
+                    PictureOutline(picture: picture, projectID: projectID, size: size)
+                }
             }
         }
         .modifier(PictureShadow(shadow: LayerGeometry.shadow(of: picture, pictureSize: pictureSize), isShown: !isMissing))
@@ -117,7 +121,7 @@ private struct PictureOutline: View {
 
     /// Long enough for a slider's next step to arrive, so a drag renders where it rests rather
     /// than at every step, and short enough that the outline still reads as following it.
-    private static let settleDelay = Duration.milliseconds(60)
+    fileprivate static let settleDelay = Duration.milliseconds(60)
 
     /// What the outline is rendered from, short of the picture's blur, which it ignores.
     private struct Source: Hashable {
@@ -160,6 +164,63 @@ private struct PictureOutline: View {
             // Faded in as its picture is, the first time, rather than after it.
             withAnimation(outline == nil ? .photoArrival : nil) {
                 outline = rendered
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// A transparent picture's styled outline, filling the layer's frame: traced from the picture at
+/// `LayerImageEffects.contourSide` whenever the picture or its border's width changes, as the
+/// export's is, and cut by the export's own code. The last trace stays on screen meanwhile, and
+/// one already made shows on the first frame. A trace is vector, so it scales with the layer sharp,
+/// and its style and color change without tracing again.
+private struct StyledOutline: View {
+    let picture: ImageLayer
+    let seed: UUID
+    let projectID: UUID
+    @Environment(\.imageLoader) private var loader
+    @State private var contour: StickerContour?
+    /// Whether this view has traced yet, after which a change waits for the next one.
+    @State private var hasTraced = false
+
+    /// What the outline is traced from.
+    private struct Source: Hashable {
+        let imageID: UUID
+        let width: Double
+    }
+
+    var body: some View {
+        let cached = LayerImageEffects.cachedContour(for: picture)
+        ZStack {
+            if let shown = cached ?? contour, let edge = BorderEdge.edge(for: picture, contour: shown, seed: seed) {
+                StyledEdgeView(edge: edge, color: picture.borderColor.uiColor.cgColor)
+                    .transition(.opacity)
+            }
+        }
+        .task(id: Source(imageID: picture.image.id, width: picture.borderWidth)) {
+            if let cached {
+                contour = cached
+                return
+            }
+            // Only a change waits, since a first trace has nothing to stand in for it.
+            if hasTraced {
+                try? await Task.sleep(for: PictureOutline.settleDelay)
+            }
+            hasTraced = true
+            let request = ImageRequest(projectID: projectID, image: picture.image, displayedPixels: CGFloat(LayerImageEffects.contourSide))
+            guard !Task.isCancelled, let image = await loader.image(request), !Task.isCancelled else {
+                return
+            }
+            let traced = await LayerImageEffects.screenContour(of: image, for: picture)
+            // A newer border's trace takes over from a slower, older one.
+            guard !Task.isCancelled, let traced else {
+                return
+            }
+            LayerImageEffects.keepContour(traced, for: picture)
+            // Faded in as its picture is, the first time, rather than after it.
+            withAnimation(contour == nil ? .photoArrival : nil) {
+                contour = traced
             }
         }
         .accessibilityHidden(true)

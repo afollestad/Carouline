@@ -117,8 +117,8 @@ nonisolated enum SlideRenderer {
         }
     }
 
-    /// Each picture layer's picture decoded at the size it's drawn, with its outline, by layer,
-    /// counting those missing.
+    /// Each picture layer's picture decoded at the size it's drawn, with its outline or the trace
+    /// a styled one's cut along, by layer, counting those missing.
     private static func decodedPictures(
         of slide: Slide,
         canvas: CGSize,
@@ -133,7 +133,9 @@ nonisolated enum SlideRenderer {
             }
             let size = LayerGeometry.pictureSize(of: picture.image, scale: layer.placement.scale, slideWidth: slideWidth)
             if let decoded = image(picture.image, size) {
-                pictures[layer.id] = LayerRenderer.Picture(decoded, for: picture)
+                let side = CGFloat(LayerImageEffects.contourSide)
+                let source = picture.hasStyledOutline ? image(picture.image, CGSize(width: side, height: side)) : nil
+                pictures[layer.id] = LayerRenderer.Picture(decoded, contourSource: source, for: picture)
             } else {
                 missing += 1
             }

@@ -170,4 +170,109 @@ struct LayerImageEffectsTests {
     @Test func drawsNothingWithoutABorder() throws {
         #expect(LayerImageEffects.outline(of: try halfClear(), width: 0, color: .white) == nil)
     }
+
+    /// `loop`'s area, positive where it runs clockwise on screen, as an outline does with its
+    /// shape on its right, and negative round a hole.
+    private func area(of loop: [CGPoint]) -> CGFloat {
+        zip(loop, loop.dropFirst() + loop.prefix(1)).reduce(0) { $0 + ($1.0.x * $1.1.y - $1.1.x * $1.0.y) } / 2
+    }
+
+    /// `loop`, in shares of a canvas `side` pixels square, in pixels.
+    private func pixels(_ loop: [CGPoint], side: CGFloat) -> [CGPoint] {
+        loop.map { CGPoint(x: $0.x * side, y: $0.y * side) }
+    }
+
+    /// A disk's outline traces as one loop round it, as far out as the outline reaches.
+    @Test func tracesADisksOutline() throws {
+        let source = try image(width: 200, height: 200) { context in
+            context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1))
+            context.fillEllipse(in: CGRect(x: 50, y: 50, width: 100, height: 100))
+        }
+        let contour = try #require(LayerImageEffects.contour(of: source, width: 20))
+
+        #expect(contour.outline.count == 1)
+        let loop = pixels(try #require(contour.outline.first), side: 240)
+        // A blur reaches a little less far round a curve than past a straight edge.
+        #expect(loop.allSatisfy { abs(hypot($0.x - 120, $0.y - 120) - 69) < 2.5 })
+        #expect(area(of: loop) > 0)
+        #expect(abs(contour.borderWidth - 0.1) < 1e-9)
+        // It starts at its top, where the grid's read first, so a pattern cut along it starts
+        // there on every launch.
+        let top = loop.map(\.y).min() ?? 0
+        #expect(abs((loop.first?.y ?? .infinity) - top) < 1.5)
+    }
+
+    /// A ring's hole traces as a loop of its own, running the other way, so a fill leaves it open.
+    @Test func tracesAHoleTheOtherWay() throws {
+        let source = try image(width: 200, height: 200) { context in
+            context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1))
+            context.addEllipse(in: CGRect(x: 20, y: 20, width: 160, height: 160))
+            context.addEllipse(in: CGRect(x: 60, y: 60, width: 80, height: 80))
+            context.fillPath(using: .evenOdd)
+        }
+        let contour = try #require(LayerImageEffects.contour(of: source, width: 10))
+        let areas = contour.outline.map { area(of: pixels($0, side: 220)) }.sorted()
+
+        #expect(areas.count == 2)
+        #expect(areas.first ?? 0 < 0)
+        #expect(areas.last ?? 0 > 0)
+    }
+
+    /// The trace keeps the picture's way up: a shape along the top traces along the top.
+    @Test func tracesThePictureUpright() throws {
+        let source = try image(width: 100, height: 100) { context in
+            // Core Graphics counts up from the bottom, so this is the picture's top 20 rows.
+            context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1))
+            context.fill(CGRect(x: 0, y: 80, width: 100, height: 20))
+        }
+        let contour = try #require(LayerImageEffects.contour(of: source, width: 10))
+        let loop = pixels(try #require(contour.outline.first), side: 120)
+
+        // The band spans 10 to 30 down the canvas, and its outline 0 to 40.
+        #expect(loop.allSatisfy { $0.y < 41 })
+        #expect(loop.contains { $0.y < 2 })
+        #expect(loop.contains { $0.y > 38 })
+    }
+
+    /// A trace is in shares of the picture, so a small one matches a large one.
+    @Test func tracesAlikeAtAnyResolution() throws {
+        let id = UUID()
+        let picture = ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 800, pixelHeight: 800, fileFormat: .png), borderWidth: 0.05)
+        let largeSticker = try #require(SampleImages.sticker(for: id, width: 800, height: 800))
+        let smallSticker = try #require(SampleImages.sticker(for: id, width: 400, height: 400))
+        let large = try #require(LayerImageEffects.contour(of: largeSticker, for: picture))
+        let small = try #require(LayerImageEffects.contour(of: smallSticker, for: picture))
+        func bounds(_ contour: StickerContour) -> CGRect {
+            let points = contour.outline.flatMap(\.self)
+            let across = points.map(\.x)
+            let down = points.map(\.y)
+            let minX = across.min() ?? 0
+            let minY = down.min() ?? 0
+            return CGRect(x: minX, y: minY, width: (across.max() ?? 0) - minX, height: (down.max() ?? 0) - minY)
+        }
+
+        #expect(large.outline.count == small.outline.count)
+        let difference = [bounds(large).minX - bounds(small).minX, bounds(large).minY - bounds(small).minY, bounds(large).width - bounds(small).width]
+        #expect(difference.allSatisfy { abs($0) < 0.005 }, "\(difference)")
+    }
+
+    /// A thin stroke's core still rings it, though its outline reaches less than the border round
+    /// it, so a styled edge never cuts the stroke's outline away.
+    @Test func keepsACoreRoundAThinStroke() throws {
+        let source = try image(width: 200, height: 100) { context in
+            context.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1))
+            context.fill(CGRect(x: 99, y: 0, width: 3, height: 100))
+        }
+        let contour = try #require(LayerImageEffects.contour(of: source, width: 12))
+        let core = CGMutablePath()
+        for loop in contour.core {
+            core.addLines(between: loop.map { CGPoint(x: $0.x * 224, y: $0.y * 124) })
+            core.closeSubpath()
+        }
+
+        // The stroke spans 111 to 114 on the outline's canvas.
+        #expect(core.contains(CGPoint(x: 112.5, y: 62)))
+        #expect(core.boundingBox.width > 5)
+        #expect(!core.contains(CGPoint(x: 105, y: 62)))
+    }
 }

@@ -275,30 +275,30 @@ extension ScreenSnapshotting {
         )
     }
 
-    /// A photo under a framed picture in each border style, three by three, each frame as wide as
-    /// it goes so its edge shows.
-    var borderStyleProject: Project {
+    /// A photo under a framed picture, or a sticker for `.png`, in each border style, three by
+    /// three, each border as wide as it goes so its edge shows.
+    func borderStyleProject(_ format: ImageFileFormat = .jpeg) -> Project {
         let colors: [BorderStyle: RGBColor] = [
             .burnt: RGBColor(red: 0.96, green: 0.91, blue: 0.8),
             .rubberStamp: RGBColor(red: 0.78, green: 0.13, blue: 0.16)
         ]
+        let isSticker = format == .png
         let layers = BorderStyle.allCases.enumerated().map { index, style in
-            Layer(
+            let color = colors[style] ?? .white
+            let image = isSticker
+                ? PlacedImage(id: fixtureID(241 + UInt8(index)), assetIdentifier: nil, pixelWidth: 600, pixelHeight: 600, fileFormat: .png)
+                : PlacedImage(id: fixtureID(216 + UInt8(index)), assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536)
+            return Layer(
                 id: fixtureID(200 + UInt8(index)),
-                content: .image(ImageLayer(
-                    image: PlacedImage(id: fixtureID(216 + UInt8(index)), assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536),
-                    borderWidth: ImageLayer.maximumBorderWidth,
-                    borderColor: colors[style] ?? .white,
-                    borderStyle: style
-                )),
+                content: .image(ImageLayer(image: image, borderWidth: ImageLayer.maximumBorderWidth, borderColor: color, borderStyle: style)),
                 placement: LayerPlacement(centerX: 0.18 + 0.32 * Double(index % 3), centerY: 0.2 + 0.3 * Double(index / 3), scale: 0.5)
             )
         }
         return Project(
-            id: fixtureID(14),
-            name: "Borders",
+            id: fixtureID(isSticker ? 18 : 14),
+            name: isSticker ? "Stickers" : "Borders",
             aspectRatio: .portrait,
-            slides: [Slide(id: fixtureID(15), layout: .single, cells: [photo(198, 2048, 2560)], layers: layers)],
+            slides: [Slide(id: fixtureID(isSticker ? 19 : 15), layout: .single, cells: [photo(198, 2048, 2560)], layers: layers)],
             createdAt: created
         )
     }

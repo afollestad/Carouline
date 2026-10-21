@@ -52,11 +52,10 @@ nonisolated extension BorderStyle {
     }
 
     /// The styles `surface` takes, in the picker's order. A highlight has no picture for an
-    /// instant photo's frame to hold, and a sticker's outline takes only plain or a card for now.
+    /// instant photo's frame to hold.
     static func offered(on surface: Surface) -> [BorderStyle] {
         switch surface {
-        case .photo: allCases
-        case .sticker: [.plain, .instant]
+        case .photo, .sticker: allCases
         case .highlight: allCases.filter { $0 != .instant }
         }
     }

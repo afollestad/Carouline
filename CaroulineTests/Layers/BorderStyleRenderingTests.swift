@@ -85,6 +85,44 @@ struct BorderStyleRenderingTests {
         #expect(inside.allSatisfy(isBlack), "\(style.name)")
     }
 
+    /// A sticker's styled outline cuts in along its shape, and leaves the band round the sticker
+    /// whole.
+    @Test func cutsAStickersOutline() throws {
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try #require(CGContext(data: nil, width: 400, height: 400, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        context.fillEllipse(in: CGRect(x: 80, y: 80, width: 240, height: 240))
+        let disk = try #require(context.makeImage())
+        let picture = ImageLayer(
+            image: PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400, fileFormat: .png),
+            borderWidth: 0.06,
+            borderColor: .black,
+            borderStyle: .jagged
+        )
+        let layer = Layer(id: UUID(uuid: (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)), content: .image(picture))
+        let decoded = LayerRenderer.Picture(disk, contourSource: disk, for: picture)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = try #require(UIGraphicsImageRenderer(size: canvas, format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: canvas))
+            LayerRenderer.draw(layer, picture: decoded, in: context.cgContext, canvas: canvas, span: 1)
+        }.cgImage)
+        func ring(radius: CGFloat) throws -> [TestImages.Pixel] {
+            try stride(from: 0, to: 2 * CGFloat.pi, by: .pi / 180).map { angle in
+                try #require(TestImages.pixel(of: image, at: CGPoint(x: 540 + radius * cos(angle), y: 540 + radius * sin(angle))))
+            }
+        }
+
+        // The disk is 162 pixels round, and its outline about 194, its teeth 16 deep.
+        let tips = try ring(radius: 190)
+        #expect(tips.contains(where: isWhite))
+        #expect(tips.contains(where: isBlack))
+        #expect(try ring(radius: 171).allSatisfy(isBlack))
+    }
+
     /// An instant photo's frame is four borders deep below the picture.
     @Test func framesAnInstantPhotoDeeperBelow() throws {
         let layer = layer(.instant)

@@ -48,11 +48,12 @@ nonisolated enum BorderEdge {
     /// The most points along an irregular edge, for the same reason.
     static let maximumSamples: CGFloat = 4000
 
-    /// `picture`'s frame with its border's style cut in, or nil when its border is plain or has no
-    /// width, which draw as they always have.
+    /// `picture`'s frame with its border's style cut in, or an instant photo's card, or nil when
+    /// its border is plain or has no width, which draw as they always have, or it's a transparent
+    /// picture's outline, which `edge(for:contour:seed:)` cuts.
     static func edge(for picture: ImageLayer, seed: UUID) -> StyledEdge? {
         let style = picture.drawnBorderStyle
-        guard style != .plain, picture.borderWidth > 0 else {
+        guard style != .plain, picture.borderWidth > 0, picture.image.fileFormat == .jpeg || style == .instant else {
             return nil
         }
         let image = picture.image
@@ -69,6 +70,41 @@ nonisolated enum BorderEdge {
             size: LayerGeometry.borderWidth(of: picture, pictureSize: size),
             seed: seed
         )
+        cache.setObject(edge, forKey: key)
+        return edge
+    }
+
+    /// A transparent picture's outline, traced as `contour`, with its border's style cut in and its
+    /// core kept whole, or nil when its border is plain, an instant photo's card, or has no width.
+    static func edge(for picture: ImageLayer, contour: StickerContour, seed: UUID) -> StyledEdge? {
+        let style = picture.drawnBorderStyle
+        guard let cut = style.cut, picture.borderWidth > 0 else {
+            return nil
+        }
+        let image = picture.image
+        let key = "sticker-\(style.rawValue)-\(seed.uuidString)-\(image.id.uuidString)-\(picture.borderWidth)-\(contour.borderWidth)" as NSString
+        if let cached = cache.object(forKey: key) {
+            return cached
+        }
+        let size = LayerGeometry.pictureSize(of: image, scale: 1, slideWidth: referenceSide / LayerGeometry.pictureSide)
+        let bounds = CGRect(origin: .zero, size: LayerGeometry.frameSize(of: picture, pictureSize: size))
+        func placed(_ loop: [CGPoint]) -> [CGPoint] {
+            loop.map { CGPoint(x: $0.x * bounds.width, y: $0.y * bounds.height) }
+        }
+        let edgeSize = LayerGeometry.borderWidth(of: picture, pictureSize: size)
+        var generator = SeededGenerator(seed: seed)
+        // A loop of one run each, so regular teeth fit it a whole number of times.
+        let loops = contour.outline.map { loop in
+            EdgeLoop(runs: [EdgeRun(points: placed(loop) + placed(Array(loop.prefix(1))), isCut: true)])
+        }
+        let points = loops.map { cutPoints($0, cut: cut, size: edgeSize, generator: &generator) }
+        // The core's loops run as the outline's do, so the nonzero rule fills the two as one.
+        var fill = path(through: points.map { $0.map(\.point) } + contour.core.map(placed))
+        if style == .rubberStamp {
+            fill = fill.subtracting(specks(in: bounds, keeping: nil, size: edgeSize, generator: &generator))
+        }
+        let char = style == .burnt ? charBands(along: points, lengths: loops.map(\.length), size: edgeSize, generator: &generator) : []
+        let edge = StyledEdge(fill: fill, char: char, bounds: bounds)
         cache.setObject(edge, forKey: key)
         return edge
     }

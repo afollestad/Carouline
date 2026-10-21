@@ -311,6 +311,12 @@ nonisolated struct ImageLayer: Codable, Hashable, Sendable {
         borderStyle.drawn(on: image.fileFormat == .png ? .sticker : .photo)
     }
 
+    /// Whether a transparent picture's outline has its style cut along a trace of its shape,
+    /// rather than drawing plain, or as an instant photo's card.
+    var hasStyledOutline: Bool {
+        image.fileFormat == .png && borderWidth > 0 && drawnBorderStyle != .plain && drawnBorderStyle != .instant
+    }
+
     func clamped() -> ImageLayer {
         var layer = self
         layer.borderWidth = min(max(borderWidth, 0), Self.maximumBorderWidth)

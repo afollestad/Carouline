@@ -26,14 +26,18 @@ nonisolated enum LayerRenderer {
     struct Picture {
         let image: CGImage
         let outline: CGImage?
+        /// A styled outline's trace, made from the picture decoded at
+        /// `LayerImageEffects.contourSide` as the screen's is, so the two cut the same teeth.
+        let contour: StickerContour?
         /// How far a transparent picture's blur spreads past its edges, as a share of its size.
         let spread: CGSize
 
-        init(_ decoded: CGImage, for picture: ImageLayer) {
+        init(_ decoded: CGImage, contourSource: CGImage? = nil, for picture: ImageLayer) {
             let isTransparent = picture.image.fileFormat == .png
             // From the picture before its blur, so the outline stays crisp. Only for a plain
             // border, since a styled one cuts its own edge.
             outline = isTransparent && picture.drawnBorderStyle == .plain ? LayerImageEffects.outline(of: decoded, for: picture) : nil
+            contour = picture.hasStyledOutline ? contourSource.flatMap { LayerImageEffects.contour(of: $0, for: picture) } : nil
             let size = CGSize(width: decoded.width, height: decoded.height)
             let sigma = LayerGeometry.blurRadius(of: picture, pictureSize: size)
             if sigma > 0, isTransparent, let blurred = LayerImageEffects.blurredOut(decoded, sigma: sigma) {
@@ -193,6 +197,8 @@ nonisolated enum LayerRenderer {
             } else if picture.image.fileFormat == .jpeg {
                 context.setFillColor(picture.borderColor.uiColor.cgColor)
                 context.fill(box)
+            } else if let contour = decoded.contour, let edge = BorderEdge.edge(for: picture, contour: contour, seed: seed) {
+                drawEdge(edge, color: picture.borderColor.uiColor.cgColor, in: context, box: box)
             } else if let outline = decoded.outline {
                 UIImage(cgImage: outline).draw(in: box)
             }

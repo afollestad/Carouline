@@ -110,12 +110,24 @@ extension SnapshotTests {
 
     /// A framed picture in each border style.
     @Test func borderStyles() async {
-        await assertScreenSnapshot(of: projectScreen(borderStyleProject))
+        await assertScreenSnapshot(of: projectScreen(borderStyleProject()))
     }
 
     /// The export cuts each border style's edge as the screen does, at the export's size.
     @Test func exportedBorderStyles() async throws {
-        try await assertScreenSnapshot(of: exportedSlide(borderStyleProject))
+        try await assertScreenSnapshot(of: exportedSlide(borderStyleProject()))
+    }
+
+    /// A sticker's outline in each border style, cut along its shape.
+    @Test func stickerStyles() async {
+        let project = borderStyleProject(.png)
+        traceStickers(in: project)
+        await assertScreenSnapshot(of: projectScreen(project))
+    }
+
+    /// The export cuts each sticker's outline as the screen does, at the export's size.
+    @Test func exportedStickerStyles() async throws {
+        try await assertScreenSnapshot(of: exportedSlide(borderStyleProject(.png)))
     }
 
     /// Highlighted text in each highlight style.
@@ -131,5 +143,19 @@ extension SnapshotTests {
     /// A blurred photo with sharp text over it.
     @Test func blurredSlideUnderText() async {
         await assertScreenSnapshot(of: projectScreen(blurredProject))
+    }
+
+    /// Each of `project`'s styled stickers traced ahead, as a screen that's shown them has, since a
+    /// snapshot can settle before a trace lands.
+    private func traceStickers(in project: Project) {
+        for layer in project.slides.flatMap(\.layers) {
+            let request = layer.image.map { ImageRequest(projectID: project.id, image: $0, displayedPixels: CGFloat(LayerImageEffects.contourSide)) }
+            guard case .image(let picture) = layer.content, picture.hasStyledOutline,
+                  let image = request.flatMap(imageLoader.cachedImage),
+                  let contour = LayerImageEffects.contour(of: image, for: picture) else {
+                continue
+            }
+            LayerImageEffects.keepContour(contour, for: picture)
+        }
     }
 }
