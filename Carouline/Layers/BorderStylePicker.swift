@@ -11,6 +11,7 @@ struct BorderStylePicker: View {
     let surface: BorderStyle.Surface
     let selected: BorderStyle
     let pick: (BorderStyle) -> Void
+    @Environment(\.layersSheetMargin) private var margin
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -21,8 +22,9 @@ struct BorderStylePicker: View {
                     }
                 }
             }
-            // Padded rather than given content margins, so the row scrolls edge to edge.
-            .padding(.horizontal, 16)
+            // Padded rather than given content margins, so the row scrolls edge to edge. By the
+            // sheet's margin, which other rows' text is in by too, but on iPhone Duo unfolded.
+            .padding(.horizontal, margin)
             .padding(.vertical, 8)
         }
         .scrollIndicators(.hidden)

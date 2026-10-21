@@ -28,7 +28,9 @@ struct TextLayerEditor: View {
             }
             StyleSections(style: style) { style in
                 Section("Font") {
-                    fonts(selected: style.font)
+                    FontRow(selected: style.font) { font in
+                        binding(\.font).wrappedValue = font
+                    }
                 }
                 Section("Color") {
                     ColorSwatches(title: "Color", color: binding(\.color, shown: style))
@@ -130,19 +132,27 @@ struct TextLayerEditor: View {
         text.isHighlighted = true
         session.draft?.content = .text(text)
     }
+}
 
-    /// Each typeface on offer, drawn in itself.
-    private func fonts(selected: LayerFont) -> some View {
+/// Each typeface on offer, drawn in itself, in a row that scrolls across its form row. A view of its
+/// own, which reads the sheet's margin, since `StyleSections` redraws only as the style changes.
+private struct FontRow: View {
+    let selected: LayerFont
+    let pick: (LayerFont) -> Void
+    @Environment(\.layersSheetMargin) private var margin
+
+    var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
                 ForEach(LayerFont.allCases, id: \.self) { font in
                     FontTile(font: font, isSelected: selected == font) {
-                        binding(\.font).wrappedValue = font
+                        pick(font)
                     }
                 }
             }
-            // Padded rather than given content margins, so the row scrolls edge to edge.
-            .padding(.horizontal, 16)
+            // Padded rather than given content margins, so the row scrolls edge to edge. By the
+            // sheet's margin, which other rows' text is in by too, but on iPhone Duo unfolded.
+            .padding(.horizontal, margin)
             .padding(.vertical, 8)
         }
         .scrollIndicators(.hidden)
