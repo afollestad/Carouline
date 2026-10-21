@@ -66,6 +66,9 @@ run_tests() {
   local device=$1
   shift
   echo "Testing on $device..."
+  local started
+  started=$(date +%s)
+  local status=0
   run_and_format xcodebuild \
     -project Carouline.xcodeproj \
     -scheme Carouline \
@@ -76,7 +79,11 @@ run_tests() {
     -parallel-testing-enabled NO \
     -collect-test-diagnostics never \
     "$@" \
-    test
+    test || status=$?
+  warn_about_springboard_crashes "$device" "$started"
+  if [ "$status" -ne 0 ]; then
+    exit "$status"
+  fi
   require_every_test_ran "$raw_log"
 }
 

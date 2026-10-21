@@ -96,6 +96,9 @@ run_and_format() {
 run_snapshot_tests() {
   local device=$1
   shift
+  local started
+  started=$(date +%s)
+  local status=0
   run_and_format xcodebuild \
     -project Carouline.xcodeproj \
     -scheme Carouline \
@@ -106,7 +109,9 @@ run_snapshot_tests() {
     -parallel-testing-enabled NO \
     -collect-test-diagnostics never \
     "$@" \
-    test
+    test || status=$?
+  warn_about_springboard_crashes "$device" "$started"
+  return "$status"
 }
 
 run_verify() {

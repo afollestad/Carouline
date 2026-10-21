@@ -35,6 +35,31 @@ prepare_snapshot_artifacts() {
   export TEST_RUNNER_SNAPSHOT_ARTIFACTS
 }
 
+# A simulator whose SpringBoard crashes as it boots, as one does on every boot once its wallpaper
+# state goes bad, leaves the test host without a window scene, and every snapshot then fails
+# with "Snapshots need the host app's window scene". Names the crash reports for the simulator
+# named `$1` since `$2`, in seconds since the epoch, and the erase that clears it.
+warn_about_springboard_crashes() {
+  local device=$1
+  local since=$2
+  local udid
+  # A lookup that fails says nothing about the run, so it never fails one.
+  udid=$(xcrun simctl list devices available -j |
+    jq -r --arg name "$device" '[.devices[][] | select(.name == $name)] | (map(select(.state == "Booted")) + .)[0].udid // empty') || return 0
+  if [ -z "$udid" ]; then
+    return 0
+  fi
+  local reports
+  # A date string, since macOS's `find` reads no `@` epoch.
+  reports=$(find "$HOME/Library/Logs/DiagnosticReports" -name 'SpringBoard-*.ips' \
+    -newermt "$(date -r "$since" '+%Y-%m-%d %H:%M:%S')" -exec grep -l "SimDevice.$udid" {} + 2>/dev/null || true)
+  if [ -n "$reports" ]; then
+    echo "warning: SpringBoard crashed on $device during this run, so its results can't be trusted:" >&2
+    echo "$reports" >&2
+    echo "Run again. If it keeps crashing, erase the simulator: xcrun simctl erase $udid" >&2
+  fi
+}
+
 # xcodebuild exits 0 when an identifier matches nothing or a test is skipped, which would
 # read as a pass. Matches Swift Testing's own console lines in the raw log, which xcodebuild
 # prints with parallel testing off.
