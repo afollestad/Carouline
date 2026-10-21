@@ -40,6 +40,41 @@ struct LayerTests {
         #expect(try JSONDecoder().decode(Layer.self, from: Data(json(shadowed).utf8)) == shadowed)
     }
 
+    /// A plain border saves as it did before styles, and one saved then reads as plain.
+    @Test func savesABorderStyleOnlyWhenItHasOne() throws {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10)
+        let plain = Layer(content: .image(ImageLayer(image: image, borderWidth: 0.04)))
+        let wavy = Layer(content: .image(ImageLayer(image: image, borderWidth: 0.04, borderStyle: .wavy)))
+
+        #expect(try !json(plain).contains("borderStyle"))
+        #expect(try json(wavy).contains(#""borderStyle":"wavy""#))
+        #expect(try JSONDecoder().decode(Layer.self, from: Data(json(wavy).utf8)) == wavy)
+    }
+
+    /// A newer build's border style draws plain here, but saves back as it was.
+    @Test func keepsABorderStyleItDoesntOffer() throws {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10)
+        let layer = Layer(content: .image(ImageLayer(image: image, borderWidth: 0.04, borderStyle: BorderStyle(rawValue: "neon"))))
+
+        let decoded = try JSONDecoder().decode(Layer.self, from: Data(try json(layer).utf8))
+
+        guard case .image(let picture) = decoded.content else {
+            Issue.record("Expected an image")
+            return
+        }
+        #expect(picture.borderStyle.rawValue == "neon")
+        #expect(picture.drawnBorderStyle == .plain)
+        #expect(BorderEdge.edge(for: picture, seed: decoded.id) == nil)
+    }
+
+    /// A highlight has no picture for an instant photo's frame to hold, so it draws plain there.
+    @Test func drawsAStyleOnlyWhereItsOffered() {
+        #expect(BorderStyle.instant.drawn(on: .photo) == .instant)
+        #expect(BorderStyle.instant.drawn(on: .highlight) == .plain)
+        #expect(BorderStyle.torn.drawn(on: .highlight) == .torn)
+        #expect(BorderStyle.allCases.allSatisfy { $0.drawn(on: .photo) == $0 })
+    }
+
     /// A newer build's typeface draws in the default one here, but saves back as it was.
     @Test func keepsATypefaceItDoesntOffer() throws {
         let layer = Layer(content: .text(TextLayer(text: "Hi", font: LayerFont(rawValue: "comicNeue"))))
@@ -134,8 +169,8 @@ struct LayerTests {
         let restored = PlacedImage(assetIdentifier: "A", pixelWidth: 10, pixelHeight: 10)
         let shown = LayerContent.image(ImageLayer(image: restored))
         let missing = PlacedImage(assetIdentifier: "A", pixelWidth: 10, pixelHeight: 10)
-        let draft = LayerContent.image(ImageLayer(image: missing, borderWidth: 0.04, blur: 0.02, hasShadow: true))
-        #expect(shown.editing(draft) == .image(ImageLayer(image: restored, borderWidth: 0.04, blur: 0.02, hasShadow: true)))
+        let draft = LayerContent.image(ImageLayer(image: missing, borderWidth: 0.04, borderStyle: .torn, blur: 0.02, hasShadow: true))
+        #expect(shown.editing(draft) == .image(ImageLayer(image: restored, borderWidth: 0.04, borderStyle: .torn, blur: 0.02, hasShadow: true)))
         #expect(shown.editing(edited) == nil)
     }
 }

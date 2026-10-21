@@ -108,6 +108,16 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: layersSheet(layeredGridFirst, path: [.image(fixtureID(188))]))
     }
 
+    /// A framed picture in each border style.
+    @Test func borderStyles() async {
+        await assertScreenSnapshot(of: projectScreen(borderStyleProject))
+    }
+
+    /// The export cuts each border style's edge as the screen does, at the export's size.
+    @Test func exportedBorderStyles() async throws {
+        try await assertScreenSnapshot(of: exportedSlide(borderStyleProject))
+    }
+
     /// A blurred photo with sharp text over it.
     @Test func blurredSlideUnderText() async {
         await assertScreenSnapshot(of: projectScreen(blurredProject))

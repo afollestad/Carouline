@@ -6,11 +6,12 @@
 import SwiftUI
 
 /// A picture in its frame, inside its border: a ring of its border color around an opaque
-/// picture, and an outline tracing a transparent one's shape. An opaque picture's blur stays in
-/// its frame, and a transparent one's spreads past its edges, and its shadow falls past them, as
-/// they do in the export.
+/// picture, and an outline tracing a transparent one's shape, or either's styled edge, from
+/// `seed`'s randomness. An opaque picture's blur stays in its frame, and a transparent one's
+/// spreads past its edges, and its shadow falls past them, as they do in the export.
 struct PictureLayerView: View {
     let picture: ImageLayer
+    let seed: UUID
     let projectID: UUID
     let background: RGBColor
     let size: CGSize
@@ -18,8 +19,9 @@ struct PictureLayerView: View {
     @Environment(\.missingPictureActions) private var missingActions
 
     var body: some View {
-        let border = LayerGeometry.borderWidth(of: picture, inFrame: size)
-        let pictureSize = CGSize(width: max(0, size.width - 2 * border), height: max(0, size.height - 2 * border))
+        let pictureRect = LayerGeometry.pictureRect(of: picture, inFrame: CGRect(origin: .zero, size: size))
+        let border = pictureRect.minX
+        let pictureSize = pictureRect.size
         let blur = LayerGeometry.blurRadius(of: picture, pictureSize: pictureSize)
         let isTransparent = picture.image.fileFormat == .png
         CellPhoto(image: picture.image, projectID: projectID, blur: isTransparent ? 0 : blur, isMissing: $isMissing) { absence in
@@ -40,9 +42,16 @@ struct PictureLayerView: View {
                 MissingLayerPicture(background: background)
             }
         }
-        .padding(border)
+        .padding(EdgeInsets(
+            top: pictureRect.minY,
+            leading: pictureRect.minX,
+            bottom: size.height - pictureRect.maxY,
+            trailing: size.width - pictureRect.maxX
+        ))
         .background {
-            if picture.image.fileFormat == .jpeg {
+            if let edge = BorderEdge.edge(for: picture, seed: seed), !isTransparent || !isMissing {
+                StyledEdgeView(edge: edge, color: picture.borderColor.uiColor.cgColor)
+            } else if picture.image.fileFormat == .jpeg {
                 picture.borderColor.color
             } else if border > 0, !isMissing {
                 PictureOutline(picture: picture, projectID: projectID, size: size)
@@ -74,6 +83,21 @@ struct MissingPictureActions {
 
 extension EnvironmentValues {
     @Entry var missingPictureActions: MissingPictureActions?
+}
+
+/// A styled edge drawn by the export's own code, filling its frame, so it matches the export.
+private struct StyledEdgeView: View {
+    let edge: StyledEdge
+    let color: CGColor
+
+    var body: some View {
+        Canvas { context, size in
+            context.withCGContext { cgContext in
+                LayerRenderer.drawEdge(edge, color: color, in: cgContext, box: CGRect(origin: .zero, size: size))
+            }
+        }
+        .accessibilityHidden(true)
+    }
 }
 
 /// A transparent picture's outline, filling the layer's frame of `size`. It renders from the
@@ -233,9 +257,11 @@ private struct MissingLayerPicture: View {
         borderWidth: 0.05
     )
     let photo = ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536), borderWidth: 0.04)
+    let stamp = ImageLayer(image: photo.image, borderWidth: 0.06, borderStyle: .postageStamp)
     HStack(spacing: 24) {
-        PictureLayerView(picture: sticker, projectID: UUID(), background: .white, size: CGSize(width: 160, height: 160))
-        PictureLayerView(picture: photo, projectID: UUID(), background: .white, size: CGSize(width: 160, height: 125))
+        PictureLayerView(picture: sticker, seed: UUID(), projectID: UUID(), background: .white, size: CGSize(width: 160, height: 160))
+        PictureLayerView(picture: photo, seed: UUID(), projectID: UUID(), background: .white, size: CGSize(width: 160, height: 125))
+        PictureLayerView(picture: stamp, seed: UUID(), projectID: UUID(), background: .white, size: CGSize(width: 160, height: 124))
     }
     .padding()
     .background(.teal)

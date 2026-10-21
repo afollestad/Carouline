@@ -194,7 +194,7 @@ nonisolated enum TextLayerAlignment: String, CaseIterable, Codable, Hashable, Se
     case trailing
 }
 
-/// A picture over a slide, framed or outlined by an optional border.
+/// A picture over a slide, framed or outlined by an optional border, whose edge can take a style.
 nonisolated struct ImageLayer: Codable, Hashable, Sendable {
     /// Always shown whole, at its default crop.
     var image: PlacedImage
@@ -202,6 +202,8 @@ nonisolated struct ImageLayer: Codable, Hashable, Sendable {
     /// outline grows and shrinks with it.
     var borderWidth: Double
     var borderColor: RGBColor
+    /// The border's edge: straight, cut into a pattern, or an instant photo's frame.
+    var borderStyle: BorderStyle
     /// The blur's radius, as a fraction of the image's longer side.
     var blur: Double
     /// Whether the picture and its border cast a shadow, as text's does.
@@ -212,31 +214,44 @@ nonisolated struct ImageLayer: Codable, Hashable, Sendable {
     /// A tenth of a picture's side blurs it past recognition.
     static let maximumBlur = 0.1
 
-    init(image: PlacedImage, borderWidth: Double = 0, borderColor: RGBColor = .white, blur: Double = 0, hasShadow: Bool = false) {
+    init(
+        image: PlacedImage,
+        borderWidth: Double = 0,
+        borderColor: RGBColor = .white,
+        borderStyle: BorderStyle = .plain,
+        blur: Double = 0,
+        hasShadow: Bool = false
+    ) {
         self.image = image
         self.borderWidth = borderWidth
         self.borderColor = borderColor
+        self.borderStyle = borderStyle
         self.blur = blur
         self.hasShadow = hasShadow
     }
 
-    /// Reads a missing `hasShadow` as none, since pictures had no shadow before it.
+    /// Reads a missing `borderStyle` as plain and a missing `hasShadow` as none, since pictures
+    /// had neither before them.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         image = try container.decode(PlacedImage.self, forKey: .image)
         borderWidth = try container.decode(Double.self, forKey: .borderWidth)
         borderColor = try container.decode(RGBColor.self, forKey: .borderColor)
+        borderStyle = try container.decodeIfPresent(BorderStyle.self, forKey: .borderStyle) ?? .plain
         blur = try container.decode(Double.self, forKey: .blur)
         hasShadow = try container.decodeIfPresent(Bool.self, forKey: .hasShadow) ?? false
     }
 
-    /// Leaves out a shadow the picture doesn't have, so a picture without one saves as it did
-    /// before shadows.
+    /// Leaves out a plain border's style and a shadow the picture doesn't have, so a picture
+    /// without either saves as it did before them.
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(image, forKey: .image)
         try container.encode(borderWidth, forKey: .borderWidth)
         try container.encode(borderColor, forKey: .borderColor)
+        if borderStyle != .plain {
+            try container.encode(borderStyle, forKey: .borderStyle)
+        }
         try container.encode(blur, forKey: .blur)
         if hasShadow {
             try container.encode(hasShadow, forKey: .hasShadow)
@@ -247,8 +262,14 @@ nonisolated struct ImageLayer: Codable, Hashable, Sendable {
         case image
         case borderWidth
         case borderColor
+        case borderStyle
         case blur
         case hasShadow
+    }
+
+    /// The border's style as it draws: plain where this build doesn't offer it on the picture.
+    var drawnBorderStyle: BorderStyle {
+        borderStyle.drawn(on: image.fileFormat == .png ? .sticker : .photo)
     }
 
     func clamped() -> ImageLayer {

@@ -235,10 +235,26 @@ struct LayerList: View {
         switch layer.content {
         case .text(let text): text.font.name
         case .image(let picture):
-            ([picture.borderWidth > 0 ? "Border" : "No border"]
+            ([border(of: picture)]
                 + (picture.blur > 0 ? ["blurred"] : [])
                 + (picture.hasShadow ? ["shadowed"] : []))
                 .joined(separator: ", ")
+        }
+    }
+
+    /// A picture's border as its row describes it: by its style, unless that's plain.
+    private func border(of picture: ImageLayer) -> String {
+        guard picture.borderWidth > 0 else {
+            return "No border"
+        }
+        switch picture.drawnBorderStyle {
+        case .plain:
+            return "Border"
+        case .instant:
+            return "Instant frame"
+        default:
+            let name = picture.drawnBorderStyle.name.lowercased()
+            return name.prefix(1).uppercased() + name.dropFirst() + " border"
         }
     }
 

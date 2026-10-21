@@ -275,6 +275,50 @@ extension ScreenSnapshotting {
         )
     }
 
+    /// A photo under a framed picture in each border style, three by three, each frame as wide as
+    /// it goes so its edge shows.
+    var borderStyleProject: Project {
+        let colors: [BorderStyle: RGBColor] = [
+            .burnt: RGBColor(red: 0.96, green: 0.91, blue: 0.8),
+            .rubberStamp: RGBColor(red: 0.78, green: 0.13, blue: 0.16)
+        ]
+        let layers = BorderStyle.allCases.enumerated().map { index, style in
+            Layer(
+                id: fixtureID(200 + UInt8(index)),
+                content: .image(ImageLayer(
+                    image: PlacedImage(id: fixtureID(216 + UInt8(index)), assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1536),
+                    borderWidth: ImageLayer.maximumBorderWidth,
+                    borderColor: colors[style] ?? .white,
+                    borderStyle: style
+                )),
+                placement: LayerPlacement(centerX: 0.18 + 0.32 * Double(index % 3), centerY: 0.2 + 0.3 * Double(index / 3), scale: 0.5)
+            )
+        }
+        return Project(
+            id: fixtureID(14),
+            name: "Borders",
+            aspectRatio: .portrait,
+            slides: [Slide(id: fixtureID(15), layout: .single, cells: [photo(198, 2048, 2560)], layers: layers)],
+            createdAt: created
+        )
+    }
+
+    /// `project`'s first slide as the export draws it, filling the screen's width.
+    func exportedSlide(_ project: Project) throws -> some View {
+        var pieces: [UIImage] = []
+        _ = SlideRenderer.render(project.slides[0], size: project.aspectRatio.exportSize) { image, size in
+            SampleImages.image(for: image, maxPixelSize: Int(max(size.width, size.height)))
+        } piece: { piece in
+            pieces.append(piece)
+        }
+        let image = try #require(pieces.first)
+        return Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black)
+    }
+
     private var violet: RGBColor {
         RGBColor(red: 0.47, green: 0.34, blue: 0.91)
     }

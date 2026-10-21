@@ -118,11 +118,53 @@ struct LayerGeometryTests {
 
         // A 500 by 250 picture, and a border a twentieth of its longer side either side.
         #expect(framed == CGSize(width: 550, height: 300))
-        let border = LayerGeometry.borderWidth(
-            of: ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 1, pixelHeight: 1), borderWidth: 0.05),
-            inFrame: framed
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 200)
+        let picture = LayerGeometry.pictureRect(
+            of: ImageLayer(image: image, borderWidth: 0.05),
+            inFrame: CGRect(origin: CGPoint(x: 10, y: 20), size: framed)
         )
-        #expect(abs(border - 25) < 0.001)
+        #expect(abs(picture.minX - 35) < 0.001)
+        #expect(abs(picture.minY - 45) < 0.001)
+        #expect(abs(picture.width - 500) < 0.001)
+        #expect(abs(picture.height - 250) < 0.001)
+    }
+
+    /// A border grows a tall picture by a share of its longer side too, which the frame's width
+    /// alone gives back.
+    @Test func findsATallPictureInItsFrame() {
+        let layer = picture(width: 200, height: 400, border: 0.05)
+        let framed = LayerGeometry.size(of: layer, slideWidth: 1000)
+        guard case .image(let content) = layer.content else {
+            Issue.record("Expected an image")
+            return
+        }
+
+        // A 250 by 500 picture, and a border of 25 either side.
+        #expect(framed == CGSize(width: 300, height: 550))
+        let picture = LayerGeometry.pictureRect(of: content, inFrame: CGRect(origin: .zero, size: framed))
+        #expect(abs(picture.minX - 25) < 0.001)
+        #expect(abs(picture.width - 250) < 0.001)
+        #expect(abs(picture.height - 500) < 0.001)
+    }
+
+    /// An instant photo's frame is deeper below the picture, by four borders' widths.
+    @Test func leavesRoomBelowAnInstantPhoto() {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400)
+        let instant = ImageLayer(image: image, borderWidth: 0.05, borderStyle: .instant)
+        let framed = LayerGeometry.size(of: Layer(content: .image(instant)), slideWidth: 1000)
+
+        // A 500-point square, a border of 25 above and either side, and 100 below.
+        #expect(framed == CGSize(width: 550, height: 625))
+        let picture = LayerGeometry.pictureRect(of: instant, inFrame: CGRect(origin: .zero, size: framed))
+        #expect(abs(picture.minY - 25) < 0.001)
+        #expect(abs(picture.height - 500) < 0.001)
+        #expect(abs(framed.height - picture.maxY - 100) < 0.001)
+        // A sticker's card is as deep, and a cut edge leaves a frame's size alone.
+        let sticker = PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 400, fileFormat: .png)
+        let card = ImageLayer(image: sticker, borderWidth: 0.05, borderStyle: .instant)
+        let wavy = ImageLayer(image: sticker, borderWidth: 0.05, borderStyle: .wavy)
+        #expect(LayerGeometry.size(of: Layer(content: .image(card)), slideWidth: 1000) == framed)
+        #expect(LayerGeometry.size(of: Layer(content: .image(wavy)), slideWidth: 1000) == CGSize(width: 550, height: 550))
     }
 
     /// Lines break once, at the reference size, so they're the same whatever the text is drawn at.

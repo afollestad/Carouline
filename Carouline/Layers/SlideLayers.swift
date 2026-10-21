@@ -392,7 +392,7 @@ struct LayerContentView: View {
                 // New text has nothing to read out until it's typed.
                 .accessibilityLabel(text.isBlank ? "Text layer, empty" : "Text layer, “\(text.text)”")
         case .image(let picture):
-            PictureLayerView(picture: picture, projectID: projectID, background: background, size: size)
+            PictureLayerView(picture: picture, seed: layer.id, projectID: projectID, background: background, size: size)
         }
     }
 }

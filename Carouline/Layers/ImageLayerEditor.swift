@@ -5,8 +5,8 @@
 
 import SwiftUI
 
-/// The layers sheet's page for a picture layer: its border's width and color, which frame an
-/// opaque picture and outline a transparent one, its blur and its shadow. It edits the session's
+/// The layers sheet's page for a picture layer: its border's style, width and color, which frame
+/// an opaque picture and outline a transparent one, its blur and its shadow. It edits the session's
 /// draft, which the slide draws as it changes, and saves the draft as a slider is let go and once
 /// it closes.
 struct ImageLayerEditor: View {
@@ -25,6 +25,11 @@ struct ImageLayerEditor: View {
     var body: some View {
         Form {
             Section("Border") {
+                BorderStylePicker(
+                    styles: BorderStyle.offered(on: picture?.image.fileFormat == .png ? .sticker : .photo),
+                    selected: picture?.drawnBorderStyle ?? .plain,
+                    pick: pickBorderStyle
+                )
                 PercentSlider(title: "Width", value: binding(\.borderWidth), maximum: ImageLayer.maximumBorderWidth) {
                     session.saveDraft(to: library, projectID: projectID, endingEdit: false)
                 }
@@ -90,6 +95,19 @@ struct ImageLayerEditor: View {
             picture.hasShadow = hasShadow
             session.draft?.content = .image(picture)
         }
+    }
+
+    /// Sets the border's style, and gives a border with no width one, so picking a style shows it.
+    /// Plain leaves the width be, since it's no style to show.
+    private func pickBorderStyle(_ style: BorderStyle) {
+        guard var picture else {
+            return
+        }
+        picture.borderStyle = style
+        if style != .plain, picture.borderWidth == 0 {
+            picture.borderWidth = Self.defaultBorderWidth
+        }
+        session.draft?.content = .image(picture)
     }
 
     /// The border's color, which also gives a border with no width one, so picking a color shows it.

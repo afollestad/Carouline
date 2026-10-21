@@ -32,6 +32,9 @@ nonisolated enum LayerGeometry {
     /// picture off a busy slide without reading as a dark band along its edge.
     static let pictureShadowRadius: CGFloat = 0.03
     static let pictureShadowOffset: CGFloat = 0.02
+    /// An instant photo's bottom margin, as a multiple of its border's other sides: about a
+    /// Polaroid's, with room under the picture to write on.
+    static let instantBottomMargin: CGFloat = 4
 
     /// A shadow's blur, as a Gaussian's sigma, and how far down it falls, in the layer's own
     /// space, so it turns with the layer.
@@ -103,10 +106,18 @@ nonisolated enum LayerGeometry {
             let scale = layer.placement.scale * slideWidth / referenceSlideWidth
             return CGSize(width: box.width * scale, height: box.height * scale)
         case .image(let picture):
-            let size = pictureSize(of: picture.image, scale: layer.placement.scale, slideWidth: slideWidth)
-            let border = borderWidth(of: picture, pictureSize: size)
-            return CGSize(width: size.width + 2 * border, height: size.height + 2 * border)
+            return frameSize(of: picture, pictureSize: pictureSize(of: picture.image, scale: layer.placement.scale, slideWidth: slideWidth))
         }
+    }
+
+    /// A picture's frame, its border included, around the picture drawn at `pictureSize`: the
+    /// border all round, and an instant photo's deeper margin below.
+    static func frameSize(of picture: ImageLayer, pictureSize: CGSize) -> CGSize {
+        let border = borderWidth(of: picture, pictureSize: pictureSize)
+        return CGSize(
+            width: pictureSize.width + 2 * border,
+            height: pictureSize.height + border + bottomMargin(of: picture, border: border)
+        )
     }
 
     /// A picture's own size, inside its border, at `scale` on slides `slideWidth` wide: its
@@ -151,9 +162,23 @@ nonisolated enum LayerGeometry {
         return Shadow(radius: pictureShadowRadius * side, offset: pictureShadowOffset * side)
     }
 
-    /// A picture's border width when its frame, border included, is `frame`: the picture and a
-    /// border either side, each a share of the picture's longer side.
-    static func borderWidth(of picture: ImageLayer, inFrame frame: CGSize) -> CGFloat {
-        picture.borderWidth * max(frame.width, frame.height) / (1 + 2 * picture.borderWidth)
+    /// Where a picture sits in its frame `frame`, border included: inset by its border, a share of
+    /// the picture's longer side, and by an instant photo's deeper margin below. Solved from the
+    /// frame's width, which every style's border grows alike, and the picture's shape.
+    static func pictureRect(of picture: ImageLayer, inFrame frame: CGRect) -> CGRect {
+        // The picture's size with its longer side 1.
+        let shape = pictureSize(of: picture.image, scale: 1, slideWidth: 1 / pictureSide)
+        let border = picture.borderWidth * frame.width / (shape.width + 2 * picture.borderWidth)
+        let bottom = bottomMargin(of: picture, border: border)
+        return CGRect(
+            x: frame.minX + border,
+            y: frame.minY + border,
+            width: max(0, frame.width - 2 * border),
+            height: max(0, frame.height - border - bottom)
+        )
+    }
+
+    private static func bottomMargin(of picture: ImageLayer, border: CGFloat) -> CGFloat {
+        picture.drawnBorderStyle == .instant ? instantBottomMargin * border : border
     }
 }

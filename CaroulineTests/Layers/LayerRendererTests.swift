@@ -407,7 +407,7 @@ struct LayerRendererTests {
 }
 
 /// Hands every view asking for a picture the one image, decoded already.
-private struct SolidImageLoader: ImageLoading {
+struct SolidImageLoader: ImageLoading {
     let image: CGImage
 
     func cachedImage(_ request: ImageRequest) -> CGImage? {

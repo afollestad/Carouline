@@ -31,8 +31,9 @@ nonisolated enum LayerRenderer {
 
         init(_ decoded: CGImage, for picture: ImageLayer) {
             let isTransparent = picture.image.fileFormat == .png
-            // From the picture before its blur, so the outline stays crisp.
-            outline = isTransparent ? LayerImageEffects.outline(of: decoded, for: picture) : nil
+            // From the picture before its blur, so the outline stays crisp. Only for a plain
+            // border, since a styled one cuts its own edge.
+            outline = isTransparent && picture.drawnBorderStyle == .plain ? LayerImageEffects.outline(of: decoded, for: picture) : nil
             let size = CGSize(width: decoded.width, height: decoded.height)
             let sigma = LayerGeometry.blurRadius(of: picture, pictureSize: size)
             if sigma > 0, isTransparent, let blurred = LayerImageEffects.blurredOut(decoded, sigma: sigma) {
@@ -68,7 +69,7 @@ nonisolated enum LayerRenderer {
             drawText(text, in: context, box: box)
         case .image(let content):
             if let picture {
-                drawPicture(content, decoded: picture, in: context, box: box)
+                drawPicture(content, decoded: picture, seed: layer.id, in: context, box: box)
             }
         }
     }
@@ -142,11 +143,33 @@ nonisolated enum LayerRenderer {
         )
     }
 
-    /// Draws a picture into `box` inside its border: over a ring of its border color for an opaque
-    /// picture, and over an outline tracing its shape for a transparent one.
-    private static func drawPicture(_ picture: ImageLayer, decoded: Picture, in context: CGContext, box: CGRect) {
-        let border = LayerGeometry.borderWidth(of: picture, inFrame: box.size)
-        let frame = box.insetBy(dx: border, dy: border)
+    /// Draws `edge` into `box`, scaled from the box it was built in, filled with `color` and, where
+    /// it's burnt, charred in from its edge. Only Core Graphics calls, since a canvas sets no UIKit
+    /// context to draw into.
+    static func drawEdge(_ edge: StyledEdge, color: CGColor, in context: CGContext, box: CGRect) {
+        guard edge.bounds.width > 0, edge.bounds.height > 0 else {
+            return
+        }
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.translateBy(x: box.minX, y: box.minY)
+        context.scaleBy(x: box.width / edge.bounds.width, y: box.height / edge.bounds.height)
+        context.translateBy(x: -edge.bounds.minX, y: -edge.bounds.minY)
+        context.addPath(edge.fill)
+        context.setFillColor(color)
+        context.fillPath()
+        for band in edge.char {
+            context.addPath(band.path)
+            context.setFillColor(CGColor(srgbRed: band.color.red, green: band.color.green, blue: band.color.blue, alpha: band.opacity))
+            context.fillPath()
+        }
+    }
+
+    /// Draws a picture into `box` inside its border: over its styled edge, a ring of its border
+    /// color for an opaque picture, or an outline tracing its shape for a transparent one.
+    private static func drawPicture(_ picture: ImageLayer, decoded: Picture, seed: UUID, in context: CGContext, box: CGRect) {
+        let frame = LayerGeometry.pictureRect(of: picture, inFrame: box)
+        let border = frame.minX - box.minX
         let shadow = LayerGeometry.shadow(of: picture, pictureSize: frame.size)
         if let shadow {
             setShadow(in: context, offset: shadow.offset, blur: shadow.radius * shadowBlurPerSigma)
@@ -159,7 +182,9 @@ nonisolated enum LayerRenderer {
             }
         }
         if border > 0 {
-            if picture.image.fileFormat == .jpeg {
+            if let edge = BorderEdge.edge(for: picture, seed: seed) {
+                drawEdge(edge, color: picture.borderColor.uiColor.cgColor, in: context, box: box)
+            } else if picture.image.fileFormat == .jpeg {
                 context.setFillColor(picture.borderColor.uiColor.cgColor)
                 context.fill(box)
             } else if let outline = decoded.outline {
