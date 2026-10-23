@@ -111,6 +111,11 @@ nonisolated struct SelectionTouches {
         fingers.count
     }
 
+    /// Where the finger is, while just one is down.
+    var location: CGPoint? {
+        fingers.count == 1 ? fingers[0].location : nil
+    }
+
     /// Whether a trackpad's pinch or twist can move the selection: while no finger is down, unless
     /// fingers have moved it already.
     var takesIndirect: Bool {

@@ -74,6 +74,18 @@ struct StripScrollingTests {
         #expect(more.offset(keeping: .slide(added), at: 1438, from: stops) == 1560)
     }
 
+    /// A layer held at the strip's edge scrolls it along a panorama only as far as it rests along it.
+    @Test func movesAlongAPanoramaNoFurtherThanItRests() {
+        #expect(stops.offset(movedBy: 50, along: .slide(panorama), from: 600) == 650)
+        #expect(stops.offset(movedBy: 500, along: .slide(panorama), from: 600) == 920)
+        #expect(stops.offset(movedBy: -500, along: .slide(panorama), from: 600) == 320)
+    }
+
+    /// Off a panorama's stretch, as while the strip is on its way to it, it doesn't jump onto it.
+    @Test func leavesTheStripOffAPanoramaWhereItIs() {
+        #expect(stops.offset(movedBy: 50, along: .slide(panorama), from: 100) == 100)
+    }
+
     /// Once the slide in the middle is gone, the strip rests on the nearest left.
     @Test func restsOnTheNearestOnceTheFrontIsGone() {
         let deleted = StripStops(

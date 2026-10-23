@@ -23,6 +23,16 @@ nonisolated struct StripStops: Equatable {
         items.firstIndex(of: item).map { (stops[$0].lowerBound + stops[$0].upperBound) / 2 }
     }
 
+    /// `offset` moved by `distance`, no further than `item` rests along its stop, or as it is
+    /// off it, short of jumping onto it. Within a point counts, as a rest can land that near.
+    func offset(movedBy distance: CGFloat, along item: StripItem, from offset: CGFloat) -> CGFloat {
+        guard let stop = items.firstIndex(of: item).map({ stops[$0] }),
+              (stop.lowerBound - 1)...(stop.upperBound + 1) ~= offset else {
+            return offset
+        }
+        return min(max(offset + distance, stop.lowerBound), stop.upperBound)
+    }
+
     /// The offset that keeps `item`, at `offset` in `old`'s layout, where it was along its stop,
     /// as slides come, go, move or change width around it. A new item, which the strip was moved to
     /// as it was added, rests in the middle, and once the item's gone, the nearest stop does.
@@ -50,7 +60,7 @@ struct StripScrolling: ViewModifier {
     @Binding var scroll: ScrollPosition
     let stops: StripStops
     let snapping: StripSnapping
-    @State private var tracked = TrackedScroll()
+    let tracked: TrackedScroll
 
     func body(content: Content) -> some View {
         content
@@ -96,7 +106,7 @@ struct StripScrolling: ViewModifier {
 
 /// Where the strip is and what's in its middle, as it last moved, which a scroll writes every
 /// frame, so it redraws nothing.
-private final class TrackedScroll {
+final class TrackedScroll {
     var offset: CGFloat = 0
     var front: StripItem?
 }

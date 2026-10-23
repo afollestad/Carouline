@@ -71,6 +71,7 @@ struct SlideStrip: View {
     @State private var dropHoverSlideID: UUID?
     /// Where the strip is scrolled to, which `StripScrolling` keeps in step with `position`.
     @State private var scroll = ScrollPosition()
+    @State private var tracked = TrackedScroll()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -127,7 +128,9 @@ struct SlideStrip: View {
             frames: slideFrames,
             isEnabled: isAnythingSelected,
             holdsStrip: $holdsStill,
-            isStripScrolling: isScrolling
+            isStripScrolling: isScrolling,
+            stripWidth: size.width,
+            scrollAlong: scroll(along:by:)
         ))
         .animation(.smooth(duration: 0.25), value: fit)
         // Under a sheet, the keyboard a text layer is typed with would lay the slides out smaller,
@@ -209,7 +212,7 @@ struct SlideStrip: View {
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
         }
-        .modifier(StripScrolling(position: $position, scroll: $scroll, stops: stops, snapping: snapping))
+        .modifier(StripScrolling(position: $position, scroll: $scroll, stops: stops, snapping: snapping, tracked: tracked))
         // Held while a gesture moves the selection, so a drag on it moves it rather than the strip,
         // while one off it scrolls the strip as usual.
         .scrollDisabled(holdsStill || (layersSlideID != nil && !scrollsAlongLayersSlide))
@@ -318,6 +321,19 @@ struct SlideStrip: View {
         )
     }
 
+    /// Scrolls the strip by up to `distance` along slide `slideID`, no further than it rests along
+    /// it, returning how far it went.
+    private func scroll(along slideID: UUID, by distance: CGFloat) -> CGFloat {
+        let offset = stops.offset(movedBy: distance, along: .slide(slideID), from: tracked.offset)
+        let scrolled = offset - tracked.offset
+        if scrolled != 0 {
+            // Ahead of the scroll's report, so the next frame's builds on it.
+            tracked.offset = offset
+            scroll.scrollTo(x: offset)
+        }
+        return scrolled
+    }
+
     /// One slide's width, which a panorama is a whole number of.
     private var slideWidth: CGFloat {
         cardSize(span: 1).width
@@ -382,47 +398,6 @@ private struct AddSlideButton: View {
         // Exactly `size` across, which the strip's snapping counts on to center it.
         .frame(width: size, height: size)
         .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
-    }
-}
-
-/// Where the first slide will go, in the project's shape.
-private struct GhostSlide: View {
-    let size: CGSize
-    /// Whether the tray below has photos to start a slide with.
-    let hasTrayPhotos: Bool
-    let onAdd: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.secondary, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
-                .frame(width: size.width, height: size.height)
-                .overlay {
-                    Button(action: onAdd) {
-                        Label("Add Slide", systemImage: "plus")
-                            .labelStyle(.iconOnly)
-                            .font(.title.weight(.semibold))
-                            .frame(width: 48, height: 48)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .buttonBorderShape(.circle)
-                    .accessibilityHint("Choose a layout for the first slide")
-                }
-            Text(caption)
-                .font(.subheadline)
-                .foregroundStyle(Color.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: size.width)
-        }
-        .padding(.bottom, 40)
-    }
-
-    private var caption: String {
-        if hasTrayPhotos {
-            "Add a slide, or tap a photo below to start one with it."
-        } else {
-            "Add a slide to start your carousel, or gather photos below first."
-        }
     }
 }
 

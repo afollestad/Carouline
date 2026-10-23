@@ -49,6 +49,12 @@ final class SelectionGestureTracker {
     /// Whether a finger scrolled the strip during the gesture, which then leaves the selection
     /// alone, so a second finger landing doesn't pinch it as the strip slides by.
     var scrolledStrip = false
+    /// How far a layer dragged to the strip's edge has scrolled it, in the slide's points, which
+    /// the layer moves along with to stay under the finger.
+    var edgeScrolled: CGFloat = 0
+    /// How fast the strip scrolls for a layer held at its edge, in points a second.
+    var edgeVelocity: CGFloat = 0
+    let edgeTicker = FrameTicker()
 }
 
 /// Where a point on a slide falls in one of its cells.
@@ -101,6 +107,11 @@ struct SelectionGesture: ViewModifier {
     @Binding var holdsStrip: Bool
     /// Whether a finger is scrolling the strip, or it's still coasting from one.
     let isStripScrolling: Bool
+    /// How wide the strip is, whose edges a layer dragged there scrolls it from.
+    let stripWidth: CGFloat
+    /// Scrolls the strip by up to a distance along a slide, as far as it rests along it, returning
+    /// how far it went.
+    let scrollAlong: (_ slideID: UUID, _ distance: CGFloat) -> CGFloat
     @State private var tracker = SelectionGestureTracker()
     /// Whether `claim` is under way, which SwiftUI resets however it ends, as when the system
     /// cancels it without `onEnded`. A finger lifting ends it early, while others carry on.
@@ -184,8 +195,41 @@ struct SelectionGesture: ViewModifier {
             holdsStrip = true
         }
         update()
+        followEdge()
         if tracker.touches.isEmpty, !tracker.isClaiming {
             end()
+        }
+    }
+
+    /// Scrolls the strip along a panorama while one finger holds the layer it's dragging near the
+    /// strip's edge, every frame, as the finger may rest there, so the layer can go past the
+    /// screen's sides. No further than the strip rests along the panorama, with its edge in view.
+    private func followEdge() {
+        var velocity: CGFloat = 0
+        if case .layer(let address) = tracker.target, holdsStrip, !tracker.scrolledStrip,
+           let location = tracker.touches.location,
+           (project.slides.first { $0.id == address.slideID }?.span ?? 1) > 1 {
+            velocity = EdgeScroll.velocity(at: location.x, across: stripWidth)
+        }
+        tracker.edgeVelocity = velocity
+        if velocity == 0 {
+            tracker.edgeTicker.stop()
+        } else if !tracker.edgeTicker.isRunning {
+            tracker.edgeTicker.start { seconds in
+                scrollAtEdge(for: seconds)
+            }
+        }
+    }
+
+    private func scrollAtEdge(for seconds: TimeInterval) {
+        guard case .layer(let address) = tracker.target else {
+            tracker.edgeTicker.stop()
+            return
+        }
+        let scrolled = scrollAlong(address.slideID, tracker.edgeVelocity * seconds)
+        if scrolled != 0 {
+            tracker.edgeScrolled += scrolled
+            update()
         }
     }
 
@@ -266,10 +310,12 @@ struct SelectionGesture: ViewModifier {
             guard let layer = layer(at: address, on: slide) else {
                 return
             }
-            // A trackpad's pinch drags nothing, so it never snaps a center it doesn't move.
+            // A trackpad's pinch drags nothing, so it never snaps a center it doesn't move. A drag
+            // carries on as far as the strip has scrolled under the finger at its edge.
+            let translation = scaled(touches.translation)
             let drag = touches.isIndirect ? nil : LayerDrag(
                 start: canvasPoint(start, in: frame),
-                translation: scaled(touches.translation),
+                translation: CGSize(width: translation.width + tracker.edgeScrolled, height: translation.height),
                 pinchTranslation: pinch.map { scaled($0.translation) }
             )
             let gesture = LayerGesture(drag: drag, magnification: pinch?.magnification, rotation: pinch?.rotation)
@@ -338,6 +384,9 @@ struct SelectionGesture: ViewModifier {
             tracker.frame = nil
             tracker.needsBegin = true
             tracker.photoSegment = nil
+            tracker.edgeScrolled = 0
+            tracker.edgeVelocity = 0
+            tracker.edgeTicker.stop()
         }
         switch tracker.target {
         case .photo(let address, let imageID):
