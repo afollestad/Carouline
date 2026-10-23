@@ -84,7 +84,13 @@ struct SelectionBar: View {
             guard session.cellSize.width > 0, session.cellSize.height > 0 else {
                 return
             }
-            session.liveCrop = CropGeometry.zoomed(crop, to: scale, imageSize: photo.pixelSize, cellSize: session.cellSize)
+            session.liveCrop = CropGeometry.zoomed(
+                crop,
+                to: scale,
+                imageSize: photo.pixelSize,
+                cellSize: session.cellSize,
+                aboutX: session.zoomAnchorX
+            )
         }
     }
 }

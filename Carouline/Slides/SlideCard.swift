@@ -94,6 +94,7 @@ struct SlideCard: View {
             .onDisappear {
                 frames?.frames[slide.id] = nil
             }
+            .reportsPanoramaFront(slide.id, span: slide.span, to: layerSession)
             .overlay {
                 SlideLayers(
                     layers: slide.layers,
@@ -123,15 +124,13 @@ struct SlideCard: View {
             // Where the picture lands once it's copied.
             .overlay {
                 if isImportingLayer {
+                    let placement = LayerPlacement.middle(ofSpan: slide.span, front: layerSession.frontSlideIndex(of: slide.id))
                     ProgressView()
                         .padding(14)
                         .glassEffect(.regular, in: .circle)
                         // From the slide, as glass over a slide takes its scheme.
                         .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
-                        .position(
-                            x: size.width * LayerPlacement.middle(ofSpan: slide.span).centerX / CGFloat(max(1, slide.span)),
-                            y: size.height / 2
-                        )
+                        .position(x: size.width * placement.centerX / CGFloat(max(1, slide.span)), y: size.height / 2)
                         .accessibilityLabel("Adding a picture")
                 }
             }

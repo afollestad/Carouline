@@ -120,6 +120,21 @@ struct LayerTests {
         #expect(placement.clamped(span: 3) == LayerPlacement.middle(ofSpan: 3))
     }
 
+    /// A new layer lands on the panorama slide in the middle of the strip, where it's in view, or
+    /// else on the panorama's middle slide.
+    @Test func placesANewLayerOnThePanoramaSlideInFront() {
+        #expect(LayerPlacement.middle(ofSpan: 5, front: 0).centerX == 0.5)
+        #expect(LayerPlacement.middle(ofSpan: 5, front: 4).centerX == 4.5)
+        #expect(LayerPlacement.middle(ofSpan: 5).centerX == 2.5)
+        #expect(LayerPlacement.middle(ofSpan: 2).centerX == 1.5)
+    }
+
+    /// A front past a panorama narrowed since lands on its last slide.
+    @Test func keepsANewLayersSlideWithinItsPanorama() {
+        #expect(LayerPlacement.middle(ofSpan: 3, front: 7).centerX == 2.5)
+        #expect(LayerPlacement.middle(ofSpan: 1, front: 2).centerX == 0.5)
+    }
+
     /// A layer saved or loaded smaller than it goes, as before it had a smallest size, grows to it.
     @Test func clampsALayerToItsSmallestSize() {
         let layer = Layer(content: .text(TextLayer(text: "Hi")), placement: LayerPlacement(scale: 0.2))

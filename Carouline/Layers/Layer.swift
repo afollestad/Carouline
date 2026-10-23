@@ -61,9 +61,12 @@ nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
     }
 
     /// Where a new layer goes on a slide `span` slides wide: the middle of the slide, or of a
-    /// panorama's middle slide, since a panorama's own middle can fall on a cut.
-    static func middle(ofSpan span: Int) -> LayerPlacement {
-        LayerPlacement(centerX: Double(max(1, span) / 2) + 0.5)
+    /// panorama's slide `front`, the one in the middle of the strip, so it lands in view on a
+    /// panorama wider than the screen, or else of its middle slide, since a panorama's own middle
+    /// can fall on a cut.
+    static func middle(ofSpan span: Int, front: Int? = nil) -> LayerPlacement {
+        let slide = front.map { min(max($0, 0), max(1, span) - 1) } ?? max(1, span) / 2
+        return LayerPlacement(centerX: Double(slide) + 0.5)
     }
 
     /// A fifth of its natural size takes a picture down to a tenth of a slide across, and four

@@ -75,6 +75,7 @@ struct CellView: View {
             }
         }
         .controlSize(isCompact ? .small : .regular)
+        .reportsZoomAnchor(isSelected: isSelected, reach: stripReach, to: session)
         .onGeometryChange(for: CGSize.self) { proxy in
             proxy.size
         } action: { size in

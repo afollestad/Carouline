@@ -55,9 +55,10 @@ nonisolated enum CropGeometry {
         return self.crop(showing: zoomed, imageSize: imageSize, cellSize: cellSize)
     }
 
-    /// `crop` at a new zoom, about the cell's center, as a slider sets it.
-    static func zoomed(_ crop: ImageCrop, to scale: Double, imageSize: CGSize, cellSize: CGSize) -> ImageCrop {
-        let center = CGPoint(x: cellSize.width / 2, y: cellSize.height / 2)
+    /// `crop` at a new zoom, about the cell's center, or `aboutX` across its middle, as a slider
+    /// sets it.
+    static func zoomed(_ crop: ImageCrop, to scale: Double, imageSize: CGSize, cellSize: CGSize, aboutX: CGFloat? = nil) -> ImageCrop {
+        let center = CGPoint(x: aboutX ?? cellSize.width / 2, y: cellSize.height / 2)
         let magnification = clampedScale(scale) / clampedScale(crop.scale)
         return zoomed(crop, by: magnification, about: center, imageSize: imageSize, cellSize: cellSize)
     }

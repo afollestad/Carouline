@@ -111,6 +111,24 @@ struct ProjectLibraryLayerImagesTests {
         #expect(address.flatMap { fixture.library.layer(at: $0) }?.placement.centerX == 1.5)
     }
 
+    /// On the panorama slide in the middle of the strip as it lands, so it's in view.
+    @Test func landsOnThePanoramaSlideInFront() async throws {
+        let fixture = try await makeFixture(layout: .panorama)
+        fixture.library.setSpan(3, of: fixture.slideID, in: fixture.projectID)
+        let file = try picked()
+
+        let address = await fixture.library.importImageLayer(
+            into: fixture.slideID,
+            of: fixture.projectID,
+            assetIdentifier: nil,
+            front: { 0 },
+            from: { .file(file) }
+        )
+
+        #expect(address.flatMap { fixture.library.layer(at: $0) }?.placement.centerX == 0.5)
+        await fixture.library.flush()
+    }
+
     @Test func leavesNoCopyWhenItsSlideGoesMeanwhile() async throws {
         let fixture = try await makeFixture()
         let file = try picked()
@@ -347,6 +365,23 @@ struct ProjectLibraryLayerImagesTests {
         let selection = try #require(session.selection)
         #expect(picture(at: selection, in: fixture.library) != nil)
         #expect(session.sheetPath == [.image(selection.layerID)])
+    }
+
+    /// The screen's import lands a picture on the panorama slide in the middle of the strip.
+    @Test func landsAPictureOnThePanoramaSlideInFront() async throws {
+        let fixture = try await makeFixture(layout: .panorama)
+        fixture.library.setSpan(3, of: fixture.slideID, in: fixture.projectID)
+        let file = try picked()
+        let session = LayerSession()
+        session.panoramaFront = PanoramaFront(slideID: fixture.slideID, index: 2)
+        var presenter = PresentationQueue<ProjectPresentation>()
+
+        await actions(fixture, session: session, presenter: Binding { presenter } set: { presenter = $0 })
+            .importImage(into: fixture.slideID, assetIdentifier: nil) { .file(file) }
+
+        let layer = try #require(fixture.library.project(fixture.projectID)?.slides.first?.layers.last)
+        #expect(layer.placement.centerX == 2.5)
+        await fixture.library.flush()
     }
 
     /// Once the sheet has closed, the picture just lands, leaving the selection, and so the strip,

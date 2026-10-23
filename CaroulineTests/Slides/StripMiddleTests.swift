@@ -29,6 +29,18 @@ struct StripMiddleTests {
         #expect(StripMiddle.shift(toward: 2000, across: 900, reach: reach) == 300)
     }
 
+    @Test func findsThePanoramaSlideAtAPoint() {
+        #expect(StripMiddle.slideIndex(at: 0, across: 900, span: 3) == 0)
+        #expect(StripMiddle.slideIndex(at: 450, across: 900, span: 3) == 1)
+        #expect(StripMiddle.slideIndex(at: 899, across: 900, span: 3) == 2)
+    }
+
+    @Test func findsNoSlideOffTheCard() {
+        #expect(StripMiddle.slideIndex(at: -1, across: 900, span: 3) == nil)
+        #expect(StripMiddle.slideIndex(at: 900, across: 900, span: 3) == nil)
+        #expect(StripMiddle.slideIndex(at: 0, across: 0, span: 3) == nil)
+    }
+
     @Test func leavesASlidesViewsWhereTheyAre() {
         #expect(StripMiddle.shift(toward: 0, across: 300, reach: 0) == 0)
     }

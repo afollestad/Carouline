@@ -92,15 +92,22 @@ struct ProjectLayerActions {
         presenter.present(.layers(slideID))
     }
 
-    /// Copies the picture `source` produces onto slide `slideID` as a new layer, then selects it
-    /// and opens its editor, as long as the slide's sheet is still open and nothing else has been
-    /// selected meanwhile. Otherwise it just lands on its slide, leaving the selection, the strip
-    /// and the sheet as they are. The editor opens only from the page it was picked from.
+    /// Copies the picture `source` produces onto slide `slideID` as a new layer, on a panorama's
+    /// slide in the middle of the strip as it lands, then selects it and opens its editor, as long
+    /// as the slide's sheet is still open and nothing else has been selected meanwhile. Otherwise
+    /// it just lands on its slide, leaving the selection, the strip and the sheet as they are. The
+    /// editor opens only from the page it was picked from.
     func importImage(into slideID: UUID, assetIdentifier: String?, from source: @escaping @Sendable () async throws -> PhotoSource?) async {
         let selection = session.selection
         let photo = photoSelection()
         let path = session.sheetPath
-        guard let address = await library.importImageLayer(into: slideID, of: projectID, assetIdentifier: assetIdentifier, from: source) else {
+        guard let address = await library.importImageLayer(
+            into: slideID,
+            of: projectID,
+            assetIdentifier: assetIdentifier,
+            front: { session.frontSlideIndex(of: slideID) },
+            from: source
+        ) else {
             return
         }
         AccessibilityNotification.Announcement("Picture added").post()

@@ -17,6 +17,7 @@ final class CropSession {
         didSet {
             if selection != oldValue {
                 gestureStart = nil
+                zoomAnchorX = nil
             }
         }
     }
@@ -24,6 +25,10 @@ final class CropSession {
     var liveCrop: ImageCrop?
     /// The selected cell's size, which gestures and the zoom slider frame the photo in.
     var cellSize: CGSize = .zero
+    /// Where across the selected cell the zoom slider zooms about: the strip's middle on a
+    /// panorama wider than the screen, whose own middle may be off it, or else the cell's middle.
+    /// Read only as the slider moves, so it redraws nothing.
+    @ObservationIgnored var zoomAnchorX: CGFloat?
     /// The crop when the current drag or pinch began, which the gesture's values build on.
     @ObservationIgnored private var gestureStart: ImageCrop?
 

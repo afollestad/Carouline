@@ -57,6 +57,16 @@ struct CropSessionTests {
         #expect(session.liveCrop == panned(next.crop, by: -50))
     }
 
+    /// A new selection's cell reports where to zoom about afresh, so the last one's can't stand.
+    @Test func aNewSelectionForgetsTheLastZoomAnchor() {
+        let session = session()
+        session.zoomAnchorX = 40
+
+        session.selection = CellAddress(projectID: UUID(), slideID: UUID(), index: 0)
+
+        #expect(session.zoomAnchorX == nil)
+    }
+
     /// A photo replacing the selected one starts from its own crop, whatever the last one was
     /// left at mid-gesture or by the zoom slider.
     @Test func discardingFramingStartsTheNextPhotoFromItsOwnCrop() {

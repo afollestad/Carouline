@@ -51,6 +51,15 @@ struct CropGeometryTests {
         #expect(abs(unitBefore - unitAfter) < 0.0001)
     }
 
+    /// The slider zooms about a point across the cell, as a panorama's in view, keeping it in place.
+    @Test func slidingTheZoomKeepsThePointAcrossInPlace() {
+        let start = ImageCrop()
+        let before = CropGeometry.frame(imageSize: image, cellSize: cell, crop: start)
+        let zoomed = CropGeometry.zoomed(start, to: 2, imageSize: image, cellSize: cell, aboutX: 60)
+        let after = CropGeometry.frame(imageSize: image, cellSize: cell, crop: zoomed)
+        #expect(abs((60 - before.minX) / before.width - (60 - after.minX) / after.width) < 0.0001)
+    }
+
     @Test func zoomStaysBetweenFillingAndTheMaximum() {
         let center = CGPoint(x: 150, y: 200)
         let out = CropGeometry.zoomed(ImageCrop(), by: 0.2, about: center, imageSize: image, cellSize: cell)

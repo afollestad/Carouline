@@ -49,6 +49,9 @@ final class LayerSession {
     /// Where the strip's unscaled frame ends on screen, which the layers sheet measures its room
     /// up from. Read only by the sheet as it makes room, so it redraws nothing.
     @ObservationIgnored var stripBottom: CGFloat = 0
+    /// The panorama in the middle of the strip, if one is, and which of its slides is, where a new
+    /// layer lands, so it's in view on a panorama wider than the screen.
+    var panoramaFront: PanoramaFront?
     /// The layer whose text is being typed, which drops the sheet to just its field. An editor
     /// clears only its own, since SwiftUI doesn't order one editor's going and the next's coming.
     var typingLayerID: UUID?
@@ -266,6 +269,17 @@ final class LayerSession {
         }
         return livePlacement
     }
+
+    /// Which of panorama `slideID`'s slides is in the middle of the strip, while it's there.
+    func frontSlideIndex(of slideID: UUID) -> Int? {
+        panoramaFront?.slideID == slideID ? panoramaFront?.index : nil
+    }
+}
+
+/// A panorama in the middle of the strip, and which of its slides, from 0, is in the middle.
+nonisolated struct PanoramaFront: Equatable {
+    let slideID: UUID
+    let index: Int
 }
 
 /// A drag's, a pinch's and a twist's values so far, any of which a gesture may lack.

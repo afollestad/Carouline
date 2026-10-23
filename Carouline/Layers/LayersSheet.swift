@@ -333,8 +333,8 @@ struct LayersSheet: View {
         add(kind)
     }
 
-    /// Adds a layer of `kind`: new text starts as a draft in the middle of the slide, or of a
-    /// panorama's middle slide, since its own middle can fall on a cut, and opens in its editor.
+    /// Adds a layer of `kind`: new text starts as a draft in the middle of the slide, or of the
+    /// panorama slide in the middle of the strip, and opens in its editor.
     /// A picture is picked first, on a page of the tray's photos with a way to the library's, and
     /// lands there once it's copied. A page rather than the library's picker at once, which can't
     /// show while the sheet that asks for it is still opening.
@@ -348,7 +348,7 @@ struct LayersSheet: View {
         case .text:
             let layer = Layer(
                 content: .text(TextLayer(on: slide.style.background)),
-                placement: .middle(ofSpan: slide.span)
+                placement: .middle(ofSpan: slide.span, front: session.frontSlideIndex(of: slideID))
             )
             session.saveDraft(to: library, projectID: projectID)
             session.beginDraft(of: layer, on: slideID, isNew: true)

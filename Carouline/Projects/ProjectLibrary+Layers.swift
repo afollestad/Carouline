@@ -44,13 +44,15 @@ extension ProjectLibrary {
     }
 
     /// Copies the picture `source` produces onto slide `slideID` as a new layer on top, in the
-    /// slide's middle, returning where it went, or nil when there was nothing to copy, the copy
-    /// failed, or the slide went meanwhile. Each import adds a layer of its own, so a second pick
-    /// for the slide never replaces the first, however long either takes.
+    /// slide's middle, or a panorama's slide `front` gives as it lands, returning where it went,
+    /// or nil when there was nothing to copy, the copy failed, or the slide went meanwhile. Each
+    /// import adds a layer of its own, so a second pick for the slide never replaces the first,
+    /// however long either takes.
     func importImageLayer(
         into slideID: UUID,
         of projectID: UUID,
         assetIdentifier: String?,
+        front: () -> Int? = { nil },
         from source: @escaping @Sendable () async throws -> PhotoSource?
     ) async -> LayerAddress? {
         importingLayers[slideID, default: 0] += 1
@@ -70,7 +72,7 @@ extension ProjectLibrary {
                 guard let span = slide(slideID, in: projectID)?.span else {
                     return false
                 }
-                let layer = Layer(content: .image(ImageLayer(image: image)), placement: .middle(ofSpan: span))
+                let layer = Layer(content: .image(ImageLayer(image: image)), placement: .middle(ofSpan: span, front: front()))
                 guard saveLayer(layer, in: slideID, of: projectID) else {
                     return false
                 }
