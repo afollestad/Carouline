@@ -227,18 +227,81 @@ struct ProjectLibraryLayersTests {
         #expect(layers(library, projectID, slideID).map(\.id) == [third.id, first.id, second.id])
     }
 
-    @Test func narrowingAPanoramaKeepsItsLayersOnIt() async throws {
+    /// An empty panorama narrowed by two slides draws its middle in by one, and its layers with it.
+    @Test func narrowingAPanoramaShiftsItsLayersWithIt() async throws {
         let fixture = try await makeLibrary(.panorama)
         let library = fixture.library
         let projectID = fixture.projectID
         let slideID = fixture.slideID
         library.setSpan(5, of: slideID, in: projectID)
-        let layer = text(placement: LayerPlacement(centerX: 4.5))
+        let layer = text(placement: LayerPlacement(centerX: 3.5))
         library.saveLayer(layer, in: slideID, of: projectID)
 
         library.setSpan(3, of: slideID, in: projectID)
 
         #expect(layers(library, projectID, slideID).first?.placement.centerX == 2.5)
+        await library.flush()
+    }
+
+    /// A panorama's photo, re-spread across a new width, takes its layers along.
+    @Test func changingAPanoramasWidthShiftsItsLayersWithItsPhoto() async throws {
+        let fixture = try await makeLibrary(.panorama)
+        let library = fixture.library
+        let projectID = fixture.projectID
+        let slideID = fixture.slideID
+        library.update(projectID) { project in
+            project.slides[0].cells[0].image = PlacedImage(assetIdentifier: nil, pixelWidth: 6000, pixelHeight: 1500)
+        }
+        library.setSpan(5, of: slideID, in: projectID)
+        library.saveLayer(text(placement: LayerPlacement(centerX: 2.5)), in: slideID, of: projectID)
+
+        library.setSpan(3, of: slideID, in: projectID)
+
+        #expect(abs((layers(library, projectID, slideID).first?.placement.centerX ?? 0) - 1.5) < 1e-9)
+        await library.flush()
+    }
+
+    /// A photo landing in an empty panorama spreads it out from its middle, and its layers with it.
+    @Test func aPhotoLandingInAnEmptyPanoramaShiftsItsLayers() async throws {
+        let fixture = try await makeLibrary(.panorama)
+        let library = fixture.library
+        let projectID = fixture.projectID
+        let slideID = fixture.slideID
+        library.saveLayer(text(placement: LayerPlacement(centerX: 1)), in: slideID, of: projectID)
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 6000, pixelHeight: 1500)
+
+        library.place(image, at: CellAddress(projectID: projectID, slideID: slideID, index: 0))
+
+        #expect(library.project(projectID)?.slides.first?.span == 5)
+        #expect(abs((layers(library, projectID, slideID).first?.placement.centerX ?? 0) - 2.5) < 1e-9)
+        await library.flush()
+    }
+
+    /// A photo moved into an empty panorama spreads it out as one landing there does, while the
+    /// slide it left keeps its layers where they were.
+    @Test func aPhotoMovedIntoAnEmptyPanoramaShiftsItsLayers() async throws {
+        let fixture = try await makeLibrary()
+        let library = fixture.library
+        let projectID = fixture.projectID
+        let slideID = fixture.slideID
+        let panoramaID = try #require(library.addSlide(.panorama, to: projectID))
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 6000, pixelHeight: 1500)
+        library.update(projectID) { project in
+            project.slides[0].cells[0].image = image
+        }
+        library.saveLayer(text(placement: LayerPlacement(centerX: 0.3)), in: slideID, of: projectID)
+        library.saveLayer(text(placement: LayerPlacement(centerX: 1)), in: panoramaID, of: projectID)
+
+        library.movePhoto(
+            from: CellAddress(projectID: projectID, slideID: slideID, index: 0),
+            imageID: image.id,
+            to: CellAddress(projectID: projectID, slideID: panoramaID, index: 0)
+        )
+
+        #expect(library.project(projectID)?.slides.last?.span == 5)
+        #expect(abs((layers(library, projectID, panoramaID).first?.placement.centerX ?? 0) - 2.5) < 1e-9)
+        #expect(layers(library, projectID, slideID).first?.placement.centerX == 0.3)
+        await library.flush()
     }
 
     @Test func changingLayoutKeepsLayersBlurAndStyle() async throws {

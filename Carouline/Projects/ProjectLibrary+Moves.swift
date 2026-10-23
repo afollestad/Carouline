@@ -36,7 +36,8 @@ extension ProjectLibrary {
     /// project, swapping it with any photo there, in one save that deletes no copy. Each keeps its
     /// framing, which doesn't depend on its cell's shape, except one moving into a panorama,
     /// which shows all of itself, as a layout changed to a panorama does. An empty panorama
-    /// spreads across as many slides as its new photo fills; one with a photo keeps its width.
+    /// spreads across as many slides as its new photo fills, its layers shifting together with the
+    /// photo; one with a photo keeps its width.
     /// Returns false, changing nothing, for a photo that's gone or been replaced, a cell that's
     /// gone, or either cell with a photo on its way in.
     @discardableResult
@@ -54,11 +55,13 @@ extension ProjectLibrary {
                   let destinationSlide = project.slides.firstIndex(where: { $0.id == destination.slideID }) else {
                 return
             }
-            if project.slides[destinationSlide].layout == .panorama, displaced == nil {
-                project.slides[destinationSlide].setSpan(Slide.panoramaSpan(fitting: moving.pixelSize, in: project.aspectRatio))
-            }
-            project.slides[destinationSlide].cells[destination.index].image = Self.framed(moving, in: project.slides[destinationSlide])
+            let old = project.slides[destinationSlide]
+            project.slides[destinationSlide].cells[destination.index].image = Self.framed(moving, in: old)
             project.slides[sourceSlide].cells[source.index].image = displaced.map { Self.framed($0, in: project.slides[sourceSlide]) }
+            if old.layout == .panorama, displaced == nil {
+                project.slides[destinationSlide].setSpan(Slide.panoramaSpan(fitting: moving.pixelSize, in: project.aspectRatio))
+                project.slides[destinationSlide].keepLayers(from: old, slideSize: project.aspectRatio.exportSize)
+            }
         }
         return true
     }

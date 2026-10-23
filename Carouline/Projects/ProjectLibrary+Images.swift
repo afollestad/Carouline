@@ -244,9 +244,9 @@ extension ProjectLibrary {
     }
 
     /// Puts `image` in the cell at `address`, deleting the copy it replaces once that's saved.
-    /// A photo filling an empty panorama spreads it across as many slides as the photo fills;
-    /// one replacing or restoring a photo keeps the width it had. Returns false, changing
-    /// nothing, when the cell no longer exists.
+    /// A photo filling an empty panorama spreads it across as many slides as the photo fills, its
+    /// layers shifting together with the photo; one replacing or restoring a photo keeps the width
+    /// it had. Returns false, changing nothing, when the cell no longer exists.
     @discardableResult
     func place(_ image: PlacedImage?, at address: CellAddress) -> Bool {
         guard let cell = cell(at: address) else {
@@ -256,10 +256,12 @@ extension ProjectLibrary {
             guard let slideIndex = project.slides.firstIndex(where: { $0.id == address.slideID }) else {
                 return
             }
-            if let image, cell.image == nil, project.slides[slideIndex].layout == .panorama {
-                project.slides[slideIndex].setSpan(Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio))
-            }
+            let old = project.slides[slideIndex]
             project.slides[slideIndex].cells[address.index].image = image
+            if let image, cell.image == nil, old.layout == .panorama {
+                project.slides[slideIndex].setSpan(Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio))
+                project.slides[slideIndex].keepLayers(from: old, slideSize: project.aspectRatio.exportSize)
+            }
         }
         return true
     }

@@ -43,8 +43,9 @@ nonisolated struct Layer: Codable, Hashable, Identifiable, Sendable {
 /// Where a layer sits on its slide, independent of the size the slide is drawn at.
 nonisolated struct LayerPlacement: Codable, Hashable, Sendable {
     /// The layer's center across the slide, in slide widths from its left edge, from 0 to its
-    /// span. Measured in slide widths rather than across the whole, so a layer stays where it is
-    /// on its slide when a panorama spans more slides or fewer.
+    /// span. Measured in slide widths rather than across the whole, as its size is, so a panorama
+    /// gaining or losing slides moves it only as far as `Slide.keepLayers(from:slideSize:)` shifts
+    /// it with the photo.
     var centerX: Double
     /// The layer's center down the slide, as a fraction of its height.
     var centerY: Double

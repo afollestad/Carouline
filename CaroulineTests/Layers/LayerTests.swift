@@ -142,8 +142,8 @@ struct LayerTests {
         #expect(layer.clamped(span: 1).placement.scale == LayerGeometry.scales(of: layer).lowerBound)
     }
 
-    /// A panorama cut down to fewer slides keeps each layer where it sat on its own slide, on
-    /// the last one, rather than piling them against the edge.
+    /// A layer past a narrower span's end, as a file can hold, moves onto the last slide at the
+    /// same place on its own, rather than piling up against the edge.
     @Test func movesLayersPastANarrowerSpanOntoItsLastSlide() {
         #expect(LayerPlacement(centerX: 4.25).clamped(span: 3).centerX == 2.25)
         #expect(LayerPlacement(centerX: 2.5).clamped(span: 1).centerX == 0.5)

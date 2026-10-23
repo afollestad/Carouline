@@ -75,8 +75,8 @@ extension ProjectLibrary {
         }
     }
 
-    /// Spreads panorama `slideID` across `span` slides, kept within `Slide.panoramaSpans`, with
-    /// its layers kept on it.
+    /// Spreads panorama `slideID` across `span` slides, kept within `Slide.panoramaSpans`, its
+    /// layers shifting together with its photo as that spreads across the new width.
     func setSpan(_ span: Int, of slideID: UUID, in projectID: UUID) {
         let span = Slide.clampedPanoramaSpan(span)
         guard let slide = project(projectID)?.slides.first(where: { $0.id == slideID }),
@@ -88,7 +88,9 @@ extension ProjectLibrary {
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return
             }
+            let old = project.slides[index]
             project.slides[index].setSpan(span)
+            project.slides[index].keepLayers(from: old, slideSize: project.aspectRatio.exportSize)
         }
     }
 

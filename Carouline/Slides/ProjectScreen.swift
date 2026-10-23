@@ -272,6 +272,9 @@ struct ProjectScreen: View {
                 }
             },
             onSetSpan: { slideID, span in
+                // Saved first, so an unsaved edit can't put back what the new width shifts.
+                session.saveLiveCrop(to: library)
+                layerSession.saveLivePlacement(to: library)
                 withAnimation {
                     library.setSpan(span, of: slideID, in: projectID)
                     // Brought to the front, as a move is, should the menu be a neighbor's.
