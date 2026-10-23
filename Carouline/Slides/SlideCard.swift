@@ -47,6 +47,7 @@ struct SlideCard: View {
     /// as the options capsule beside it, where the glyph alone falls a little short.
     @ScaledMetric(relativeTo: .subheadline) private var iconSide: CGFloat = 18
     @Environment(ProjectTour.self) var tour: ProjectTour?
+    @Environment(\.shownPopovers) private var popovers
 
     /// The room between the slide and its caption, which a caption tip's arrow reaches across, to
     /// the top of the caption's frame, just above its glass.
@@ -183,6 +184,7 @@ struct SlideCard: View {
         .popover(isPresented: layerActions.showsPopover ? layerActions.isShowingSheet(slide.id) : .constant(false)) {
             layerActions.sheet(slide.id)
                 .frame(idealWidth: LayersSheet.popoverSize.width, idealHeight: LayersSheet.popoverSize.height)
+                .countsAsPopover()
         }
     }
 
@@ -192,8 +194,10 @@ struct SlideCard: View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
                 Button {
-                    tour?.finish(.changeLayout)
-                    onChangeLayout()
+                    popovers.whenGone {
+                        tour?.finish(.changeLayout)
+                        onChangeLayout()
+                    }
                 } label: {
                     Label("Change Layout", systemImage: "rectangle.split.2x2")
                         .labelStyle(.iconOnly)
@@ -205,7 +209,7 @@ struct SlideCard: View {
                 .accessibilityHint("Chooses another layout for the slide")
                 .tourTarget(.layoutButton)
                 Button {
-                    openPopover = .options
+                    popovers.whenGone { openPopover = .options }
                 } label: {
                     HStack(spacing: 8) {
                         Text(numbersText)
@@ -218,7 +222,7 @@ struct SlideCard: View {
                     CaptionPopover(groups: optionGroups, header: { widthChoice }, onGone: { popoverGone(finishing: .slideMenu) })
                 }
                 Button {
-                    openPopover = .layers
+                    popovers.whenGone { openPopover = .layers }
                 } label: {
                     Label("Layers", systemImage: "square.3.layers.3d")
                         .labelStyle(.iconOnly)

@@ -14,6 +14,7 @@ struct ProjectToolbar: ToolbarContent {
     let onShare: () -> Void
     /// Runs as the popover's content goes, once it no longer covers the screen.
     let onPopoverGone: () -> Void
+    @Environment(\.shownPopovers) private var popovers
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
@@ -22,13 +23,15 @@ struct ProjectToolbar: ToolbarContent {
     }
 
     private var shareButton: some View {
-        Button("Share Slides", systemImage: "square.and.arrow.up", action: onShare)
+        // On a wide screen the export is a popover too, which one still closing would cancel.
+        Button("Share Slides", systemImage: "square.and.arrow.up") { popovers.whenGone(onShare) }
             .disabled(project.slides.isEmpty)
             .accessibilityHint("Saves the slides to Photos or shares them to another app")
             .popover(isPresented: $isExporting) {
                 ExportSheet(project: project, exporter: exporter)
                     .frame(idealWidth: 420, idealHeight: 480)
                     .onDisappear(perform: onPopoverGone)
+                    .countsAsPopover()
             }
     }
 }

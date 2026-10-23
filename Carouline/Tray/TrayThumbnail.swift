@@ -24,6 +24,7 @@ struct TrayThumbnail: View {
     /// fades with the photo already taken off them.
     @State private var choosingPlaces: [TrayPhotoPlace] = []
     @Environment(\.imageLoader) private var loader
+    @Environment(\.shownPopovers) private var popovers
 
     /// Tall enough to make out what's in a photo, with room above and below in the bar's glass.
     static let height: CGFloat = 44
@@ -125,11 +126,12 @@ struct TrayThumbnail: View {
         }
     }
 
-    /// Takes it off its one place, or asks which to take it off when there are several.
+    /// Takes it off its one place, or asks which to take it off when there are several, once any
+    /// popover still closing has gone, which would cancel the question.
     private func removeFromSlides() {
         if places.count > 1 {
             choosingPlaces = places
-            isChoosingPlace = true
+            popovers.whenGone { isChoosingPlace = true }
         } else {
             actions.removeFromSlides(photo.id, places)
         }

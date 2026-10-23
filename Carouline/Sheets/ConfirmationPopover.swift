@@ -51,6 +51,7 @@ struct ConfirmationPopover<Actions: View>: View {
         // A popover on a phone too, growing out of what it asks about as the dialog does, rather than
         // a sheet.
         .presentationCompactAdaptation(.popover)
+        .countsAsPopover()
     }
 
     private var content: some View {

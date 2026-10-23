@@ -55,6 +55,7 @@ struct CaptionPopover<Header: View>: View {
         .dynamicTypeSize(screenDynamicTypeSize)
         .presentationCompactAdaptation(.popover)
         .onDisappear(perform: onGone)
+        .countsAsPopover()
     }
 
     private func row(_ choice: CaptionChoice) -> some View {

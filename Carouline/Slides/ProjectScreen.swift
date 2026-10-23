@@ -53,6 +53,7 @@ struct ProjectScreen: View {
     var body: some View {
         if let project = library.project(projectID) {
             content(project)
+                .tracksPopovers()
         } else {
             // Another window deleted it.
             ContentUnavailableView("Project Deleted", systemImage: "trash")
