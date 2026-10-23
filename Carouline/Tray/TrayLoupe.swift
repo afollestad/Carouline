@@ -11,8 +11,9 @@ struct TrayLoupe: View {
     let photo: TrayPhoto
     let projectID: UUID
 
-    /// Large enough to judge a photo by, and small enough to leave the slides above in view.
-    static let maximumSize = CGSize(width: 220, height: 220)
+    /// Large enough to judge a photo by, and small enough to leave most of the slide above in view,
+    /// within a phone's width with room either side.
+    static let maximumSize = CGSize(width: 260, height: 260)
     private static let cornerRadius: CGFloat = 12
 
     var body: some View {
