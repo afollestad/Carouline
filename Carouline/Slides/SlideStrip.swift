@@ -178,10 +178,10 @@ struct SlideStrip: View {
     /// How far the slides shrink and move up while a layers sheet is open over them, so the one
     /// being edited stays in view and in reach above the sheet, or above the keyboard and the short
     /// sheet over it while a text layer is typed: the tallest slide and its caption, fitted into
-    /// the room they leave. Scaled rather than laid out smaller, since the lazy stack drops the
-    /// slide while laying out its new size, and rebuilds it. Not at a compact height, as a phone's
-    /// in landscape, where the sheet is always full height and covers the slides however small
-    /// they are.
+    /// the room they leave. Scaled rather than laid out smaller, since slides laid out at a new size
+    /// decode their photos again for it, on every frame the sheet moves. Not at a compact height, as
+    /// a phone's in landscape, where the sheet is always full height and covers the slides however
+    /// small they are.
     private var roomFit: RoomFit {
         guard sitsUnderSheet else {
             return .identity
@@ -196,10 +196,24 @@ struct SlideStrip: View {
 
     private func strip(screenPoint: CGFloat) -> some View {
         let numbers = project.slideNumbers
+        let built = builtSlides
         return ScrollView(.horizontal) {
-            LazyHStack(spacing: Self.spacing) {
+            // Whole rather than lazy, so every slide sits where the strip's stops put it, which a lazy
+            // stack guessing the widths of slides it hasn't built doesn't. Only those near the middle
+            // build their photos and layers.
+            HStack(spacing: Self.spacing) {
                 ForEach(Array(project.slides.enumerated()), id: \.element.id) { index, slide in
-                    card(for: slide, at: index, numbers: numbers[index], screenPoint: screenPoint)
+                    if built.contains(index) {
+                        card(for: slide, at: index, numbers: numbers[index], screenPoint: screenPoint)
+                    } else {
+                        SlidePlaceholder(
+                            size: cardSize(span: slide.span),
+                            background: slide.style.background,
+                            label: "\(numbers[index].spokenSlidesName) of \(project.carouselSlideCount), \(slide.layout.name)"
+                        )
+                        // Over room as tall as a caption's, so it sits as its card does.
+                        .padding(.bottom, Self.captionSpace)
+                    }
                 }
                 AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
                     // Over room as tall as a caption's, so it centers on the slides beside it rather
@@ -345,6 +359,26 @@ struct SlideStrip: View {
             scroll.scrollTo(x: offset)
         }
         return scrolled
+    }
+
+    /// The slides that build their photos and layers: the one in the middle and those either side
+    /// as far as the screen shows, scaled down for a layers sheet, and one more, so a slide coming
+    /// into view is built before it gets there.
+    private var builtSlides: ClosedRange<Int> {
+        // Or where the strip rests, once `position`'s slide is deleted without the strip moving.
+        let front = index(of: position) ?? index(of: stops.item(at: tracked.offset)) ?? 0
+        let shown = size.width / 2 / max(roomFit.scale, 0.1)
+        let reach = Int((shown / max(1, slideWidth + Self.spacing)).rounded(.up)) + 1
+        return (front - reach)...(front + reach)
+    }
+
+    /// Where `item` is among the slides, the add button counting as the last.
+    private func index(of item: StripItem?) -> Int? {
+        switch item {
+        case .slide(let slideID): project.slides.firstIndex { $0.id == slideID }
+        case .add: project.slides.indices.last
+        case nil: nil
+        }
     }
 
     /// One slide's width, which a panorama is a whole number of.

@@ -2,8 +2,9 @@
 
 ### Strip layout and scrolling
 
-- Keep `SlideStrip`'s layout size fixed while a layers sheet is open, and shrink and move its slides with `scaleEffect` and `offset`, as `RoomFit` does. The lazy stack drops the card being edited while laying out a new size, and rebuilds it.
-- Center anything beside the slides in the strip by padding it to a card's shape, as the add button's `captionSpace` padding does, not with an alignment guide inside `SlideCard`. The strip's `LazyHStack` ignores one there and centers each card whole, caption included.
+- Keep `SlideStrip`'s layout size fixed while a layers sheet is open, and shrink and move its slides with `scaleEffect` and `offset`, as `RoomFit` does. Slides laid out at a new size decode their photos again for it, on every frame the sheet moves.
+- Lay the strip out in an `HStack`, never a lazy stack, and build only the slides near its middle, as `builtSlides` does, with a `SlidePlaceholder` for the rest. A lazy stack guesses the widths of slides it hasn't built, so they sit off the stops the strip scrolls by.
+- Shape anything beside or in place of a slide in the strip like a card, padding it by `captionSpace` below as the add button and `SlidePlaceholder` are, since the strip centers each card whole, caption included.
 - Clip the strip and its content shape where iPhone Duo's column of bar buttons starts, with `TrailingClip`, since a clip alone still lets taps reach the slides it hides. Its scroll view reaches under the column even when padded clear of the safe area there with `ignoresSafeArea`, and no scroll edge effect softens what's under it.
 - Scroll the strip by offset through `StripScrolling`, never `scrollPosition(id:)`, and keep what sits on a panorama in view with `followsStripMiddle`'s `offset`, never a `visualEffect`. A scroll view finds the item whose middle is nearest its own, the slide beside a panorama wider than the screen, and a popover, tour anchor or tap stays where layout put it under a visual effect.
 
