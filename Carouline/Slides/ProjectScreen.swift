@@ -81,7 +81,8 @@ struct ProjectScreen: View {
                 actions: trayActions(project)
             ))
             .background {
-                SlideBackdrop(slide: project.frontSlide(at: stripPosition), projectID: projectID, aspectRatio: project.aspectRatio)
+                let front = project.frontSlide(at: stripPosition)
+                SlideBackdrop(slide: front, projectID: projectID, aspectRatio: project.aspectRatio, layerSession: layerSession)
             }
             .navigationTitle(nameBinding)
             .navigationBarTitleDisplayMode(.inline)

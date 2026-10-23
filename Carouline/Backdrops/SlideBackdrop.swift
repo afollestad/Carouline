@@ -12,6 +12,9 @@ struct SlideBackdrop: View {
     let slide: Slide?
     let projectID: UUID
     let aspectRatio: AspectRatio
+    /// Which of a panorama's slides is in the middle of the strip, read here alone, so a cut the
+    /// strip crosses redraws the backdrop rather than the screen.
+    var layerSession: LayerSession?
     @Environment(\.colorScheme) private var colorScheme
 
     /// Small enough that the photos decode at their smallest size and blur into a small image,
@@ -21,11 +24,12 @@ struct SlideBackdrop: View {
     private static let blurRadius: CGFloat = 48
 
     var body: some View {
+        let frontIndex = slide.flatMap { layerSession?.frontSlideIndex(of: $0.id) }
         GeometryReader { proxy in
             ZStack {
                 GlowBackdrop()
                 if let slide, slide.cells.contains(where: { $0.image != nil }) {
-                    photos(of: slide, filling: proxy.size)
+                    photos(of: slide, from: frontIndex, filling: proxy.size)
                         .id(slide.id)
                         .transition(.opacity)
                     scrim
@@ -36,6 +40,7 @@ struct SlideBackdrop: View {
         }
         .ignoresSafeArea()
         .animation(.smooth(duration: 0.6), value: slide?.id)
+        .animation(.smooth(duration: 0.6), value: frontIndex)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -51,11 +56,14 @@ struct SlideBackdrop: View {
     }
 
     /// The slide's photos where its cells put them, blurred small and scaled up to fill `size`.
-    /// A panorama renders each of its slides as small as one, so the screen fills from its middle.
-    private func photos(of slide: Slide, filling size: CGSize) -> some View {
+    /// A panorama renders each of its slides as small as one, and the screen fills from slide
+    /// `frontIndex`, the one in the middle of the strip, or else from its middle.
+    private func photos(of slide: Slide, from frontIndex: Int?, filling size: CGSize) -> some View {
         let small = CGSize(width: Self.renderWidth * CGFloat(slide.span), height: Self.renderWidth / aspectRatio.widthOverHeight)
-        // Half again past filling, so the blur's fade at the photos' edges falls off the screen.
-        let scale = max(size.width / small.width, size.height / small.height) * 1.5
+        // Half again past one slide filling it, so the blur's fade at the photos' edges falls off
+        // the screen wherever the slide in front sits along a panorama.
+        let scale = max(size.width / Self.renderWidth, size.height / small.height) * 1.5
+        let slidesFromMiddle = frontIndex.map { CGFloat(slide.span) / 2 - (CGFloat($0) + 0.5) } ?? 0
         return SlideCells(layout: slide.layout, style: slide.style, span: slide.span) {
             ForEach(slide.cells.indices, id: \.self) { index in
                 if let image = slide.cells[index].image {
@@ -75,6 +83,7 @@ struct SlideBackdrop: View {
         // Blurred once into a small image, rather than again on every frame the strip scrolls.
         .drawingGroup()
         .scaleEffect(scale)
+        .offset(x: slidesFromMiddle * Self.renderWidth * scale)
         .frame(width: size.width, height: size.height)
     }
 }
