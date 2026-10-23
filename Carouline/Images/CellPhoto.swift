@@ -124,7 +124,7 @@ extension CellPhoto {
     private func photo(_ image: CGImage, frame: CGRect, cell: CGSize) -> some View {
         let reach = LayerImageEffects.blurReach * blur
         let region = frame.intersection(CGRect(origin: .zero, size: cell).insetBy(dx: -reach, dy: -reach))
-        let shrink = ScreenBlur.shrink(for: blur)
+        let shrink = ScreenBlur.shrink(for: blur, region: region.size, displayScale: displayScale)
         let small = CGSize(width: region.width / shrink, height: region.height / shrink)
         // A cell not yet measured has nothing to blur.
         if blur > 0, small.width > 0, small.height > 0 {
@@ -156,12 +156,22 @@ extension CellPhoto {
 }
 
 /// How the screen renders a blur.
-enum ScreenBlur {
+nonisolated enum ScreenBlur {
+    /// The most pixels across a blur renders at: half a texture's 16,384, which a ten-slide
+    /// panorama's photo would near on an iPad, keeping its render around 35 MB on a phone.
+    static let maximumPixels: CGFloat = 8192
+
     /// How many times smaller than it's shown a blur renders before it's scaled up: as much as a
     /// quarter, while the blur stays two points or more across there, which hides the coarser
     /// pixels, as `SlideBackdrop` blurs small and scales up.
     static func shrink(for radius: CGFloat) -> CGFloat {
         min(4, max(1, (radius / 2).rounded(.down)))
+    }
+
+    /// `shrink(for:)` for a blur over `region` on a screen of `displayScale`, or more where the
+    /// region would render past `maximumPixels` across, as a wide panorama's would.
+    static func shrink(for radius: CGFloat, region: CGSize, displayScale: CGFloat) -> CGFloat {
+        max(shrink(for: radius), max(region.width, region.height) * displayScale / maximumPixels)
     }
 }
 
