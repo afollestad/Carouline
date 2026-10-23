@@ -21,6 +21,12 @@ nonisolated enum StripMiddle {
         reach > 0 ? min(max(middle - width / 2, -reach), reach) : 0
     }
 
+    /// How far either way from its container's middle a view `width` wide moves and still stays
+    /// inside a container `containerWidth` wide.
+    static func room(for width: CGFloat, in containerWidth: CGFloat) -> CGFloat {
+        max(0, (containerWidth - width) / 2)
+    }
+
     /// Which of the `span` slides across a card `width` wide is at `x`, or nil off the card.
     static func slideIndex(at x: CGFloat, across width: CGFloat, span: Int) -> Int? {
         guard width > 0, x >= 0, x < width else {
@@ -33,7 +39,7 @@ nonisolated enum StripMiddle {
 
 extension View {
     /// Slides the view across its container, as wide as it's offered, to stay under the strip's
-    /// middle, up to `reach` either way from the container's middle.
+    /// middle, up to `reach` either way from the container's middle, and never past its edges.
     func followsStripMiddle(reach: CGFloat) -> some View {
         modifier(FollowsStripMiddle(reach: reach))
     }
@@ -120,14 +126,23 @@ private final class MeasuredAnchor {
 
 /// Moves its content with an offset rather than a visual effect, so a popover from it, a tour
 /// anchor on it and its taps all follow. Its own state, so a scroll redraws no more than this.
+/// Kept inside its container, so a caption wider than a panorama's slide stops at the panorama's
+/// end, rather than running over the next slide's caption under the end slide's middle.
 private struct FollowsStripMiddle: ViewModifier {
     let reach: CGFloat
     @State private var shift: CGFloat = 0
+    /// The content's width and its container's, which keep it inside. Held as state rather than
+    /// taken into the shift's measurement, so the shift holds to them as soon as both are measured.
+    @State private var width: CGFloat = 0
+    @State private var containerWidth: CGFloat = 0
 
     func body(content: Content) -> some View {
+        let room = StripMiddle.room(for: width, in: containerWidth)
         content
-            .offset(x: shift)
+            .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
+            .offset(x: min(max(shift, -room), room))
             .frame(maxWidth: .infinity)
+            .onGeometryChange(for: CGFloat.self, of: \.size.width) { containerWidth = $0 }
             // Measured on the frame, which the offset inside it doesn't move.
             .onGeometryChange(for: CGFloat.self) { [reach] proxy in
                 guard reach > 0, let visible = proxy.bounds(of: .scrollView) else {

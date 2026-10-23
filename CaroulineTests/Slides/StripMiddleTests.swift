@@ -29,6 +29,12 @@ struct StripMiddleTests {
         #expect(StripMiddle.shift(toward: 2000, across: 900, reach: reach) == 300)
     }
 
+    /// A caption wider than a slide moves only as far as keeps it on the card.
+    @Test func keepsAViewInsideItsContainer() {
+        #expect(StripMiddle.room(for: 600, in: 900) == 150)
+        #expect(StripMiddle.room(for: 1000, in: 900) == 0)
+    }
+
     @Test func findsThePanoramaSlideAtAPoint() {
         #expect(StripMiddle.slideIndex(at: 0, across: 900, span: 3) == 0)
         #expect(StripMiddle.slideIndex(at: 450, across: 900, span: 3) == 1)
