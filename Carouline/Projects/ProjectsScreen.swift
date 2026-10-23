@@ -292,10 +292,12 @@ private struct ProjectRow: View {
                 onRename(draftName)
             }
         }
-        .confirmationDialog("Delete “\(project.name)”?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+        .confirmationPopover(
+            "Delete “\(project.name)”?",
+            isPresented: $isConfirmingDelete,
+            message: "Its slides and the copies of its photos are deleted. The originals stay in your photo library."
+        ) {
             Button("Delete Project", role: .destructive, action: onDelete)
-        } message: {
-            Text("Its slides and the copies of its photos are deleted. The originals stay in your photo library.")
         }
     }
 
@@ -430,10 +432,12 @@ private struct UnreadableRow: View {
                 isConfirmingDelete = true
             }
         }
-        .confirmationDialog("Delete This Project?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+        .confirmationPopover(
+            "Delete This Project?",
+            isPresented: $isConfirmingDelete,
+            message: "It can't be opened, so its slides and photo copies are deleted unseen."
+        ) {
             Button("Delete Project", role: .destructive, action: onDelete)
-        } message: {
-            Text("It can't be opened, so its slides and photo copies are deleted unseen.")
         }
     }
 
