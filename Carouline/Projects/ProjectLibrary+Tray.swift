@@ -82,12 +82,11 @@ extension ProjectLibrary {
     /// a restore on sight never prompts; one that asks reports what went wrong.
     @discardableResult
     func restoreTrayPhoto(_ photoID: UUID, in projectID: UUID, from photos: any PhotoLibrarySource, asking: Bool) async -> RestoreOutcome {
-        guard let project = project(projectID), let missing = trayPhoto(photoID, in: projectID)?.image else {
+        guard let project = project(projectID), let photo = trayPhoto(photoID, in: projectID) else {
             return .unavailable
         }
-        let standIns = project.slides.flatMap(\.cells).compactMap(\.image).filter { image in
-            image.trayPhotoID == photoID || (image.assetIdentifier != nil && image.assetIdentifier == missing.assetIdentifier)
-        }
+        let missing = photo.image
+        let standIns = project.slides.flatMap(\.cells).compactMap(\.image).filter(photo.matches)
         for standIn in standIns {
             let copy = PlacedImage(
                 assetIdentifier: missing.assetIdentifier,

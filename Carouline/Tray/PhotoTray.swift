@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 
 /// Glass along the bottom of the project screen with the photos gathered to see before they go on
 /// a slide: a button to gather more, then the photos in the order they were added, each marked
-/// once it's on a slide.
+/// once it's on a slide, with how many cells hold it once that's more than one.
 struct PhotoTray: View {
     let project: Project
     /// How many photos are on their way in, which hold places at the end.
@@ -78,17 +78,18 @@ struct PhotoTray: View {
     }
 
     private var photos: some View {
-        let holding = project.slidesHoldingTrayPhotos
+        let holding = project.trayPhotoPlaces
         let count = project.tray.count
         return ScrollView(.horizontal) {
             LazyHStack(spacing: 8) {
                 ForEach(Array(project.tray.enumerated()), id: \.element.id) { index, photo in
+                    let places = holding[photo.id] ?? []
                     TrayThumbnail(
                         photo: photo,
                         projectID: project.id,
-                        isUsed: holding[photo.id] != nil,
+                        places: places,
                         position: "photo \(index + 1) of \(count)",
-                        usedOn: holding[photo.id].map(project.slidesName(at:)),
+                        usedOn: places.isEmpty ? nil : project.slidesName(at: places.slideIndexes),
                         actions: actions
                     )
                 }

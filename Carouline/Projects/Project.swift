@@ -99,19 +99,25 @@ nonisolated struct Project: Codable, Hashable, Identifiable, Sendable {
         slides.flatMap(\.images) + tray.map(\.image)
     }
 
-    /// The slides, by index, that each tray photo on a slide is on: those with a cell's photo
-    /// cloned from it, or from the same library photo, as a photo picked straight into a cell is.
-    /// Pictures in layers don't count, since they're decoration rather than the carousel's photos.
-    var slidesHoldingTrayPhotos: [UUID: [Int]] {
-        var holding: [UUID: [Int]] = [:]
-        for (index, slide) in slides.enumerated() {
-            let placed = slide.cells.compactMap(\.image)
-            let clonedFrom = Set(placed.compactMap(\.trayPhotoID))
-            let originals = Set(placed.compactMap(\.assetIdentifier))
-            for photo in tray where clonedFrom.contains(photo.id) || photo.image.assetIdentifier.map(originals.contains) == true {
-                holding[photo.id, default: []].append(index)
+    /// The cells, in carousel order, holding each tray photo that's on a slide: those whose photo
+    /// `TrayPhoto.matches`. Pictures in layers don't count, since they're decoration rather than
+    /// the carousel's photos.
+    var trayPhotoPlaces: [UUID: [TrayPhotoPlace]] {
+        var places: [UUID: [TrayPhotoPlace]] = [:]
+        let numbers = slideNumbers
+        for (slideIndex, slide) in slides.enumerated() {
+            for photo in tray {
+                let indexes = slide.cells.indices.filter { slide.cells[$0].image.map(photo.matches) == true }
+                for index in indexes {
+                    places[photo.id, default: []].append(TrayPhotoPlace(
+                        address: CellAddress(projectID: id, slideID: slide.id, index: index),
+                        slideIndex: slideIndex,
+                        numbers: numbers[slideIndex],
+                        photoNumber: indexes.count > 1 ? index + 1 : nil
+                    ))
+                }
             }
         }
-        return holding
+        return places
     }
 }

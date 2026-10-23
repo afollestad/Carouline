@@ -64,8 +64,34 @@ struct ProjectTests {
             tray: [cloned, picked, decorating, unused]
         )
 
-        #expect(trip.slidesHoldingTrayPhotos == [cloned.id: [0], picked.id: [0]])
+        let slideID = trip.slides[0].id
+        #expect(trip.trayPhotoPlaces.mapValues { $0.map(\.address) } == [
+            cloned.id: [CellAddress(projectID: trip.id, slideID: slideID, index: 0)],
+            picked.id: [CellAddress(projectID: trip.id, slideID: slideID, index: 1)]
+        ])
         // The cells' and layer's copies, and the tray's own.
         #expect(trip.images.count == 7)
+    }
+
+    /// A tray photo's places by their slides' carousel numbers, and by each cell's number on a
+    /// slide holding the photo more than once.
+    @Test func namesTheTrayPhotosPlaces() {
+        let photo = TrayPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10))
+        let clone = { Cell(image: PlacedImage(assetIdentifier: nil, pixelWidth: 10, pixelHeight: 10, trayPhotoID: photo.id)) }
+        let trip = Project(
+            name: "Trip",
+            aspectRatio: .portrait,
+            slides: [
+                Slide(layout: .panorama, span: 2, cells: [clone()]),
+                Slide(layout: .twoColumns, cells: [clone(), clone()]),
+                Slide(layout: .twoColumns, cells: [Cell(), clone()])
+            ],
+            tray: [photo]
+        )
+
+        let places = trip.trayPhotoPlaces[photo.id] ?? []
+        #expect(places.map(\.name) == ["Slides 1–2", "Slide 3, Photo 1", "Slide 3, Photo 2", "Slide 4"])
+        #expect(places.map(\.spokenName) == ["Slides 1 to 2", "Slide 3, photo 1", "Slide 3, photo 2", "Slide 4"])
+        #expect(places.slideIndexes == [0, 1, 2])
     }
 }

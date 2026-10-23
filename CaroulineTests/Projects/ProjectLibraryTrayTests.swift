@@ -179,7 +179,7 @@ struct ProjectLibraryTrayTests {
         #expect(clone.crop == ImageCrop())
         #expect(copyExists(clone, in: address.projectID))
         #expect(copyExists(photo.image, in: address.projectID))
-        #expect(library.project(address.projectID)?.slidesHoldingTrayPhotos == [photo.id: [0]])
+        #expect(library.project(address.projectID)?.trayPhotoPlaces.mapValues { $0.map(\.address) } == [photo.id: [address]])
         #expect(library.importingCells.isEmpty)
     }
 

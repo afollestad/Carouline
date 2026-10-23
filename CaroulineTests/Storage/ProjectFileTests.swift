@@ -85,7 +85,7 @@ struct ProjectFileTests {
         #expect(project.tray[1].image.pixelSize == CGSize(width: 4096, height: 1024))
         let clone = try #require(project.slides.first?.cells.first?.image)
         #expect(clone.trayPhotoID == project.tray[0].id)
-        #expect(project.slidesHoldingTrayPhotos == [project.tray[0].id: [0]])
+        #expect(project.trayPhotoPlaces.mapValues(\.slideIndexes) == [project.tray[0].id: [0]])
         #expect(project.images.map(\.id) == [clone.id] + project.tray.map(\.image.id))
         #expect(String(bytes: try ProjectFile.encode(project), encoding: .utf8) == Self.version6)
     }

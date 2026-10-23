@@ -19,6 +19,12 @@ nonisolated struct TrayPhoto: Codable, Hashable, Identifiable, Sendable {
         self.id = id
         self.image = image
     }
+
+    /// Whether a cell's `image` is this photo: a clone of it, or from the same library original,
+    /// as a photo picked straight into a cell is.
+    func matches(_ image: PlacedImage) -> Bool {
+        image.trayPhotoID == id || (self.image.assetIdentifier != nil && image.assetIdentifier == self.image.assetIdentifier)
+    }
 }
 
 nonisolated extension [TrayPhoto] {

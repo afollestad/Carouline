@@ -10,8 +10,8 @@ import SwiftUI
 struct TrayThumbnail: View {
     let photo: TrayPhoto
     let projectID: UUID
-    /// Whether it's on a slide, which a badge marks.
-    let isUsed: Bool
+    /// The cells holding it, which a badge marks, with how many once that's more than one.
+    let places: [TrayPhotoPlace]
     /// Where it sits in the tray, as in "photo 3 of 12", for VoiceOver.
     let position: String
     /// The slides it's on, as "Slides 2 and 5", for its preview, or nil when it's on none.
@@ -33,8 +33,8 @@ struct TrayThumbnail: View {
         } label: {
             PhotoThumbnail(image: photo.image, projectID: projectID, height: Self.height, isMissing: $isMissing)
                 .overlay(alignment: .topTrailing) {
-                    if isUsed {
-                        UsedBadge()
+                    if !places.isEmpty {
+                        UsedBadge(count: places.count)
                     }
                 }
                 // Over the photo, rather than a modifier on it, so turning dragging off for a
@@ -108,7 +108,15 @@ struct TrayThumbnail: View {
         if isMissing {
             return "\(position.capitalizingFirstLetter), unavailable"
         }
-        return "\(position.capitalizingFirstLetter), \(shape)\(isUsed ? ", on a slide" : "")"
+        return "\(position.capitalizingFirstLetter), \(shape)\(usedText)"
+    }
+
+    private var usedText: String {
+        switch places.count {
+        case 0: ""
+        case 1: ", on a slide"
+        case let count: ", in \(count) places on slides"
+        }
     }
 
     private var hint: String {
@@ -120,17 +128,32 @@ struct TrayThumbnail: View {
     }
 }
 
-/// A check on solid accent in a thumbnail's corner, marking a photo that's on a slide. White on
-/// the accent, which a faint tint would wash out on the glass.
+/// A check on solid accent in a thumbnail's corner, marking a photo that's on a slide, or how many
+/// cells hold it once that's more than one. White on the accent, which a faint tint would wash out
+/// on the glass.
 private struct UsedBadge: View {
+    let count: Int
+
     var body: some View {
-        Image(systemName: "checkmark")
-            .font(.system(size: 8, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 16, height: 16)
-            .background(Color.accentColor, in: .circle)
-            .padding(3)
-            .accessibilityHidden(true)
+        Group {
+            if count > 1 {
+                Text(count, format: .number)
+                    .font(.system(size: 10, weight: .bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+                    // Clear of the capsule's ends past one digit; one stays a circle.
+                    .padding(.horizontal, count > 9 ? 4 : 0)
+            } else {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(minWidth: 16, minHeight: 16, maxHeight: 16)
+        .background(Color.accentColor, in: .capsule)
+        .padding(3)
+        .accessibilityHidden(true)
     }
 }
 
@@ -166,20 +189,37 @@ nonisolated enum Orientation {
 }
 
 #Preview {
+    let projectID = UUID()
+    let places = (1...3).map { index in
+        TrayPhotoPlace(
+            address: CellAddress(projectID: projectID, slideID: UUID(), index: 0),
+            slideIndex: index,
+            numbers: (index + 1)...(index + 1),
+            photoNumber: nil
+        )
+    }
     HStack {
         TrayThumbnail(
             photo: TrayPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 1365)),
-            projectID: UUID(),
-            isUsed: true,
-            position: "photo 1 of 2",
+            projectID: projectID,
+            places: Array(places.prefix(1)),
+            position: "photo 1 of 3",
             usedOn: "Slide 2",
             actions: .preview
         )
         TrayThumbnail(
+            photo: TrayPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 2048, pixelHeight: 2048)),
+            projectID: projectID,
+            places: places,
+            position: "photo 2 of 3",
+            usedOn: "Slides 2, 3, and 4",
+            actions: .preview
+        )
+        TrayThumbnail(
             photo: TrayPhoto(image: PlacedImage(assetIdentifier: nil, pixelWidth: 1536, pixelHeight: 2048)),
-            projectID: UUID(),
-            isUsed: false,
-            position: "photo 2 of 2",
+            projectID: projectID,
+            places: [],
+            position: "photo 3 of 3",
             usedOn: nil,
             actions: .preview
         )
