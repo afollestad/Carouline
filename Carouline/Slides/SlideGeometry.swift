@@ -39,4 +39,19 @@ nonisolated enum SlideGeometry {
             return CGRect(x: snap(minX), y: snap(minY), width: snap(maxX) - snap(minX), height: snap(maxY) - snap(minY))
         }
     }
+
+    /// What a slide's contents move with as it turns into a panorama or out of one, or a panorama
+    /// changes width, on a canvas `span` slides of `slideSize` wide: the frame a one-cell slide's
+    /// photo draws at, or else a slide's frame centered on the canvas, as a centered photo of a
+    /// slide's shape would be, since layers over several cells are placed on the whole slide.
+    static func anchor(of slide: Slide, slideSize: CGSize) -> CGRect {
+        let span = CGFloat(max(1, slide.span))
+        let canvas = CGSize(width: slideSize.width * span, height: slideSize.height)
+        if slide.layout.grid.cells.count == 1, let image = slide.cells.first?.image,
+           let cell = cellFrames(for: slide.layout, in: canvas, style: slide.style, span: slide.span).first {
+            return CropGeometry.frame(imageSize: image.pixelSize, cellSize: cell.size, crop: image.crop)
+                .offsetBy(dx: cell.minX, dy: cell.minY)
+        }
+        return CGRect(x: (span - 1) / 2 * slideSize.width, y: 0, width: slideSize.width, height: slideSize.height)
+    }
 }

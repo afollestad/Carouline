@@ -246,7 +246,8 @@ struct ProjectLibraryLayersTests {
         let library = fixture.library
         let projectID = fixture.projectID
         let slideID = fixture.slideID
-        let layer = text(placement: LayerPlacement(centerX: 2.25))
+        // A quarter slide right of an empty two-slide panorama's middle, which becomes the grid's.
+        let layer = text(placement: LayerPlacement(centerX: 1.25))
         library.saveLayer(layer, in: slideID, of: projectID)
         let style = SlideStyle(spacing: 0.02, border: 0.03, background: .black)
         library.update(projectID) { project in
@@ -258,9 +259,29 @@ struct ProjectLibraryLayersTests {
 
         let slide = try #require(library.project(projectID)?.slides.first)
         #expect(slide.layers.map(\.id) == [layer.id])
-        #expect(slide.layers.first?.placement.centerX == 0.25)
+        #expect(slide.layers.first?.placement.centerX == 0.75)
         #expect(slide.blur == 0.02)
         #expect(slide.style == style)
+    }
+
+    /// A slide's photo spreading across the panorama it turns into takes its layers along, over
+    /// the same part of it, rather than leaving them on the panorama's first slide.
+    @Test func turningASlidePanoramaShiftsItsLayersWithItsPhoto() async throws {
+        let fixture = try await makeLibrary()
+        let library = fixture.library
+        let projectID = fixture.projectID
+        let slideID = fixture.slideID
+        library.update(projectID) { project in
+            project.slides[0].cells[0].image = PlacedImage(assetIdentifier: nil, pixelWidth: 6000, pixelHeight: 1500)
+        }
+        library.saveLayer(text(), in: slideID, of: projectID)
+
+        library.changeLayout(of: slideID, in: projectID, to: .panorama)
+
+        let slide = try #require(library.project(projectID)?.slides.first)
+        #expect(slide.span == 5)
+        #expect(abs((slide.layers.first?.placement.centerX ?? 0) - 2.5) < 1e-9)
+        await library.flush()
     }
 
     @Test func deletingASlideDeletesItsLayersCopies() async throws {

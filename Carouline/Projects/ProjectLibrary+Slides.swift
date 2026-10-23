@@ -47,9 +47,10 @@ extension ProjectLibrary {
     /// Gives slide `slideID` a new layout, carrying its photos over in order and deleting any
     /// the new layout has no cell for. A panorama spans as many slides as its photo fills, which
     /// shows all of it once its framing is reset, since a zoom set for one slide's shape crops
-    /// a panorama to a strip. Its layers, blur and style carry over, the layers kept on the new
-    /// span. A slide with a photo on its way into a cell keeps its layout, since packing would
-    /// move another photo into that cell, which the one landing would replace and delete.
+    /// a panorama to a strip. Its blur, style and layers carry over, the layers shifting together
+    /// with what it shows into or out of a panorama, as `Slide.keepLayers(from:slideSize:)` moves
+    /// them. A slide with a photo on its way into a cell keeps its layout, since packing would move
+    /// another photo into that cell, which the one landing would replace and delete.
     func changeLayout(of slideID: UUID, in projectID: UUID, to layout: SlideLayout) {
         guard let project = project(projectID),
               let slide = project.slides.first(where: { $0.id == slideID }),
@@ -64,7 +65,8 @@ extension ProjectLibrary {
             cells[0].image?.crop = ImageCrop()
             span = Slide.panoramaSpan(fitting: image.pixelSize, in: project.aspectRatio)
         }
-        let changed = Slide(id: slideID, layout: layout, span: span, cells: cells, layers: slide.layers, blur: slide.blur, style: slide.style)
+        var changed = Slide(id: slideID, layout: layout, span: span, cells: cells, blur: slide.blur, style: slide.style)
+        changed.keepLayers(from: slide, slideSize: project.aspectRatio.exportSize)
         update(projectID, deletingImages: dropped) { project in
             guard let index = project.slides.firstIndex(where: { $0.id == slideID }) else {
                 return

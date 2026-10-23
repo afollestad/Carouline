@@ -57,6 +57,44 @@ nonisolated enum LayerGeometry {
         return CGRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height)
     }
 
+    /// `layer`'s placement moved by `shift`, in slide widths across and heights down, from a canvas
+    /// `oldSpan` slides of `slideSize` wide to one `span` wide, and kept on it as far as it was: one
+    /// shown whole comes back in from an edge the shift took it past, and one hanging past an edge
+    /// hangs no further. One too big for that along the new canvas keeps its center on it instead.
+    static func placement(of layer: Layer, shiftedBy shift: CGVector, slideSize: CGSize, fromSpan oldSpan: Int, toSpan span: Int) -> LayerPlacement {
+        let oldWidth = Double(max(1, oldSpan))
+        let frame = frame(of: layer, canvas: CGSize(width: slideSize.width * oldWidth, height: slideSize.height), span: oldSpan)
+        let box = frame.applying(turn(about: frame, by: layer.placement.rotation))
+        var placement = layer.placement
+        placement.centerX = kept(
+            placement.centerX + Double(shift.dx),
+            from: placement.centerX,
+            half: Double(box.width / 2 / slideSize.width),
+            oldLength: oldWidth,
+            length: Double(max(1, span))
+        )
+        placement.centerY = kept(
+            placement.centerY + Double(shift.dy),
+            from: placement.centerY,
+            half: Double(box.height / 2 / slideSize.height),
+            oldLength: 1,
+            length: 1
+        )
+        return placement
+    }
+
+    /// `center` along a canvas `length` long, for a layer reaching `half` either side of it that was
+    /// at `old` on one `oldLength` long: no further past either end than it was, or anywhere along
+    /// the canvas when that leaves it nowhere.
+    private static func kept(_ center: Double, from old: Double, half: Double, oldLength: Double, length: Double) -> Double {
+        let low = min(half, old)
+        let high = max(length - half, old + length - oldLength)
+        guard low <= high else {
+            return min(max(center, 0), length)
+        }
+        return min(max(center, low), high)
+    }
+
     /// The layer's unturned frame on `canvas`, grown to a fingertip's target on screen, which is
     /// where it takes touches.
     static func hitBox(of layer: Layer, on canvas: LayerCanvas) -> CGRect {

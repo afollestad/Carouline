@@ -3,6 +3,7 @@
 //  Carouline
 //
 
+import CoreGraphics
 import Foundation
 
 /// One image of a carousel, split into cells by its layout, or, as a panorama, one photo cut
@@ -110,6 +111,44 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
         }
         self.span = Self.clampedPanoramaSpan(span)
         layers = layers.map { $0.clamped(span: self.span) }
+    }
+
+    /// How far the slide's layers move as it takes its shape from `old`, on slides of `slideSize`,
+    /// in slide widths across and heights down: as far as the point under `old`'s middle moves with
+    /// what `SlideGeometry.anchor(of:slideSize:)` finds it showing, so they move together with it.
+    /// Nil unless the span changed, since only a panorama gaining or losing slides moves what a
+    /// slide shows sideways.
+    func shift(from old: Slide, slideSize: CGSize) -> CGVector? {
+        guard span != old.span else {
+            return nil
+        }
+        let before = SlideGeometry.anchor(of: old, slideSize: slideSize)
+        let after = SlideGeometry.anchor(of: self, slideSize: slideSize)
+        guard before.width > 0, before.height > 0, slideSize.width > 0, slideSize.height > 0 else {
+            return .zero
+        }
+        let middle = CGPoint(x: slideSize.width * CGFloat(max(1, old.span)) / 2, y: slideSize.height / 2)
+        let across = (middle.x - before.minX) / before.width
+        let down = (middle.y - before.minY) / before.height
+        return CGVector(
+            dx: (after.minX + across * after.width - middle.x) / slideSize.width,
+            dy: (after.minY + down * after.height - middle.y) / slideSize.height
+        )
+    }
+
+    /// Takes the layers of `old`, this slide in its shape before, on slides of `slideSize`: shifted
+    /// together as `shift(from:slideSize:)` finds, each kept on the slide as far as it was on `old`,
+    /// or where they were when nothing shifts.
+    mutating func keepLayers(from old: Slide, slideSize: CGSize) {
+        guard let shift = shift(from: old, slideSize: slideSize) else {
+            layers = old.layers.map { $0.clamped(span: span) }
+            return
+        }
+        layers = old.layers.map { layer in
+            var moved = layer
+            moved.placement = LayerGeometry.placement(of: layer, shiftedBy: shift, slideSize: slideSize, fromSpan: old.span, toSpan: span)
+            return moved.clamped(span: span)
+        }
     }
 
     /// The span that shows all of a photo of `imageSize` across slides of `aspectRatio` at its

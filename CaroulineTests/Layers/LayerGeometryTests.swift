@@ -9,6 +9,9 @@ import Testing
 @testable import Carouline
 
 struct LayerGeometryTests {
+    /// A portrait slide's export size.
+    private let portrait = CGSize(width: 1080, height: 1350)
+
     private func picture(width: Int, height: Int, border: Double = 0) -> Layer {
         Layer(content: .image(ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: width, pixelHeight: height), borderWidth: border)))
     }
@@ -44,6 +47,53 @@ struct LayerGeometryTests {
         #expect(abs(strip.lowerBound - 0.8) < 1e-9)
         #expect(LayerGeometry.scales(of: picture(width: 1000, height: 100, border: 0.08)) == strip)
         #expect(LayerGeometry.scales(of: picture(width: 6000, height: 100)) == 4...4)
+    }
+
+    /// A layer a reshape shifts past the slide's edge comes in until it shows whole.
+    @Test func bringsAShiftedLayerBackInside() {
+        var layer = picture(width: 400, height: 200)
+        layer.placement = LayerPlacement(centerX: 0.3, centerY: 0.5)
+
+        let placement = LayerGeometry.placement(of: layer, shiftedBy: CGVector(dx: -0.2, dy: 0), slideSize: portrait, fromSpan: 1, toSpan: 1)
+
+        #expect(abs(placement.centerX - 0.25) < 1e-9)
+        #expect(placement.centerY == 0.5)
+    }
+
+    /// A turned layer comes in as far as its turned box needs.
+    @Test func bringsATurnedLayerInByItsTurnedBox() {
+        var layer = picture(width: 400, height: 200)
+        layer.placement = LayerPlacement(centerX: 0.3, centerY: 0.3, rotation: .pi / 2)
+
+        let placement = LayerGeometry.placement(of: layer, shiftedBy: CGVector(dx: -0.25, dy: -0.2), slideSize: portrait, fromSpan: 1, toSpan: 1)
+
+        #expect(abs(placement.centerX - 0.125) < 1e-9)
+        #expect(abs(placement.centerY - 0.2) < 1e-9)
+    }
+
+    /// A layer left hanging past an edge, as a drag can leave one, hangs no further for a shift
+    /// toward it, rather than being pulled in, and a shift away moves it exactly as far.
+    @Test func keepsALayerHangingPastAnEdgeNoFurther() {
+        var layer = picture(width: 400, height: 200)
+        layer.placement = LayerPlacement(centerY: 0.05)
+
+        let upward = LayerGeometry.placement(of: layer, shiftedBy: CGVector(dx: 0, dy: -0.02), slideSize: portrait, fromSpan: 1, toSpan: 1)
+        let along = LayerGeometry.placement(of: layer, shiftedBy: CGVector(dx: 0.1, dy: 0), slideSize: portrait, fromSpan: 1, toSpan: 1)
+
+        #expect(upward == layer.placement)
+        #expect(along.centerX == layer.placement.centerX + 0.1)
+        #expect(along.centerY == layer.placement.centerY)
+    }
+
+    /// A layer too wide for the narrower canvas it's shifted onto keeps its center on it.
+    @Test func keepsATooWideLayersCenterOnTheCanvas() {
+        var layer = picture(width: 400, height: 200)
+        layer.placement = LayerPlacement(centerX: 1.5, centerY: 0.5, scale: 4)
+
+        let placement = LayerGeometry.placement(of: layer, shiftedBy: CGVector(dx: -1, dy: 0), slideSize: portrait, fromSpan: 3, toSpan: 1)
+
+        #expect(placement.centerX == 0.5)
+        #expect(placement.centerY == 0.5)
     }
 
     /// A panorama measures layers from one of its slides, so a layer is as big on a panorama as on

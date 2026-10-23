@@ -111,4 +111,99 @@ struct SlideTests {
         let slide = try JSONDecoder().decode(Slide.self, from: Data(json.utf8))
         #expect(slide.style == .standard)
     }
+
+    // MARK: Reshaping
+
+    /// A portrait slide's export size, which every reshape here measures on.
+    private let slideSize = AspectRatio.portrait.exportSize
+
+    /// Four times as wide as it's high, which a panorama of portrait slides fits five wide.
+    private func widePhoto(crop: ImageCrop = ImageCrop()) -> Cell {
+        Cell(image: PlacedImage(assetIdentifier: nil, pixelWidth: 6000, pixelHeight: 1500, crop: crop))
+    }
+
+    /// A picture 216 by 108 on a slide 1080 wide, so it shows whole with its center from 0.1 to 0.9
+    /// of a slide across and from 0.04 to 0.96 down.
+    private func picture(at centerX: Double, _ centerY: Double = 0.5) -> Layer {
+        Layer(
+            content: .image(ImageLayer(image: PlacedImage(assetIdentifier: nil, pixelWidth: 400, pixelHeight: 200))),
+            placement: LayerPlacement(centerX: centerX, centerY: centerY, scale: 0.4)
+        )
+    }
+
+    /// `old` given `layout`, `span` and `cells`, its layers kept as a layout change keeps them.
+    private func reshaped(_ old: Slide, to layout: SlideLayout, span: Int? = nil, cells: [Cell]) -> Slide {
+        var slide = Slide(id: old.id, layout: layout, span: span, cells: cells)
+        slide.keepLayers(from: old, slideSize: slideSize)
+        return slide
+    }
+
+    /// Whether `slide`'s layers have their centers at `centers`, within rounding.
+    private func sits(_ slide: Slide, at centers: [(x: Double, y: Double)]) -> Bool {
+        slide.layers.count == centers.count && zip(slide.layers, centers).allSatisfy { layer, center in
+            abs(layer.placement.centerX - center.x) < 1e-9 && abs(layer.placement.centerY - center.y) < 1e-9
+        }
+    }
+
+    /// A slide's photo spreads across the panorama it turns into, and its layers shift together with
+    /// it, over the same part of it, and back as they were when it turns back.
+    @Test func shiftsLayersWithAPhotoIntoAPanoramaAndBack() throws {
+        let single = Slide(layout: .single, cells: [widePhoto()], layers: [picture(at: 0.5), picture(at: 0.25, 0.3)])
+        let panorama = reshaped(single, to: .panorama, span: 5, cells: single.cells)
+
+        let shift = try #require(panorama.shift(from: single, slideSize: slideSize))
+        #expect(abs(shift.dx - 2) < 1e-9)
+        #expect(abs(shift.dy) < 1e-9)
+        #expect(sits(panorama, at: [(2.5, 0.5), (2.25, 0.3)]))
+        #expect(sits(reshaped(panorama, to: .single, cells: panorama.cells), at: [(0.5, 0.5), (0.25, 0.3)]))
+    }
+
+    /// A zoomed photo shows whole in a panorama, and its layers shift as far as the part of it at
+    /// the slide's middle, together, rather than each drawing in with the smaller photo.
+    @Test func shiftsLayersTogetherWithAZoomedPhoto() {
+        let single = Slide(layout: .single, cells: [widePhoto(crop: ImageCrop(scale: 2, centerX: 0.3))], layers: [picture(at: 0.5, 0.25)])
+
+        #expect(sits(reshaped(single, to: .panorama, span: 5, cells: [widePhoto()]), at: [(1.5, 0.25)]))
+    }
+
+    /// Layers on a panorama's far slides, past the part of its photo a single slide shows, come in
+    /// from the slide's edges until they show whole.
+    @Test func bringsLayersShiftedPastTheEdgesBackInside() {
+        let panorama = Slide(layout: .panorama, span: 5, cells: [widePhoto()], layers: [picture(at: 0.5), picture(at: 4.5)])
+
+        #expect(sits(reshaped(panorama, to: .single, cells: panorama.cells), at: [(0.1, 0.5), (0.9, 0.5)]))
+    }
+
+    /// Layers over a slide of several cells are placed on the whole slide rather than its first
+    /// photo, so they keep their arrangement, centered on the panorama the photo spreads across.
+    @Test func centersTheLayersOfSeveralCellsOnAPanorama() {
+        let grid = Slide(layout: .grid, cells: [widePhoto(), Cell(), Cell(), Cell()], layers: [picture(at: 0.5, 0.45), picture(at: 0.76, 0.78)])
+
+        #expect(sits(reshaped(grid, to: .panorama, span: 5, cells: [widePhoto()]), at: [(2.5, 0.45), (2.76, 0.78)]))
+    }
+
+    /// With no photo, a slide's layers keep their places on a slide-shaped middle of the panorama,
+    /// as a centered photo's would, and come back off it.
+    @Test func centersAnEmptySlidesLayersOnAPanorama() {
+        let single = Slide(layout: .single, layers: [picture(at: 0.5)])
+        let wide = Slide(layout: .panorama, span: 4, layers: [picture(at: 2)])
+
+        #expect(sits(reshaped(single, to: .panorama, cells: [Cell()]), at: [(1, 0.5)]))
+        #expect(sits(reshaped(single, to: .panorama, span: 3, cells: [Cell()]), at: [(1.5, 0.5)]))
+        #expect(sits(reshaped(wide, to: .single, cells: [Cell()]), at: [(0.5, 0.5)]))
+    }
+
+    /// Only a span changing moves what a slide shows sideways, so a layout keeping it, or a
+    /// panorama's photo replaced, leaves layers where they are.
+    @Test func shiftsNothingWhereTheSpanStays() {
+        let single = Slide(layout: .single, cells: [widePhoto()], layers: [picture(at: 0.3)])
+        let grid = reshaped(single, to: .grid, cells: [widePhoto(), Cell(), Cell(), Cell()])
+        let panorama = Slide(layout: .panorama, span: 5, cells: [widePhoto()])
+        var replaced = panorama
+        replaced.cells[0].image = PlacedImage(assetIdentifier: nil, pixelWidth: 3000, pixelHeight: 1000)
+
+        #expect(grid.shift(from: single, slideSize: slideSize) == nil)
+        #expect(grid.layers == single.layers)
+        #expect(replaced.shift(from: panorama, slideSize: slideSize) == nil)
+    }
 }
