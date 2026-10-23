@@ -19,9 +19,16 @@ struct LayerDraftEditing: ViewModifier {
     /// Ends anything else of the editor's own as its page goes, before the draft is saved.
     var onLeave: () -> Void = {}
     @State private var isConfirmingDelete = false
+    /// The page's width, which the delete's confirmation widens to at accessibility sizes.
+    @State private var pageWidth: CGFloat = 0
 
     func body(content: Content) -> some View {
         content
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                pageWidth = width
+            }
             .toolbar {
                 // Not while typing, where Done takes its place, so a tap meant to end the typing
                 // can't land on it.
@@ -68,20 +75,24 @@ struct LayerDraftEditing: ViewModifier {
         library.layer(at: address) == nil && !(session.isDraftNew && session.draftLayerID == address.layerID)
     }
 
+    private var isPicture: Bool {
+        if case .image = page {
+            return true
+        }
+        return false
+    }
+
     private var deleteButton: some View {
         Button("Delete Layer", systemImage: "trash", role: .destructive) {
             isConfirmingDelete = true
         }
         // Red for a destructive item, rather than the sheet's accent, which washes out on the glass.
         .tint(.red)
-        // From the button, so on iPad it points there.
-        .confirmationDialog("Delete Layer?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-            Button("Delete Layer", role: .destructive) {
+        // From the button, so it grows out of it, and on iPad points there.
+        .popover(isPresented: $isConfirmingDelete) {
+            DeleteLayerConfirmation(isPicture: isPicture, pageWidth: pageWidth) {
+                isConfirmingDelete = false
                 delete(address)
-            }
-        } message: {
-            if case .image = page {
-                Text("Its picture is removed from the project. The original stays in your photo library.")
             }
         }
     }
