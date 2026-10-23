@@ -310,13 +310,14 @@ private struct ApplyStyleSection: View {
                     }
                     .accessibilityHint("Gives every slide this slide's spacing, border and background")
                     // From the button, so on iPad it points there.
-                    .confirmationDialog("Apply Style to All Slides?", isPresented: $isConfirming, titleVisibility: .visible) {
+                    .confirmationPopover(
+                        "Apply Style to All Slides?",
+                        isPresented: $isConfirming,
+                        message: "Every slide takes this slide's spacing, border and background."
+                    ) {
                         Button("Apply to All Slides", action: apply)
-                    } message: {
-                        Text("Every slide takes this slide's spacing, border and background.")
                     }
-                    // Primary, the row's and the dialog's action alike, since the accent washes out
-                    // on the glass.
+                    // Primary, since the accent washes out on the glass.
                     .tint(Color.primary)
                 }
             }

@@ -13,6 +13,10 @@ struct ContentView: View {
     /// A project created in the shape sheet, opened once the sheet is gone, since a push while it
     /// slides away can be dropped.
     @State private var createdProjectID: UUID?
+    /// The window's size past its safe area, which confirmation popovers size themselves by.
+    @State private var screenSize: CGSize = .zero
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #if DEBUG
     @Environment(DebugSettings.self) private var debug: DebugSettings?
     /// Opens the shape sheet on its custom page, for `-DebugSheet customRatio`, until it closes.
@@ -31,6 +35,12 @@ struct ContentView: View {
                 ProjectScreen(library: library, projectID: projectID)
             }
         }
+        .background {
+            // Past the safe area, so neither the keyboard nor a phone held sideways shrinks it.
+            Color.clear
+                .ignoresSafeArea()
+                .onGeometryChange(for: CGSize.self, of: \.size) { screenSize = $0 }
+        }
         .sheet(isPresented: $isChoosingShape, onDismiss: shapeSheetClosed) {
             AspectRatioSheet(presets: presets, startsOnCustom: startingDraft) { ratio in
                 createdProjectID = library.createProject(aspectRatio: ratio).id
@@ -47,6 +57,10 @@ struct ContentView: View {
             await applyDebugSettings()
             #endif
         }
+        // Last, so the sheets and alerts above take them too. The window's, since a popover's own
+        // width class is compact, and the strip caps its text size.
+        .environment(\.screenMetrics, ScreenMetrics(size: screenSize, isRegularWidth: horizontalSizeClass == .regular))
+        .environment(\.screenDynamicTypeSize, dynamicTypeSize)
     }
 
     private var showsFailure: Binding<Bool> {

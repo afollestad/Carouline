@@ -99,11 +99,6 @@ extension CaptionRow where Trailing == EmptyView {
     }
 }
 
-extension EnvironmentValues {
-    /// The screen's text size outside the strip, which caps its own, for what the strip presents.
-    @Entry var screenDynamicTypeSize: DynamicTypeSize = .large
-}
-
 #Preview {
     CaptionPopover(
         groups: [
