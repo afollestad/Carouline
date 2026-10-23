@@ -64,8 +64,10 @@ struct PhotoTray: View {
 
     private var addButton: some View {
         Button(action: actions.addPhotos) {
-            Image(systemName: "plus")
+            Image(systemName: "photo.badge.plus")
                 .font(.title3.weight(.semibold))
+                // Past this, the wide glyph crowds its circle, which keeps the tray's height.
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .foregroundStyle(Color.primary)
                 .frame(width: Self.height, height: Self.height)
                 .contentShape(.circle)
