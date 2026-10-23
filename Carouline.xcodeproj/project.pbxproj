@@ -29,6 +29,8 @@
 		5E7A5E700000000000000019 /* Exceptions for "Carouline" folder in "Carouline" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Backdrops/AGENTS.md,
+				Backdrops/CLAUDE.md,
 				Debug/AGENTS.md,
 				Debug/CLAUDE.md,
 				Layers/AGENTS.md,

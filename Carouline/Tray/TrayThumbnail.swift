@@ -20,6 +20,9 @@ struct TrayThumbnail: View {
     @State private var isMissing = false
     /// Whether it's asking which of its places to take it off.
     @State private var isChoosingPlace = false
+    /// The places it asked about, kept as they were, so its choices don't drop out as the popover
+    /// fades with the photo already taken off them.
+    @State private var choosingPlaces: [TrayPhotoPlace] = []
     @Environment(\.imageLoader) private var loader
 
     /// Tall enough to make out what's in a photo, with room above and below in the bar's glass.
@@ -58,14 +61,14 @@ struct TrayThumbnail: View {
                 // A preview renders apart from the tray, where it would find the sample loader.
                 .environment(\.imageLoader, loader)
         }
-        .confirmationDialog("Remove from Which Slide?", isPresented: $isChoosingPlace, titleVisibility: .visible) {
-            ForEach(places, id: \.address) { place in
+        .confirmationPopover("Remove from Which Slide?", isPresented: $isChoosingPlace) {
+            ForEach(choosingPlaces, id: \.address) { place in
                 Button(place.name, role: .destructive) {
                     actions.removeFromSlides(photo.id, [place])
                 }
             }
             Button("Remove from All", role: .destructive) {
-                actions.removeFromSlides(photo.id, places)
+                actions.removeFromSlides(photo.id, choosingPlaces)
             }
         }
         .accessibilityLabel(label)
@@ -125,6 +128,7 @@ struct TrayThumbnail: View {
     /// Takes it off its one place, or asks which to take it off when there are several.
     private func removeFromSlides() {
         if places.count > 1 {
+            choosingPlaces = places
             isChoosingPlace = true
         } else {
             actions.removeFromSlides(photo.id, places)
