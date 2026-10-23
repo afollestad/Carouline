@@ -48,11 +48,13 @@ extension ProjectLibrary {
     /// the new layout has no cell for. A panorama spans as many slides as its photo fills, which
     /// shows all of it once its framing is reset, since a zoom set for one slide's shape crops
     /// a panorama to a strip. Its layers, blur and style carry over, the layers kept on the new
-    /// span.
+    /// span. A slide with a photo on its way into a cell keeps its layout, since packing would
+    /// move another photo into that cell, which the one landing would replace and delete.
     func changeLayout(of slideID: UUID, in projectID: UUID, to layout: SlideLayout) {
         guard let project = project(projectID),
               let slide = project.slides.first(where: { $0.id == slideID }),
-              slide.layout != layout else {
+              slide.layout != layout,
+              !importingCells.contains(where: { $0.projectID == projectID && $0.slideID == slideID }) else {
             return
         }
         let (packed, dropped) = Self.cells(of: slide, in: layout)

@@ -115,6 +115,22 @@ struct ProjectLibrarySlidesTests {
         #expect(!exists(paths.imageFile(named: dropped.fileName, in: projectID)))
     }
 
+    /// A photo on its way into a cell holds the slide's layout, which would pack another photo into
+    /// that cell for the one landing to replace and delete.
+    @Test func keepsTheLayoutWhileAPhotoIsOnItsWayIn() async throws {
+        let (library, projectID) = await makeLibrary()
+        let slideID = try #require(library.addSlide(.grid, to: projectID))
+        _ = try await placeImage(in: library, projectID: projectID, slideID: slideID, cell: 1)
+        _ = try await placeImage(in: library, projectID: projectID, slideID: slideID, cell: 2)
+        let slide = try #require(slides(library, projectID).first)
+        library.importingCells.insert(CellAddress(projectID: projectID, slideID: slideID, index: 0))
+
+        library.changeLayout(of: slideID, in: projectID, to: .panorama)
+
+        #expect(slides(library, projectID).first == slide)
+        await library.flush()
+    }
+
     @Test func aPanoramaTurnedSlideKeepsItsPhotoInTheFirstCell() async throws {
         let (library, projectID) = await makeLibrary()
         let slideID = try #require(library.addSlide(.panorama, to: projectID))

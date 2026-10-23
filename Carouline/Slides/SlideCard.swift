@@ -207,6 +207,8 @@ struct SlideCard: View {
                 .accessibilityValue(slide.layout.name)
                 .accessibilityHint("Chooses another layout for the slide")
                 .tourTarget(.layoutButton)
+                // Not while a photo is on its way in, which the library leaves the layout alone for.
+                .disabled(!importingIndexes.isEmpty)
                 Button {
                     popovers.whenGone { openPopover = .options }
                 } label: {
