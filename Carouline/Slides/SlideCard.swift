@@ -54,6 +54,11 @@ struct SlideCard: View {
     /// A fingertip's target, which the caption's row holds whatever its glass's height.
     static let captionHeight: CGFloat = 44
 
+    /// How far what follows the strip's middle along a panorama moves either way, as its caption does.
+    var stripReach: CGFloat {
+        StripMiddle.reach(span: slide.span, cardWidth: size.width)
+    }
+
     var body: some View {
         // Measured only while the slide holds the selection, so a scroll measures nothing.
         let holdsSelection = session.selection?.slideID == slide.id || layerSession.selection?.slideID == slide.id
@@ -71,10 +76,15 @@ struct SlideCard: View {
                 dropTarget: dropTarget
             )
             .frame(width: size.width, height: size.height)
-            // From the slide rather than the card, where the system's dialog pointed on a phone, since
-            // under the caption alone there isn't room for it.
-            .confirmationPopover("Delete \(numbersText)?", isPresented: $isConfirmingDelete, message: deletionMessage) {
-                Button(deleteTitle, role: .destructive, action: onDelete)
+            // From the slide, or a panorama's slide in view, rather than the card, where the system's
+            // dialog pointed on a phone, since under the caption alone there isn't room for it.
+            .background {
+                Color.clear
+                    .frame(width: size.width - 2 * stripReach)
+                    .confirmationPopover("Delete \(numbersText)?", isPresented: $isConfirmingDelete, message: deletionMessage) {
+                        Button(deleteTitle, role: .destructive, action: onDelete)
+                    }
+                    .followsStripMiddle(reach: stripReach)
             }
             .onGeometryChange(for: CGRect?.self) { proxy in
                 holdsSelection ? proxy.frame(in: .named(SelectionGesture.space)) : nil
@@ -155,7 +165,10 @@ struct SlideCard: View {
             // Over the caption, which comes after it, so a tip grown past a short slide still shows
             // and takes its taps.
             .zIndex(1)
+            // Only a panorama's as wide as the card, so a slide still widens for a caption wider than it.
             caption
+                .followsStripMiddle(reach: stripReach)
+                .frame(width: stripReach > 0 ? size.width : nil)
         }
         // Over the slide and its caption, where the tip finds the caption's buttons. Not while
         // one of their popovers is open over it.
@@ -415,7 +428,8 @@ private struct CardPhotos: View {
                 isPanorama: slide.layout == .panorama,
                 isAnythingSelected: isAnythingSelected,
                 blur: blur,
-                isDropTarget: dropTarget == index
+                isDropTarget: dropTarget == index,
+                stripReach: StripMiddle.reach(span: slide.span, cardWidth: size.width)
             )
         }
     }

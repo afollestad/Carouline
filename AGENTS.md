@@ -58,7 +58,7 @@ Guidance for AI agents working in this repo. `README.md` says what the app is.
 - Keep each view file to one screen or overlay.
 - Every view has a `#Preview`. Use `@Previewable @State` for bindings.
 - Doc comments explain why a constant has its value, not what the code does.
-- Pad a horizontal scroll view's content rather than using `contentMargins`, which stop view-aligned scrolling from snapping and center `scrollPosition`'s anchor between the margins. To rest targets in the middle, snap with a `ScrollTargetBehavior` of their offsets, as `SlideStrip` does, since `.viewAligned` rests leading edges on the screen's whatever its anchor.
+- Pad a horizontal scroll view's content rather than using `contentMargins`, which stop view-aligned scrolling from snapping and center `scrollPosition`'s anchor between the margins. To rest targets in the middle, snap with a `ScrollTargetBehavior` of their stops, as `StripSnapping` does, since `.viewAligned` rests leading edges on the screen's whatever its anchor.
 - Count and number the carousel with `Project.carouselSlideCount` and `slideNumbers`, never `slides.count` or indexes, since a panorama is one slide that posts as several.
 - Default isolation is `MainActor`: mark models that cross actors `nonisolated`, and heavy `async` work `@concurrent`, since approachable concurrency runs a `nonisolated async` function on its caller's actor.
 - Start a repeating animation with an explicit `withAnimation`, as `LoadingPulse` does, which `assertScreenSnapshot()`'s `transaction` holds still. An implicit or scoped `.animation` sets its own and keeps moving there, so the baseline flakes.

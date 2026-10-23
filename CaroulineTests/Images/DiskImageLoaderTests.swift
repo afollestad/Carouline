@@ -36,4 +36,22 @@ struct DiskImageLoaderTests {
 
         #expect(await loader.image(ImageRequest(projectID: UUID(), image: image, displayedPixels: 100)) == nil)
     }
+
+    /// A slide's cell is never wider than a preset's cell copy, so a zoomed photo in one decodes
+    /// no larger than the copy, as it always has.
+    @Test func capsACellsDecodeAtACellCopy() {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 9000, pixelHeight: 1500)
+
+        #expect(ImageRequest(projectID: UUID(), image: image, displayedPixels: 5000, cellPixels: 1236).maxPixelSize == 3072)
+    }
+
+    /// A panorama's cell is several slides wide, so its photo decodes as wide as it's shown, in
+    /// steps of about half again.
+    @Test func decodesAPanoramaAsWideAsItsCell() {
+        let image = PlacedImage(assetIdentifier: nil, pixelWidth: 9000, pixelHeight: 1500)
+
+        #expect(ImageRequest(projectID: UUID(), image: image, displayedPixels: 4950, cellPixels: 4950).maxPixelSize == 6144)
+        #expect(ImageRequest(projectID: UUID(), image: image, displayedPixels: 9900, cellPixels: 4950).maxPixelSize == 6144)
+        #expect(ImageRequest(projectID: UUID(), image: image, displayedPixels: 20_000, cellPixels: 20_000).maxPixelSize == 12_288)
+    }
 }

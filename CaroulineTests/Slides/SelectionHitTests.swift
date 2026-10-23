@@ -47,8 +47,8 @@ struct SelectionHitTests {
         #expect(SelectionHit.cellPoint(CGPoint(x: 850, y: 200), cell: 0, of: slide, style: flush, on: panorama) == CGPoint(x: 850, y: 200))
     }
 
-    /// A cell thinner than a fingertip, as a wide panorama's is, takes a drag across one, which
-    /// grows with the canvas's points on screen while the slides are scaled down.
+    /// A cell thinner than a fingertip takes a drag across one, which grows with the canvas's
+    /// points on screen while the slides are scaled down.
     @Test func reachesAFingertipPastAThinCell() {
         let slide = Slide(layout: .panorama, span: 5)
         let thin = LayerCanvas(size: CGSize(width: 1000, height: 30), span: 5)

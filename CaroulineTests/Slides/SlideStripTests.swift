@@ -31,3 +31,30 @@ struct SlideStripTests {
         #expect(!SlideStrip.layersPopoverFits(span: 3, aspectRatio: .portrait, in: CGSize(width: 1376, height: 914)))
     }
 }
+
+/// Which slide is in the middle of the strip, which a selection there leaves the strip alone for,
+/// so a panorama keeps the part in view rather than moving to its own middle.
+@MainActor
+struct StripFrontTests {
+    private let project = Project(
+        name: "Ridgeline",
+        aspectRatio: .portrait,
+        slides: [Slide(layout: .panorama), Slide(layout: .single)]
+    )
+
+    /// Before the strip has moved, it rests on the first slide.
+    @Test func restsOnTheFirstSlideBeforeMoving() {
+        #expect(project.isFront(project.slides[0].id, at: nil))
+        #expect(!project.isFront(project.slides[1].id, at: nil))
+    }
+
+    @Test func findsTheSlideItRestsOn() {
+        #expect(project.isFront(project.slides[1].id, at: .slide(project.slides[1].id)))
+        #expect(!project.isFront(project.slides[0].id, at: .slide(project.slides[1].id)))
+    }
+
+    /// Resting on the add button, no slide is in front.
+    @Test func findsNoSlideOnTheAddButton() {
+        #expect(!project.isFront(project.slides[1].id, at: .add))
+    }
+}

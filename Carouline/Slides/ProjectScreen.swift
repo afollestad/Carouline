@@ -371,9 +371,7 @@ struct ProjectScreen: View {
         layerSession.selection = nil
         session.selection = address
         if let address {
-            withAnimation {
-                stripPosition = .slide(address.slideID)
-            }
+            bringForward(address.slideID)
         }
     }
 
@@ -389,9 +387,18 @@ struct ProjectScreen: View {
         session.selection = nil
         layerSession.selection = address
         if let address {
-            withAnimation {
-                stripPosition = .slide(address.slideID)
-            }
+            bringForward(address.slideID)
+        }
+    }
+
+    /// Brings slide `slideID` to the middle of the strip, unless it's there already, where a panorama
+    /// would move from the part in view to its own middle.
+    private func bringForward(_ slideID: UUID) {
+        guard library.project(projectID)?.isFront(slideID, at: stripPosition) != true else {
+            return
+        }
+        withAnimation {
+            stripPosition = .slide(slideID)
         }
     }
 

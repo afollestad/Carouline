@@ -26,9 +26,9 @@ nonisolated struct Slide: Codable, Hashable, Identifiable, Sendable {
     /// Two is the least that reads as one photo swiped across, and ten, half of Instagram's
     /// twenty, keeps a panorama's export within 10,800 pixels and leaves room for other slides.
     static let panoramaSpans = 2...10
-    /// Before a photo there's nothing to fit to, and three reads as a panorama without making
-    /// the card a sliver.
-    static let defaultPanoramaSpan = 3
+    /// Before a photo there's nothing to fit to, and two, the fewest, reads as a panorama while
+    /// running least past the screen's sides.
+    static let defaultPanoramaSpan = 2
     /// A twentieth of a slide's width blurs its photos past recognition, into a backdrop for
     /// the layers over them.
     static let maximumBlur = 0.05

@@ -51,7 +51,8 @@ struct CellPhoto<Placeholder: View>: View {
             let request = ImageRequest(
                 projectID: projectID,
                 image: image,
-                displayedPixels: max(frame.width, frame.height) * displayScale
+                displayedPixels: max(frame.width, frame.height) * displayScale,
+                cellPixels: max(proxy.size.width, proxy.size.height) * displayScale
             )
             // None until the cell is measured, as the strip's aren't on its first pass, since the
             // decode for no size would only be thrown away for the real one.

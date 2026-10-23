@@ -16,21 +16,27 @@ nonisolated struct ImageRequest: Hashable, Sendable {
     let pixelHeight: Int
     let maxPixelSize: Int
 
-    init(projectID: UUID, image: PlacedImage, displayedPixels: CGFloat) {
+    /// `cellPixels` is the longer side of the cell showing the photo, which lifts the cap past a
+    /// preset's cell copy for a panorama's, as wide as several slides.
+    init(projectID: UUID, image: PlacedImage, displayedPixels: CGFloat, cellPixels: CGFloat = 0) {
         self.projectID = projectID
         imageID = image.id
         fileFormat = image.fileFormat
         pixelWidth = image.pixelWidth
         pixelHeight = image.pixelHeight
-        maxPixelSize = Self.bucket(for: displayedPixels)
+        maxPixelSize = Self.bucket(for: displayedPixels, upTo: max(CGFloat(ImageImporter.maximumPixelSize), cellPixels))
     }
 
-    /// Rounds a size up to one of a few, so a cell resized or zoomed a little reuses its decode
-    /// rather than making another. Capped at a preset's cell copy size even for a panorama's or a
-    /// wider export's larger copy, since no card on screen shows more, and a whole copy decodes to
-    /// up to 96 MB.
-    static func bucket(for pixels: CGFloat) -> Int {
-        [256, 512, 1024, 2048].first { CGFloat($0) >= pixels } ?? ImageImporter.maximumPixelSize
+    /// The sizes a decode rounds up to: up to a preset's cell copy, then steps of about half again
+    /// for a panorama's, as wide as up to ten slides, to 12,288 pixels, inside a texture's 16,384.
+    static let buckets = [256, 512, 1024, 2048, ImageImporter.maximumPixelSize, 4096, 6144, 8192, 12_288]
+
+    /// Rounds a size, no larger than `cap`, up to one of `buckets`, so a cell resized or zoomed a
+    /// little reuses its decode rather than making another. Capped at a preset's cell copy size,
+    /// or a panorama's cell, even for a wider export's larger copy, since a zoomed photo shows no
+    /// more than its cell, and a whole copy decodes to up to 96 MB.
+    static func bucket(for pixels: CGFloat, upTo cap: CGFloat = CGFloat(ImageImporter.maximumPixelSize)) -> Int {
+        buckets.first { CGFloat($0) >= min(pixels, cap) } ?? 12_288
     }
 }
 
@@ -47,8 +53,9 @@ extension ImageLoading {
     /// for a view that must show the photo on its first frame and can't wait for a decode at its
     /// own size, as a drag's preview can't.
     func anyCachedImage(of image: PlacedImage, in projectID: UUID) -> CGImage? {
-        let sizes = [ImageImporter.maximumPixelSize, 2048, 1024, 512, 256]
-        return sizes.lazy.compactMap { cachedImage(ImageRequest(projectID: projectID, image: image, displayedPixels: CGFloat($0))) }.first
+        ImageRequest.buckets.reversed().lazy.compactMap { size in
+            cachedImage(ImageRequest(projectID: projectID, image: image, displayedPixels: CGFloat(size), cellPixels: CGFloat(size)))
+        }.first
     }
 }
 

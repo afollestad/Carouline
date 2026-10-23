@@ -66,7 +66,7 @@ nonisolated enum LayerGeometry {
     }
 
     /// Whether `point`, in `canvas`'s coordinates, falls in `layer`'s hit box turned with it. Not
-    /// cut to the slide, so a fingertip's reach past a thin panorama's edge still finds it.
+    /// cut to the slide, so a fingertip's reach past the slide's edge still finds it.
     static func contains(_ point: CGPoint, layer: Layer, on canvas: LayerCanvas) -> Bool {
         let box = hitBox(of: layer, on: canvas)
         return box.contains(point.applying(turn(about: box, by: layer.placement.rotation).inverted()))

@@ -54,8 +54,8 @@ final class SelectionGestureTracker {
 /// Where a point on a slide falls in one of its cells.
 nonisolated enum SelectionHit {
     /// `point`, in `canvas`'s coordinates, as a point in cell `cell`'s own, when it's within the
-    /// cell grown to a fingertip's target on screen, so a thin panorama's cell can still be
-    /// grabbed; or nil when it's off the cell.
+    /// cell grown to a fingertip's target on screen, so a cell thinner than a fingertip can still
+    /// be grabbed; or nil when it's off the cell.
     static func cellPoint(_ point: CGPoint, cell: Int, of slide: Slide, style: SlideStyle, on canvas: LayerCanvas) -> CGPoint? {
         let frames = SlideGeometry.cellFrames(for: slide.layout, in: canvas.size, style: style, span: slide.span)
         guard frames.indices.contains(cell) else {

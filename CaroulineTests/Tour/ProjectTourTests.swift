@@ -90,7 +90,8 @@ struct ProjectTourTests {
         #expect(!targets.hasPhotoToFrame)
     }
 
-    /// A panorama's card fits a slide's width, too short to hold a tip beside its photo or layers.
+    /// A panorama runs past the screen's sides, where a tip over its photo or layers can fall off
+    /// screen.
     @Test func pointsAtPhotosAndLayersOnlyOnSlidesOfTheirOwn() throws {
         let lisbon = try #require(SampleProjects.all.first { $0.name == "Lisbon" })
         let split = lisbon.slides[1]

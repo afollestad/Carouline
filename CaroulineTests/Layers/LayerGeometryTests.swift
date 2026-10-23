@@ -85,8 +85,8 @@ struct LayerGeometryTests {
         #expect(!LayerGeometry.contains(CGPoint(x: 250, y: 200), layer: layer, on: scaled))
     }
 
-    /// A layer past the slide's edge still takes a drag there, which a thin panorama needs, where
-    /// a fingertip's reach is taller than the slide.
+    /// A layer past the slide's edge still takes a drag there, where a fingertip reaching for it
+    /// can land.
     @Test func containsAPointPastTheSlidesEdge() {
         var layer = picture(width: 400, height: 200)
         layer.placement.centerX = 0.95

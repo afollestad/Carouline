@@ -87,7 +87,7 @@ extension ScreenSnapshotting {
         )
     }
 
-    /// An empty panorama across three landscape slides, the thinnest card a default one makes.
+    /// An empty panorama across two landscape slides, running past the screen's sides.
     var landscapePanorama: Project {
         Project(
             id: fixtureID(7),

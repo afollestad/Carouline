@@ -345,8 +345,8 @@ nonisolated struct TourTargets: Equatable {
     var hasSlides = false
     var hasTrayPhotos = false
     /// Whether the slide in front has a photo for the photo tip to point at, on a slide of its own
-    /// rather than a panorama, whose card fits a slide's width, too short to hold a tip beside
-    /// what it points at.
+    /// rather than a panorama, which runs past the screen's sides, where a tip over it can fall
+    /// off screen.
     var canPointAtPhoto = false
     /// Whether any slide has a photo the photo tip could point at, once it's in front.
     var hasPhotoToFrame = false

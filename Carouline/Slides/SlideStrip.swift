@@ -6,7 +6,7 @@
 import SwiftUI
 
 /// Something the strip can scroll to: a slide, or the button after the last one.
-enum StripItem: Hashable {
+nonisolated enum StripItem: Hashable {
     case slide(UUID)
     case add
 }
@@ -19,6 +19,12 @@ extension Project {
         case .add: slides.last
         case nil: slides.first
         }
+    }
+
+    /// Whether slide `slideID` is in the middle of the strip at `position`, which with none set
+    /// yet rests on the first slide.
+    func isFront(_ slideID: UUID, at position: StripItem?) -> Bool {
+        (position ?? slides.first.map { .slide($0.id) }) == .slide(slideID)
     }
 }
 
@@ -34,7 +40,8 @@ struct SlideStrip: View {
     let layerSession: LayerSession
     let layerActions: LayerActions
     /// The slide whose layers sheet is open, which the strip holds still for, so the slide being
-    /// edited stays put.
+    /// edited stays put, except along a panorama under a sheet, whose slides past the screen's
+    /// sides hold layers too.
     let layersSlideID: UUID?
     /// Whether a slide's layers show in a sheet over the strip, as on a phone or wherever their
     /// popover doesn't fit, rather than in a popover beside the slide.
@@ -62,6 +69,8 @@ struct SlideStrip: View {
     @State private var screenFrame: CGRect = .zero
     /// The slide a drop hovers over, which comes to the front once the drop rests there.
     @State private var dropHoverSlideID: UUID?
+    /// Where the strip is scrolled to, which `StripScrolling` keeps in step with `position`.
+    @State private var scroll = ScrollPosition()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -174,9 +183,8 @@ struct SlideStrip: View {
         guard sitsUnderSheet else {
             return .identity
         }
-        let span = project.slides.map(\.span).min() ?? 1
         return RoomFit(
-            slideHeight: cardSize(span: span).height + Self.captionSpace,
+            slideHeight: cardSize(span: 1).height + Self.captionSpace,
             stripHeight: size.height,
             bottomReserve: SelectionBar.reservedHeight,
             room: verticalSizeClass == .compact ? 0 : layerSession.sheetRoom
@@ -191,28 +199,24 @@ struct SlideStrip: View {
                     card(for: slide, at: index, numbers: numbers[index], screenPoint: screenPoint)
                 }
                 AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
-                    .id(StripItem.add)
             }
-            // Where `scrollPosition` finds the slides and the add button by ID.
-            .scrollTargetLayout()
             // Room for the first slide and the add button each to reach the middle. Padding
             // rather than `contentMargins`, which stop view-aligned scrolling from snapping and
             // shift a centered `scrollPosition` off the middle of the screen.
-            .padding(.leading, max(0, (size.width - firstCardWidth) / 2))
+            .padding(.leading, max(0, (size.width - slideWidth) / 2))
             .padding(.trailing, max(0, (size.width - Self.addButtonSize) / 2))
             .padding(.bottom, SelectionBar.reservedHeight)
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
         }
-        .scrollTargetBehavior(snapping)
+        .modifier(StripScrolling(position: $position, scroll: $scroll, stops: stops, snapping: snapping))
         // Held while a gesture moves the selection, so a drag on it moves it rather than the strip,
         // while one off it scrolls the strip as usual.
-        .scrollDisabled(holdsStill || layersSlideID != nil)
+        .scrollDisabled(holdsStill || (layersSlideID != nil && !scrollsAlongLayersSlide))
         .onScrollPhaseChange { _, phase in
             isScrolling = phase == .interacting || phase == .decelerating
         }
         .sensoryFeedback(.alignment, trigger: layerSession.snapsTaken)
-        .scrollPosition(id: $position, anchor: .center)
         .scrollIndicators(.hidden)
         // Unclipped, so the slides either side of the middle one still peek in from the screen's
         // edges while the strip is scaled down for a layers sheet, rather than ending in a straight
@@ -257,7 +261,6 @@ struct SlideStrip: View {
                 }
             }
         )
-        .id(StripItem.slide(slide.id))
         // Over its neighbors, which come later or earlier in the stack, so a tour tip grown past a
         // narrow slide still shows and takes its taps.
         .zIndex(project.frontSlide(at: position)?.id == slide.id ? 1 : 0)
@@ -286,39 +289,53 @@ struct SlideStrip: View {
         }
     }
 
-    /// Rests the strip with a slide, or the add button, in the middle of the screen. View-aligned
-    /// scrolling would rest a slide's leading edge on the screen's instead, whatever its anchor.
-    /// Each offset centers its item past the leading padding, which centers the first, so a
-    /// panorama wider than a slide centers too.
-    private var snapping: StripSnapping {
-        let first = firstCardWidth
-        var leadingEdge: CGFloat = 0
-        var offsets: [CGFloat] = []
-        for slide in project.slides {
-            let width = cardSize(span: slide.span).width
-            offsets.append(leadingEdge + (width - first) / 2)
-            leadingEdge += width + Self.spacing
-        }
-        return StripSnapping(offsets: offsets + [leadingEdge + (Self.addButtonSize - first) / 2])
+    /// Whether the strip scrolls along the slide whose layers are open: a panorama under a sheet,
+    /// rather than beside a popover, which moving the slide would close.
+    private var scrollsAlongLayersSlide: Bool {
+        sitsUnderSheet && (project.slides.first { $0.id == layersSlideID }?.span ?? 1) > 1
     }
 
-    private var firstCardWidth: CGFloat {
-        cardSize(span: project.slides.first?.span ?? 1).width
+    /// Rests the strip with a slide, or the add button, in the middle of the screen, or anywhere
+    /// along a panorama. View-aligned scrolling would rest a slide's leading edge on the screen's
+    /// instead, whatever its anchor. While a slide's layers are open, it rests on that slide alone.
+    private var snapping: StripSnapping {
+        if layersSlideID != nil, let index = project.slides.firstIndex(where: { $0.id == layersSlideID }) {
+            return StripSnapping(stops: [stops.stops[index]])
+        }
+        return StripSnapping(stops: stops.stops)
+    }
+
+    /// The slides, then the add button, with where the strip rests for each.
+    private var stops: StripStops {
+        StripStops(
+            items: project.slides.map { .slide($0.id) } + [.add],
+            stops: StripSnapping.stops(
+                spans: project.slides.map(\.span),
+                slideWidth: slideWidth,
+                spacing: Self.spacing,
+                addButtonSize: Self.addButtonSize
+            )
+        )
+    }
+
+    /// One slide's width, which a panorama is a whole number of.
+    private var slideWidth: CGFloat {
+        cardSize(span: 1).width
     }
 
     private func cardSize(span: Int) -> CGSize {
         Self.cardSize(span: span, aspectRatio: project.aspectRatio, isRegular: horizontalSizeClass == .regular, in: size)
     }
 
-    /// The project's shape, `span` slides wide, fitted to the screen, leaving the slides either
-    /// side peeking in at the edges so the strip reads as one to scroll. A panorama fits in the
-    /// same room as a slide, so all of it can be framed at once.
+    /// The project's shape fitted to the screen, leaving the slides either side peeking in at the
+    /// edges so the strip reads as one to scroll, and `span` of them wide. A panorama is as tall as
+    /// a slide, running past the screen's sides, which the strip scrolls along.
     private static func cardSize(span: Int, aspectRatio: AspectRatio, isRegular: Bool, in size: CGSize) -> CGSize {
-        let ratio = aspectRatio.widthOverHeight * CGFloat(span)
+        let ratio = aspectRatio.widthOverHeight
         let maxWidth = size.width * (isRegular ? 0.7 : 0.82)
         let maxHeight = max(0, size.height - captionSpace - SelectionBar.reservedHeight - 32)
         let width = max(0, min(maxWidth, maxHeight * ratio))
-        return CGSize(width: width, height: width / ratio)
+        return CGSize(width: width * CGFloat(max(1, span)), height: width / ratio)
     }
 }
 
@@ -333,24 +350,6 @@ private struct TrailingClip: Shape {
     func path(in rect: CGRect) -> Path {
         let open = rect.insetBy(dx: -Self.reach, dy: -Self.reach)
         return Path(isClipping ? open.divided(atDistance: rect.maxX - open.minX, from: .minXEdge).slice : open)
-    }
-}
-
-/// Snaps a scroll to the nearest of `offsets`.
-private struct StripSnapping: ScrollTargetBehavior {
-    let offsets: [CGFloat]
-
-    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
-        // A scroll to a `scrollPosition` targets the item's own rect, anchored to center it,
-        // which already rests it on one of the offsets. Snapping that rect as if it were the
-        // visible region would stop the scroll short.
-        guard target.anchor == nil else {
-            return
-        }
-        let proposed = target.rect.minX
-        if let nearest = offsets.min(by: { abs($0 - proposed) < abs($1 - proposed) }) {
-            target.rect.origin.x = nearest
-        }
     }
 }
 

@@ -27,6 +27,8 @@ struct CellView: View {
     var blur: CGFloat = 0
     /// Whether a drop over the slide would land here.
     var isDropTarget = false
+    /// How far a panorama's controls move either way to stay under the strip's middle.
+    var stripReach: CGFloat = 0
     @State private var size: CGSize = .zero
     @State private var isMissing = false
     @Environment(\.colorScheme) private var colorScheme
@@ -42,7 +44,7 @@ struct CellView: View {
                 Color.clear
                     .glassEffect(.regular, in: .rect)
                 if !isImporting, let held = actions.held {
-                    PlaceHereButton(position: position, held: held) {
+                    PlaceHereButton(position: position, held: held, stripReach: stripReach) {
                         actions.land(address)
                     }
                 } else if !isImporting {
@@ -50,17 +52,19 @@ struct CellView: View {
                         position: position,
                         emptyCellCount: emptyCellCount,
                         isPanorama: isPanorama,
-                        offersSources: actions.takePhoto != nil
+                        offersSources: actions.takePhoto != nil,
+                        labelWidth: stripReach > 0 && size.width > 0 ? max(0, size.width - 2 * stripReach) : nil,
+                        stripReach: stripReach
                     ) {
                         sourceButtons
                     } choose: {
                         actions.choosePhoto(address)
                     }
-                    .accessibilityDropPoint(.center, description: "Into \(position)", isEnabled: true)
                 }
             }
             if isImporting {
                 importingSpinner
+                    .followsStripMiddle(reach: stripReach)
             }
         }
         .overlay {
@@ -128,7 +132,8 @@ struct CellView: View {
             .environment(\.colorScheme, colorScheme)
     }
 
-    /// Shorter than this, as a wide panorama's cell is, the regular controls overflow the cell.
+    /// Shorter than this, as a cell of three rows on a wide slide with a border can be, the regular
+    /// controls overflow the cell.
     private static let compactHeight: CGFloat = 52
 
     private var isCompact: Bool {
@@ -150,6 +155,7 @@ struct CellView: View {
                 ZStack {
                     placeholder(isLoading: false)
                     MissingPhoto(menu: missingMenu(image))
+                        .followsStripMiddle(reach: stripReach)
                         .task {
                             actions.restorePhotoQuietly(address)
                         }
@@ -332,6 +338,10 @@ private struct AddPhotoButton<Sources: View>: View {
     let isPanorama: Bool
     /// Whether there's more than the library to choose from.
     let offersSources: Bool
+    /// A panorama's slide, which the button covers and moves with to stay in view, rather than the
+    /// whole cell, which a menu would open from the middle of, off screen.
+    let labelWidth: CGFloat?
+    let stripReach: CGFloat
     @ViewBuilder let sources: () -> Sources
     let choose: () -> Void
     @Environment(\.controlSize) private var controlSize
@@ -348,12 +358,14 @@ private struct AddPhotoButton<Sources: View>: View {
                 }
             }
         }
-        // Plain, since the cell's own glass is behind it, and the whole cell, an easy target
-        // even in a thin panorama.
+        // Plain, since the cell's own glass is behind it, and the whole cell, or a panorama's slide
+        // in view, an easy target.
         .buttonStyle(.plain)
         .hoverEffect(.highlight)
         .accessibilityLabel("Add \(position)")
         .accessibilityHint(hint)
+        .accessibilityDropPoint(.center, description: "Into \(position)", isEnabled: true)
+        .followsStripMiddle(reach: stripReach)
     }
 
     private var hint: String {
@@ -370,7 +382,7 @@ private struct AddPhotoButton<Sources: View>: View {
         Image(systemName: "plus")
             .font(controlSize == .small ? .body.weight(.semibold) : .title2.weight(.semibold))
             .foregroundStyle(Color.primary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: labelWidth ?? .infinity, maxHeight: .infinity)
             .contentShape(.rect)
     }
 }
@@ -379,6 +391,9 @@ private struct AddPhotoButton<Sources: View>: View {
 private struct PlaceHereButton: View {
     let position: String
     let held: HeldPhoto
+    /// How far its glyph moves to stay in view on a panorama, whose whole cell still takes the tap,
+    /// rather than dropping the held photo for a tap beside the glyph.
+    let stripReach: CGFloat
     let place: () -> Void
     @Environment(\.controlSize) private var controlSize
 
@@ -387,6 +402,7 @@ private struct PlaceHereButton: View {
             Image(systemName: "square.and.arrow.down")
                 .font(controlSize == .small ? .body.weight(.semibold) : .title2.weight(.semibold))
                 .foregroundStyle(Color.primary)
+                .followsStripMiddle(reach: stripReach)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(.rect)
         }

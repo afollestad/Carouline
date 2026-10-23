@@ -32,14 +32,18 @@ extension SlideCard {
 
     /// The tour's tip about one of the buttons under the slide in front, over the slide and its
     /// caption, along the slide's foot, its arrow reaching down across to the button `targets`
-    /// finds.
+    /// finds. Over a panorama, it's one slide wide over the caption, which slides along under the
+    /// strip's middle.
     @ViewBuilder
     func captionTip(at targets: [TourAnchor.Target: Anchor<CGRect>]) -> some View {
         if let tour, let caption = tour.captionTip(on: slide.id), let bounds = targets[caption.target] {
             GeometryReader { proxy in
                 let anchor = tour.anchor(caption.target)
+                let width = proxy.size.width / CGFloat(max(1, slide.span))
+                let shift = slide.span > 1 ? captionMiddle(at: targets, in: proxy) - width / 2 : 0
                 ZStack(alignment: .bottom) {
-                    anchor.standIn(at: proxy[bounds])
+                    // Back by the shift, which moves it onto the button with the tip.
+                    anchor.standIn(at: proxy[bounds].offsetBy(dx: -shift, dy: 0))
                     TipView(caption.tip, arrowEdge: .bottom, anchorID: anchor)
                         .modifier(SlideTipSize())
                         .padding([.horizontal, .top], tipInset)
@@ -48,9 +52,16 @@ extension SlideCard {
                 }
                 // Growing past a narrow slide evenly either side, and past a short one upward, with
                 // its stand-in still over the button.
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+                .frame(width: width, height: proxy.size.height, alignment: .bottom)
+                .offset(x: shift)
             }
         }
+    }
+
+    /// The middle of the caption's buttons that `targets` finds, in `proxy`'s space.
+    private func captionMiddle(at targets: [TourAnchor.Target: Anchor<CGRect>], in proxy: GeometryProxy) -> CGFloat {
+        let buttons = [TourAnchor.Target.layoutButton, .optionsButton, .layersButton].compactMap { targets[$0].map { proxy[$0] } }
+        return buttons.isEmpty ? proxy.size.width / 2 : buttons.reduce(CGRect.null) { $0.union($1) }.midX
     }
 
     private var canvas: LayerCanvas {
