@@ -83,11 +83,12 @@ nonisolated struct GatherPhotosTip: Tip {
     var actions: [Action] { [nextAction()] }
 }
 
-/// Putting a tray photo on a slide, with a tap or a drag.
+/// Putting a tray photo on a slide, with a tap or a drag, and taking one off with a tap.
 nonisolated struct PlacePhotoTip: Tip {
     var title: Text { Text("Place a Photo") }
     var message: Text? {
-        Text("Tap a photo to put it on a slide, or drag it onto the cell you want.").foregroundStyle(Color.primary)
+        Text("Tap a photo to put it on a slide, or drag it onto the cell you want. Tap one already on a slide to take it off.")
+            .foregroundStyle(Color.primary)
     }
     var image: Image? { Image(systemName: "plus.square.on.square") }
     var actions: [Action] { [nextAction()] }
