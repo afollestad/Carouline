@@ -197,11 +197,14 @@ struct SlideStrip: View {
     private func strip(screenPoint: CGFloat) -> some View {
         let numbers = project.slideNumbers
         return ScrollView(.horizontal) {
-            LazyHStack(alignment: .slideCenter, spacing: Self.spacing) {
+            LazyHStack(spacing: Self.spacing) {
                 ForEach(Array(project.slides.enumerated()), id: \.element.id) { index, slide in
                     card(for: slide, at: index, numbers: numbers[index], screenPoint: screenPoint)
                 }
                 AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
+                    // Over room as tall as a caption's, so it centers on the slides beside it rather
+                    // than on them and their captions.
+                    .padding(.bottom, Self.captionSpace)
             }
             // Room for the first slide and the add button each to reach the middle. Padding
             // rather than `contentMargins`, which stop view-aligned scrolling from snapping and
@@ -369,18 +372,6 @@ private struct TrailingClip: Shape {
     }
 }
 
-extension VerticalAlignment {
-    /// The middle of the slides, so the add button beside them lines up with the slides
-    /// rather than with the slides and their captions.
-    private enum SlideCenter: AlignmentID {
-        static func defaultValue(in context: ViewDimensions) -> CGFloat {
-            context[VerticalAlignment.center]
-        }
-    }
-
-    static let slideCenter = VerticalAlignment(SlideCenter.self)
-}
-
 private struct AddSlideButton: View {
     let size: CGFloat
     let action: () -> Void
@@ -397,7 +388,6 @@ private struct AddSlideButton: View {
         .accessibilityHint("Choose a layout for a new slide")
         // Exactly `size` across, which the strip's snapping counts on to center it.
         .frame(width: size, height: size)
-        .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
     }
 }
 

@@ -159,7 +159,6 @@ struct SlideCard: View {
                 onHover: onDropHover,
                 actions: cellActions
             ))
-            .alignmentGuide(.slideCenter) { $0[VerticalAlignment.center] }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(spokenNumbers) of \(count), \(slide.layout.name)\(spokenLayers)")
             // Over the caption, which comes after it, so a tip grown past a short slide still shows
