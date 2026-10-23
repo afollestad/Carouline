@@ -13,7 +13,10 @@ struct LayoutSheet: View {
     /// How many photos a layout would remove, which the sheet asks about before choosing it.
     let photosLost: (SlideLayout) -> Int
     let onChoose: (SlideLayout) -> Void
-    @State private var pendingLayout: SlideLayout?
+    /// The layout the sheet is asking about, kept past the answer, so the question doesn't change as
+    /// the popover fades with the layout already chosen.
+    @State private var pending: PendingLayout?
+    @State private var isConfirmingLayout = false
     @State private var detent: PresentationDetent = .medium
     @State private var firstTile: CGRect = .zero
     @Environment(\.dismiss) private var dismiss
@@ -55,18 +58,14 @@ struct LayoutSheet: View {
                     dismiss()
                 }
             }
-            .confirmationDialog(
-                pendingTitle,
-                isPresented: Binding { pendingLayout != nil } set: { if !$0 { pendingLayout = nil } },
-                titleVisibility: .visible,
-                presenting: pendingLayout
-            ) { layout in
-                Button("Change Layout", role: .destructive) {
-                    finish(layout)
+        }
+        // From the whole sheet, so it sits above it as the system's dialog did, rather than over the
+        // title bar, as from the page below it.
+        .confirmationPopover(pendingTitle, isPresented: $isConfirmingLayout, message: pendingMessage) {
+            Button("Change Layout", role: .destructive) {
+                if let pending {
+                    finish(pending.layout)
                 }
-            } message: { layout in
-                let count = layout.grid.cells.count
-                Text("“\(layout.name)” holds \(count == 1 ? "1 photo" : "\(count) photos"), so the slide's last ones are removed.")
             }
         }
         .presentationDetents(Set([.medium, .large, detent]), selection: $detent)
@@ -87,18 +86,29 @@ struct LayoutSheet: View {
     }
 
     private var pendingTitle: String {
-        guard let pendingLayout else {
+        guard let pending else {
             return ""
         }
-        let count = photosLost(pendingLayout)
-        return count == 1 ? "Remove 1 Photo?" : "Remove \(count) Photos?"
+        return pending.photosLost == 1 ? "Remove 1 Photo?" : "Remove \(pending.photosLost) Photos?"
+    }
+
+    private var pendingMessage: String? {
+        guard let pending else {
+            return nil
+        }
+        let count = pending.layout.grid.cells.count
+        return "“\(pending.layout.name)” holds \(count == 1 ? "1 photo" : "\(count) photos"), so the slide's last ones are removed."
     }
 
     private func choose(_ layout: SlideLayout) {
-        if layout == current {
+        guard layout != current else {
             dismiss()
-        } else if photosLost(layout) > 0 {
-            pendingLayout = layout
+            return
+        }
+        let lost = photosLost(layout)
+        if lost > 0 {
+            pending = PendingLayout(layout: layout, photosLost: lost)
+            isConfirmingLayout = true
         } else {
             finish(layout)
         }
@@ -108,6 +118,13 @@ struct LayoutSheet: View {
         onChoose(layout)
         dismiss()
     }
+}
+
+/// A layout that would remove photos, with how many, counted as it was chosen, since the slide
+/// holds fewer once it changes.
+private struct PendingLayout {
+    let layout: SlideLayout
+    let photosLost: Int
 }
 
 /// A layout drawn as tinted cells on the tile, with gaps wide enough to read at this size

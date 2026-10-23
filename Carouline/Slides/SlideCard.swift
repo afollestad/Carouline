@@ -71,6 +71,11 @@ struct SlideCard: View {
                 dropTarget: dropTarget
             )
             .frame(width: size.width, height: size.height)
+            // From the slide rather than the card, where the system's dialog pointed on a phone, since
+            // under the caption alone there isn't room for it.
+            .confirmationPopover("Delete \(numbersText)?", isPresented: $isConfirmingDelete, message: deletionMessage) {
+                Button(deleteTitle, role: .destructive, action: onDelete)
+            }
             .onGeometryChange(for: CGRect?.self) { proxy in
                 holdsSelection ? proxy.frame(in: .named(SelectionGesture.space)) : nil
             } action: { frame in
@@ -166,11 +171,6 @@ struct SlideCard: View {
         .popover(isPresented: layerActions.showsPopover ? layerActions.isShowingSheet(slide.id) : .constant(false)) {
             layerActions.sheet(slide.id)
                 .frame(idealWidth: LayersSheet.popoverSize.width, idealHeight: LayersSheet.popoverSize.height)
-        }
-        .confirmationDialog("Delete \(numbersText)?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-            Button(deleteTitle, role: .destructive, action: onDelete)
-        } message: {
-            Text(deletionMessage)
         }
     }
 
@@ -360,7 +360,8 @@ struct SlideCard: View {
         slide.layout == .panorama ? "Delete Panorama" : "Delete Slide"
     }
 
-    /// Where cell `index` sits, for VoiceOver.
+    /// What deleting the slide takes with it: its photos' copies, whose originals stay in the photo
+    /// library, and its layers.
     private var deletionMessage: String {
         let layers = slide.layers.count
         switch (slide.cells.compactMap(\.image).count, layers) {
