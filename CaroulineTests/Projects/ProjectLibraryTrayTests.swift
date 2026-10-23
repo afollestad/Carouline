@@ -253,6 +253,47 @@ struct ProjectLibraryTrayTests {
         await library.flush()
     }
 
+    // MARK: Taking off slides
+
+    /// Its clones and a photo from the same original come off, and the tray keeps its copy.
+    @Test func removesATrayPhotoFromItsCells() async throws {
+        let fixture = try await makeLibraryWithATrayPhoto()
+        let library = fixture.library, address = fixture.address, photo = fixture.photo
+        let pickedCell = CellAddress(projectID: address.projectID, slideID: address.slideID, index: 1)
+        await library.land(.tray(projectID: address.projectID, photoID: photo.id), at: address)
+        await library.importPhoto(into: pickedCell, assetIdentifier: "A/L0/001", from: try picked().load)
+        let removed = [address, pickedCell].compactMap(library.photo(at:))
+        let places = try #require(library.project(address.projectID)?.trayPhotoPlaces[photo.id])
+        #expect(places.map(\.address) == [address, pickedCell])
+
+        #expect(library.removeTrayPhoto(photo.id, fromCellsAt: places.map(\.address), in: address.projectID) == 2)
+        await library.flush()
+
+        #expect(library.photo(at: address) == nil)
+        #expect(library.photo(at: pickedCell) == nil)
+        #expect(removed.count == 2 && removed.allSatisfy { !copyExists($0, in: address.projectID) })
+        #expect(copyExists(photo.image, in: address.projectID))
+    }
+
+    /// A cell left out, or holding another photo by then, keeps what it has.
+    @Test func removesATrayPhotoFromOnlyTheCellsGivenThatHoldIt() async throws {
+        let fixture = try await makeLibraryWithATrayPhoto(layout: .grid)
+        let library = fixture.library, photo = fixture.photo
+        let cells = (0..<3).map { CellAddress(projectID: fixture.address.projectID, slideID: fixture.address.slideID, index: $0) }
+        for cell in cells {
+            await library.land(.tray(projectID: cell.projectID, photoID: photo.id), at: cell)
+        }
+        await library.importPhoto(into: cells[2], assetIdentifier: "B/L0/001", from: try picked().load)
+        let kept = try #require(library.photo(at: cells[1]))
+
+        #expect(library.removeTrayPhoto(photo.id, fromCellsAt: [cells[0], cells[2]], in: cells[0].projectID) == 1)
+        await library.flush()
+
+        #expect(library.photo(at: cells[0]) == nil)
+        #expect(library.photo(at: cells[1]) == kept)
+        #expect(library.photo(at: cells[2])?.assetIdentifier == "B/L0/001")
+    }
+
     // MARK: Picture layers
 
     /// A held tray photo tapped onto a picture takes its place, the layer keeping its frame and

@@ -5,8 +5,8 @@
 
 import SwiftUI
 
-/// One photo in the tray: a tap puts it on a slide, and a long press shows it large, with what
-/// else it can do.
+/// One photo in the tray: a tap puts it on a slide, or takes it off once it's on one, and a long
+/// press shows it large, with what else it can do.
 struct TrayThumbnail: View {
     let photo: TrayPhoto
     let projectID: UUID
@@ -18,6 +18,8 @@ struct TrayThumbnail: View {
     let usedOn: String?
     let actions: TrayActions
     @State private var isMissing = false
+    /// Whether it's asking which of its places to take it off.
+    @State private var isChoosingPlace = false
     @Environment(\.imageLoader) private var loader
 
     /// Tall enough to make out what's in a photo, with room above and below in the bar's glass.
@@ -27,8 +29,10 @@ struct TrayThumbnail: View {
         Button {
             if isMissing {
                 actions.restore(photo.id)
-            } else {
+            } else if places.isEmpty {
                 actions.place(photo.id)
+            } else {
+                removeFromSlides()
             }
         } label: {
             PhotoThumbnail(image: photo.image, projectID: projectID, height: Self.height, isMissing: $isMissing)
@@ -53,6 +57,16 @@ struct TrayThumbnail: View {
             TrayPhotoPreview(photo: photo, projectID: projectID, usedOn: usedOn)
                 // A preview renders apart from the tray, where it would find the sample loader.
                 .environment(\.imageLoader, loader)
+        }
+        .confirmationDialog("Remove from Which Slide?", isPresented: $isChoosingPlace, titleVisibility: .visible) {
+            ForEach(places, id: \.address) { place in
+                Button(place.name, role: .destructive) {
+                    actions.removeFromSlides(photo.id, [place])
+                }
+            }
+            Button("Remove from All", role: .destructive) {
+                actions.removeFromSlides(photo.id, places)
+            }
         }
         .accessibilityLabel(label)
         .accessibilityHint(hint)
@@ -98,8 +112,22 @@ struct TrayThumbnail: View {
             }
         }
         Divider()
+        if !places.isEmpty {
+            Button(places.count == 1 ? "Remove from \(places[0].name)" : "Remove from a Slide…", systemImage: "minus.square", role: .destructive) {
+                removeFromSlides()
+            }
+        }
         Button("Remove from Tray", systemImage: "trash", role: .destructive) {
             actions.remove(photo.id)
+        }
+    }
+
+    /// Takes it off its one place, or asks which to take it off when there are several.
+    private func removeFromSlides() {
+        if places.count > 1 {
+            isChoosingPlace = true
+        } else {
+            actions.removeFromSlides(photo.id, places)
         }
     }
 
@@ -122,6 +150,10 @@ struct TrayThumbnail: View {
     private var hint: String {
         if isMissing {
             photo.image.assetIdentifier == nil ? "" : "Restores the photo from your library"
+        } else if places.count == 1 {
+            "Removes the photo from \(places[0].spokenName)"
+        } else if places.count > 1 {
+            "Asks which slide to remove the photo from"
         } else {
             actions.placeHint
         }

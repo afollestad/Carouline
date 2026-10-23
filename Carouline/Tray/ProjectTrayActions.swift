@@ -42,6 +42,21 @@ struct ProjectTrayActions {
                     library.removeFromTray(photoID, in: projectID)
                 }
             },
+            removeFromSlides: { photoID, places in
+                let removed = withAnimation {
+                    library.removeTrayPhoto(photoID, fromCellsAt: places.map(\.address), in: projectID)
+                }
+                // Places gone some other way, as from another window, while the choice was open
+                // leave nothing to announce.
+                if removed > 0 {
+                    let name = switch (places.count, removed) {
+                    case (1, _): places[0].spokenName
+                    case (_, 1): "1 place"
+                    default: "\(removed) places"
+                    }
+                    AccessibilityNotification.Announcement("Removed from \(name)").post()
+                }
+            },
             restore: { photoID in
                 Task {
                     await library.restoreTrayPhoto(photoID, in: projectID, from: photoLibrary, asking: true)

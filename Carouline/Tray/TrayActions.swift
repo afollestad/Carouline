@@ -19,6 +19,8 @@ struct TrayActions {
     /// Starts a new slide with a photo in its first cell.
     let startSlide: (UUID) -> Void
     let remove: (UUID) -> Void
+    /// Takes a photo off the slides at the places given.
+    let removeFromSlides: (UUID, [TrayPhotoPlace]) -> Void
     /// Brings a missing photo back, asking for access to the library if need be.
     let restore: (UUID) -> Void
     /// Brings a missing photo back if that needs no asking, as when one is found missing.
@@ -36,6 +38,7 @@ struct TrayActions {
         hold: { _ in },
         startSlide: { _ in },
         remove: { _ in },
+        removeFromSlides: { _, _ in },
         restore: { _ in },
         restoreQuietly: { _ in },
         roomInFront: "Slide 2",

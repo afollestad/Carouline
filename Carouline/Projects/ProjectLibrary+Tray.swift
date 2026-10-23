@@ -76,6 +76,30 @@ extension ProjectLibrary {
         }
     }
 
+    /// Takes tray photo `photoID` out of the cells at `addresses` in one save, deleting their
+    /// copies. A cell holding another photo by then keeps it, and the tray keeps its own copy.
+    /// Returns how many cells it took the photo out of.
+    func removeTrayPhoto(_ photoID: UUID, fromCellsAt addresses: [CellAddress], in projectID: UUID) -> Int {
+        guard let trayPhoto = trayPhoto(photoID, in: projectID) else {
+            return 0
+        }
+        let held = addresses.filter { address in
+            address.projectID == projectID && photo(at: address).map(trayPhoto.matches) == true
+        }
+        guard !held.isEmpty else {
+            return 0
+        }
+        update(projectID, deletingImages: held.compactMap(photo(at:))) { project in
+            for address in held {
+                guard let slideIndex = project.slides.firstIndex(where: { $0.id == address.slideID }) else {
+                    continue
+                }
+                project.slides[slideIndex].cells[address.index].image = nil
+            }
+        }
+        return held.count
+    }
+
     /// Copies tray photo `photoID` in again when its copy went missing: from a cell's clone of it,
     /// or a cell's photo from the same library original, which needs no access to the library,
     /// or else from its library original. Asks for access to the library only when `asking`, so
