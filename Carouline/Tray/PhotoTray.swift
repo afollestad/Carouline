@@ -106,9 +106,10 @@ struct PhotoTray: View {
         }
         .scrollIndicators(.hidden)
         .frame(height: Self.height)
-        .glassEffect(.regular, in: .capsule)
         // Glass doesn't clip what's on it, and a photo scrolled past its ends would show outside.
+        // Clipped before the glass, since a clip after it leaves what's on the glass unclipped.
         .clipShape(.capsule)
+        .glassEffect(.regular, in: .capsule)
         .overlay {
             dropHighlight(in: Capsule())
         }
