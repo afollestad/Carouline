@@ -78,4 +78,13 @@ final class CropSession {
         }
         return liveCrop
     }
+
+    /// Saves a crop the zoom slider left unsaved, as VoiceOver's adjustments and `axe slider` do,
+    /// since they never end an edit.
+    func saveLiveCrop(to library: ProjectLibrary) {
+        if let selection, let liveCrop {
+            library.setCrop(liveCrop, at: selection)
+        }
+        liveCrop = nil
+    }
 }

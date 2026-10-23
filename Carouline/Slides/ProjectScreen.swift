@@ -70,7 +70,7 @@ struct ProjectScreen: View {
                 project: project,
                 session: layerSession,
                 actions: layerActions,
-                onCommitSize: saveLivePlacement,
+                onCommitSize: { layerSession.saveLivePlacement(to: library) },
                 onDone: { selectLayer(nil) }
             ))
             .modifier(PlacementBarOverlay(library: library, held: $held, onNewSlide: addSlide))
@@ -114,15 +114,15 @@ struct ProjectScreen: View {
             session: session,
             onChoosePhoto: { selection in
                 // Saved first, so the replacement doesn't inherit an unsaved zoom.
-                saveLiveCrop()
+                session.saveLiveCrop(to: library)
                 choosePhotos(for: selection)
             },
             onTakePhoto: { selection in
-                saveLiveCrop()
+                session.saveLiveCrop(to: library)
                 presenter.present(.camera(selection))
             },
             onMove: { selection in
-                saveLiveCrop()
+                session.saveLiveCrop(to: library)
                 if let imageID = library.photo(at: selection)?.id {
                     hold(.cell(selection, imageID: imageID))
                 }
@@ -133,7 +133,7 @@ struct ProjectScreen: View {
                     library.removePhoto(at: selection)
                 }
             },
-            onCommitZoom: saveLiveCrop,
+            onCommitZoom: { session.saveLiveCrop(to: library) },
             onDone: { select(nil) }
         )
     }
@@ -254,7 +254,11 @@ struct ProjectScreen: View {
                 }
             },
             onAddSlide: addSlide,
-            onChangeLayout: { presenter.present(.layout(.change($0))) },
+            onChangeLayout: { slideID in
+                // Saved and let go first, as the new layout reshapes what's selected, or drops it.
+                select(nil)
+                presenter.present(.layout(.change(slideID)))
+            },
             onMove: { slideID, offset in
                 withAnimation {
                     library.moveSlide(slideID, in: projectID, by: offset)
@@ -364,8 +368,8 @@ struct ProjectScreen: View {
     /// Selects the photo at `address` to frame, or nothing, saving whatever the last photo or
     /// layer was left at, and brings the photo's slide to the middle.
     private func select(_ address: CellAddress?) {
-        saveLiveCrop()
-        saveLivePlacement()
+        session.saveLiveCrop(to: library)
+        layerSession.saveLivePlacement(to: library)
         if let address {
             held = nil
             followSelection(on: address.slideID, to: nil)
@@ -380,8 +384,8 @@ struct ProjectScreen: View {
     /// Selects the layer at `address` to move, size and turn, or none, saving whatever the last
     /// photo or layer was left at, and brings the layer's slide to the middle.
     private func selectLayer(_ address: LayerAddress?) {
-        saveLiveCrop()
-        saveLivePlacement()
+        session.saveLiveCrop(to: library)
+        layerSession.saveLivePlacement(to: library)
         if let address {
             held = nil
             followSelection(on: address.slideID, to: address)
@@ -417,15 +421,6 @@ struct ProjectScreen: View {
         layerSession.sheetPath = layer.map { [.editor(for: $0)] } ?? []
     }
 
-    /// Saves a placement the size slider left unsaved, as VoiceOver's adjustments do, since they
-    /// never end an edit.
-    private func saveLivePlacement() {
-        if let selection = layerSession.selection, let livePlacement = layerSession.livePlacement {
-            layerSession.commitPlacement(livePlacement, at: selection, to: library)
-        }
-        layerSession.livePlacement = nil
-    }
-
     private var layersSlideID: UUID? {
         if case .layers(let slideID) = presenter.current { slideID } else { nil }
     }
@@ -444,15 +439,6 @@ struct ProjectScreen: View {
             restoresQuietly: { quietRestores.insert($0).inserted }
         )
         .actions
-    }
-
-    /// Saves a crop the zoom slider left unsaved, as VoiceOver's adjustments and `axe slider` do,
-    /// since they never end an edit.
-    private func saveLiveCrop() {
-        if let selection = session.selection, let liveCrop = session.liveCrop {
-            library.setCrop(liveCrop, at: selection)
-        }
-        session.liveCrop = nil
     }
 
     /// Opens the picker for the cell at `address`, taking as many photos as its slide has empty

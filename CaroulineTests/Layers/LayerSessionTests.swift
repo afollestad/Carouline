@@ -255,4 +255,24 @@ struct LayerSessionTests {
         #expect(session.livePlacement?.rotation == 0)
         #expect(session.snapsTaken == 0)
     }
+
+    /// A placement the size slider left unsaved, which nothing else ends, is saved to the
+    /// selected layer and let go.
+    @Test func savesAPlacementTheSliderLeft() async throws {
+        let library = ProjectLibrary(store: CountingStore(), projects: [])
+        let projectID = library.createProject(aspectRatio: .portrait).id
+        let slideID = try #require(library.addSlide(.single, to: projectID))
+        library.saveLayer(layer, in: slideID, of: projectID)
+        let address = LayerAddress(projectID: projectID, slideID: slideID, layerID: layer.id)
+        let session = LayerSession(selection: address)
+        var sized = layer.placement
+        sized.scale = 2
+        session.livePlacement = sized
+
+        session.saveLivePlacement(to: library)
+
+        #expect(library.layer(at: address)?.placement == sized)
+        #expect(session.livePlacement == nil)
+        await library.flush()
+    }
 }

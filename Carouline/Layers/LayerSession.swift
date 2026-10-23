@@ -253,6 +253,15 @@ final class LayerSession {
         }
     }
 
+    /// Saves a placement the size slider left unsaved, as VoiceOver's adjustments do, since they
+    /// never end an edit.
+    func saveLivePlacement(to library: ProjectLibrary) {
+        if let selection, let livePlacement {
+            commitPlacement(livePlacement, at: selection, to: library)
+        }
+        livePlacement = nil
+    }
+
     /// Ends the gesture, returning the placement it left for saving, unless another layer was
     /// selected while it ran.
     func endMoving() -> LayerPlacement? {

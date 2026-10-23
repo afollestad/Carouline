@@ -112,4 +112,23 @@ struct CropSessionTests {
 
         #expect(session.liveCrop == panned(zoomed, by: -30))
     }
+
+    /// A crop the zoom slider left unsaved, which nothing else ends, is saved to the selected
+    /// photo and let go.
+    @Test func savesACropTheSliderLeft() async throws {
+        let library = ProjectLibrary(store: CountingStore(), projects: [])
+        let projectID = library.createProject(aspectRatio: .portrait).id
+        let slideID = try #require(library.addSlide(.single, to: projectID))
+        let address = CellAddress(projectID: projectID, slideID: slideID, index: 0)
+        library.update(projectID) { $0.slides[0].cells[0].image = image }
+        let session = CropSession(selection: address)
+        let zoomed = ImageCrop(scale: 2)
+        session.liveCrop = zoomed
+
+        session.saveLiveCrop(to: library)
+
+        #expect(library.photo(at: address)?.crop == zoomed)
+        #expect(session.liveCrop == nil)
+        await library.flush()
+    }
 }
