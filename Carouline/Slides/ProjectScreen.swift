@@ -24,6 +24,8 @@ struct ProjectScreen: View {
     /// A held photo waiting for the slide the layout sheet adds, which takes it in its first cell.
     @State private var heldForNewSlide: HeldPhoto?
     @State private var trayRemovals: TrayRemovals
+    /// A tray photo held down, to see it larger or carry it onto a cell.
+    @State private var trayPress: TrayPress
     /// Photos already tried quietly, so one whose original is gone isn't tried on every redraw.
     @State private var quietRestores: Set<UUID> = []
     @Environment(\.photoLibrary) private var photoLibrary
@@ -32,15 +34,16 @@ struct ProjectScreen: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     /// `selection`, when given, opens with that photo selected to frame, `layerSession` with its
-    /// layer selected, `held` with that photo held to place, and `trayRemoval` asking about removing
-    /// those tray photos, as snapshots need.
+    /// layer selected, `held` with that photo held to place, `trayRemoval` asking about removing
+    /// those tray photos, and `trayPress` with a tray photo held down, as snapshots need.
     init(
         library: ProjectLibrary,
         projectID: UUID,
         selection: CellAddress? = nil,
         layerSession: LayerSession = LayerSession(),
         held: HeldPhoto? = nil,
-        trayRemoval: TrayRemoval? = nil
+        trayRemoval: TrayRemoval? = nil,
+        trayPress: TrayPress = TrayPress()
     ) {
         self.library = library
         self.projectID = projectID
@@ -48,12 +51,14 @@ struct ProjectScreen: View {
         _layerSession = State(initialValue: layerSession)
         _held = State(initialValue: held)
         _trayRemovals = State(initialValue: TrayRemovals(pending: trayRemoval))
+        _trayPress = State(initialValue: trayPress)
     }
 
     var body: some View {
         if let project = library.project(projectID) {
             content(project)
                 .tracksPopovers()
+                .environment(trayPress)
         } else {
             // Another window deleted it.
             ContentUnavailableView("Project Deleted", systemImage: "trash")

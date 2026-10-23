@@ -87,7 +87,7 @@ nonisolated struct GatherPhotosTip: Tip {
 nonisolated struct PlacePhotoTip: Tip {
     var title: Text { Text("Place a Photo") }
     var message: Text? {
-        Text("Tap a photo to put it on a slide, or drag it onto the cell you want. Tap one already on a slide to take it off.")
+        Text("Tap a photo to put it on a slide, or hold it to see it larger and drag it onto a cell. Tap one already on a slide to take it off.")
             .foregroundStyle(Color.primary)
     }
     var image: Image? { Image(systemName: "plus.square.on.square") }

@@ -16,10 +16,10 @@ struct CaptionChoice: Identifiable {
     var id: String { title }
 }
 
-/// A slide caption's choices, listed as a menu lists them, in a popover anchored to the button that
-/// opened it. A popover rather than a menu, since a menu's rows lie over the caption's other
-/// buttons, which take the taps meant for them. `header` goes above the choices, as a panorama's
-/// width does.
+/// A slide caption's choices, or a tray photo's, listed as a menu lists them, in a popover anchored
+/// to what opened it. A popover rather than a menu, since a menu's rows lie over the caption's other
+/// buttons, which take the taps meant for them, and no menu opens from a finger held on the tray.
+/// `header` goes above the choices, as a panorama's width or the tray photo does.
 struct CaptionPopover<Header: View>: View {
     /// Groups of choices, with a line between each.
     let groups: [[CaptionChoice]]
@@ -31,6 +31,25 @@ struct CaptionPopover<Header: View>: View {
     @Environment(\.screenDynamicTypeSize) private var screenDynamicTypeSize
 
     var body: some View {
+        // Scrolls only when the popover can't fit it whole, as a tray photo's actions under the
+        // photo at the largest text sizes, which UIKit would cut off.
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView {
+                content
+            }
+        }
+        // The caption's glass buttons, smaller text and tint aren't the popover's.
+        .buttonStyle(.plain)
+        .font(.body)
+        .foregroundStyle(Color.primary)
+        .dynamicTypeSize(screenDynamicTypeSize)
+        .presentationCompactAdaptation(.popover)
+        .onDisappear(perform: onGone)
+        .countsAsPopover()
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             ForEach(groups.indices, id: \.self) { index in
@@ -48,14 +67,6 @@ struct CaptionPopover<Header: View>: View {
         // the popover's margins, past which titles wrap.
         .frame(minWidth: 240, maxWidth: 340, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
-        // The caption's glass buttons, smaller text and tint aren't the popover's.
-        .buttonStyle(.plain)
-        .font(.body)
-        .foregroundStyle(Color.primary)
-        .dynamicTypeSize(screenDynamicTypeSize)
-        .presentationCompactAdaptation(.popover)
-        .onDisappear(perform: onGone)
-        .countsAsPopover()
     }
 
     private func row(_ choice: CaptionChoice) -> some View {

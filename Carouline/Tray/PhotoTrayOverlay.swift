@@ -9,8 +9,8 @@ import UIKit
 
 /// The tray along the bottom of the project screen while nothing else is there: no photo or layer
 /// selected, no photo held to place, no slide's layers open, and no keyboard up, with the tour's tip
-/// about it above. In its place, the question about tray photos a pick left out, until it's
-/// answered.
+/// about it above, and over the screen, a tray photo held down. In its place, the question about
+/// tray photos a pick left out, until it's answered.
 struct PhotoTrayOverlay: ViewModifier {
     let library: ProjectLibrary
     let project: Project
@@ -22,6 +22,7 @@ struct PhotoTrayOverlay: ViewModifier {
     /// which UIKit reports for every change, docked, floating or gone.
     @State private var isKeyboardUp = false
     @Environment(ProjectTour.self) private var tour: ProjectTour?
+    @Environment(TrayPress.self) private var press: TrayPress?
 
     func body(content: Content) -> some View {
         content
@@ -31,6 +32,7 @@ struct PhotoTrayOverlay: ViewModifier {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .modifier(TrayPressOverlay(project: project))
             .animation(.smooth(duration: 0.25), value: isShown && !isKeyboardUp)
             .animation(.smooth(duration: 0.25), value: removalPhotos.isEmpty)
             // Photos gone from the tray some other way, as from another window, leave nothing to
@@ -68,10 +70,11 @@ struct PhotoTrayOverlay: ViewModifier {
         }
     }
 
-    /// The tour's tip about the tray, above it, pointing down at its add button or its photos.
+    /// The tour's tip about the tray, above it, pointing down at its add button or its photos. Not
+    /// while a photo is held, or its actions are open, where they are.
     @ViewBuilder
     private func tourTip(at targets: [TourAnchor.Target: Anchor<CGRect>]) -> some View {
-        if let tour, let tip = tour.trayTip {
+        if let tour, let tip = tour.trayTip, press?.photoID == nil, press?.menuPhotoID == nil {
             let target: TourAnchor.Target = tour.step == .placePhoto ? .trayPhotos : .addPhotos
             if let bounds = targets[target] {
                 GeometryReader { proxy in

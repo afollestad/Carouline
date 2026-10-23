@@ -108,7 +108,8 @@ extension ScreenSnapshotting {
         missing: Set<UUID>? = nil,
         loading: Set<UUID> = [],
         held: HeldPhoto? = nil,
-        trayRemoval: TrayRemoval? = nil
+        trayRemoval: TrayRemoval? = nil,
+        trayPress: TrayPress = TrayPress()
     ) -> some View {
         var loader = missing.map { MockImageLoader(missing: $0) } ?? imageLoader
         loader.loading = loading
@@ -119,7 +120,8 @@ extension ScreenSnapshotting {
                 selection: selection,
                 layerSession: layerSession ?? LayerSession(),
                 held: held,
-                trayRemoval: trayRemoval
+                trayRemoval: trayRemoval,
+                trayPress: trayPress
             )
         }
         .environment(\.imageLoader, loader)

@@ -5,8 +5,8 @@
 
 import SwiftUI
 
-/// One photo in the tray: a tap puts it on a slide, or takes it off once it's on one, and a long
-/// press shows it large, with what else it can do.
+/// One photo in the tray: a tap puts it on a slide, or takes it off once it's on one. Held, it shows
+/// large over the tray, and lifted there, it shows what else it can do.
 struct TrayThumbnail: View {
     let photo: TrayPhoto
     let projectID: UUID
@@ -23,8 +23,11 @@ struct TrayThumbnail: View {
     /// The places it asked about, kept as they were, so its choices don't drop out as the popover
     /// fades with the photo already taken off them.
     @State private var choosingPlaces: [TrayPhotoPlace] = []
-    @Environment(\.imageLoader) private var loader
+    /// What a choice in its actions' popover does once the popover has gone.
+    @State private var afterMenu: (() -> Void)?
+    @Environment(TrayPress.self) private var press: TrayPress?
     @Environment(\.shownPopovers) private var popovers
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     /// Tall enough to make out what's in a photo, with room above and below in the bar's glass.
     static let height: CGFloat = 44
@@ -45,22 +48,15 @@ struct TrayThumbnail: View {
                         UsedBadge(count: places.count)
                     }
                 }
-                // Over the photo, rather than a modifier on it, so turning dragging off for a
-                // missing copy leaves the photo and what it has loaded alone.
-                .overlay {
-                    if !isMissing {
-                        dragSurface
-                    }
-                }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TrayThumbnailStyle())
         .hoverEffect(.lift)
-        .contextMenu {
-            menu
-        } preview: {
-            TrayPhotoPreview(photo: photo, projectID: projectID, usedOn: usedOn)
-                // A preview renders apart from the tray, where it would find the sample loader.
-                .environment(\.imageLoader, loader)
+        // From a view of its own, since the button presents the question about removing it.
+        .background {
+            Color.clear
+                .popover(isPresented: isShowingMenu) {
+                    CaptionPopover(groups: menuGroups, header: { menuHeader }, onGone: menuGone)
+                }
         }
         .confirmationPopover("Remove from Which Slide?", isPresented: $isChoosingPlace) {
             ForEach(choosingPlaces, id: \.address) { place in
@@ -74,56 +70,110 @@ struct TrayThumbnail: View {
         }
         .accessibilityLabel(label)
         .accessibilityHint(hint)
-        .accessibilityDragPoint(.center, description: "Photo", isEnabled: !isMissing)
         .accessibilityActions {
-            menu
+            ForEach(choices.flatMap { $0 }) { choice in
+                Button(choice.title, systemImage: choice.systemImage, role: choice.isDestructive ? .destructive : nil, action: choice.action)
+            }
         }
         .task(id: isMissing) {
             if isMissing {
                 actions.restoreQuietly(photo.id)
             }
         }
-    }
-
-    /// A clear surface a long press lifts the photo from, to drop on a cell.
-    private var dragSurface: some View {
-        Color.clear
-            .contentShape(.rect)
-            .draggable(HeldPhoto.tray(projectID: projectID, photoID: photo.id)) {
-                PhotoDragPreview(image: photo.image, projectID: projectID, loader: loader)
+        .onChange(of: isMissing, initial: true) { _, isMissing in
+            press?.setMissing(isMissing, for: photo.id)
+        }
+        // Its actions go with it, as when another window takes it out of the tray.
+        .onDisappear {
+            if press?.menuPhotoID == photo.id {
+                press?.menuPhotoID = nil
             }
+        }
     }
 
-    @ViewBuilder
-    private var menu: some View {
+    /// What it can do, in groups a line apart in its popover: put it somewhere, or bring it back,
+    /// then take it off the slides or the tray.
+    private var choices: [[CaptionChoice]] {
+        var placing: [CaptionChoice] = []
         if isMissing {
             if photo.image.assetIdentifier != nil {
-                Button("Restore from Photos", systemImage: "arrow.clockwise") {
+                placing.append(CaptionChoice(title: "Restore from Photos", systemImage: "arrow.clockwise") {
                     actions.restore(photo.id)
-                }
+                })
             }
         } else {
             if let roomInFront = actions.roomInFront {
-                Button("Add to \(roomInFront)", systemImage: "plus.square.on.square") {
+                placing.append(CaptionChoice(title: "Add to \(roomInFront)", systemImage: "plus.square.on.square") {
                     actions.place(photo.id)
+                })
+            }
+            placing.append(CaptionChoice(title: "Choose a Cell…", systemImage: "hand.tap") {
+                actions.hold(photo.id)
+            })
+            placing.append(CaptionChoice(title: "Start a Slide…", systemImage: "plus.rectangle.on.rectangle") {
+                actions.startSlide(photo.id)
+            })
+        }
+        var removing: [CaptionChoice] = []
+        if !places.isEmpty {
+            let title = places.count == 1 ? "Remove from \(places[0].name)" : "Remove from a Slide…"
+            removing.append(CaptionChoice(title: title, systemImage: "minus.square", isDestructive: true, action: removeFromSlides))
+        }
+        removing.append(CaptionChoice(title: "Remove from Tray", systemImage: "trash", isDestructive: true) {
+            actions.remove(photo.id)
+        })
+        return [placing, removing].filter { !$0.isEmpty }
+    }
+
+    /// `choices`, each done once the popover has gone.
+    private var menuGroups: [[CaptionChoice]] {
+        choices.map { group in
+            group.map { choice in
+                CaptionChoice(title: choice.title, systemImage: choice.systemImage, isDestructive: choice.isDestructive) {
+                    chooseInMenu(choice.action)
                 }
             }
-            Button("Choose a Cell…", systemImage: "hand.tap") {
-                actions.hold(photo.id)
-            }
-            Button("Start a Slide…", systemImage: "plus.rectangle.on.rectangle") {
-                actions.startSlide(photo.id)
+        }
+    }
+
+    /// The photo large atop its actions, as a long press showed it before, where there's room for
+    /// it: not at a compact height, as a phone's in landscape.
+    @ViewBuilder
+    private var menuHeader: some View {
+        if verticalSizeClass != .compact {
+            TrayPhotoPreview(photo: photo, projectID: projectID, usedOn: usedOn)
+            Divider()
+                .padding(.vertical, 4)
+        }
+    }
+
+    /// Whether its actions are open, as lifting a finger held on it in the tray opens them.
+    private var isShowingMenu: Binding<Bool> {
+        Binding {
+            press?.menuPhotoID == photo.id
+        } set: { isShown in
+            if !isShown, press?.menuPhotoID == photo.id {
+                press?.menuPhotoID = nil
             }
         }
-        Divider()
-        if !places.isEmpty {
-            Button(places.count == 1 ? "Remove from \(places[0].name)" : "Remove from a Slide…", systemImage: "minus.square", role: .destructive) {
-                removeFromSlides()
-            }
+    }
+
+    /// Closes its actions and does `action` once they've gone, since a sheet, a popover or a
+    /// question asked for as they go never shows.
+    private func chooseInMenu(_ action: @escaping () -> Void) {
+        afterMenu = action
+        // At once rather than animated, since the choice waits for the popover to go.
+        var closing = Transaction()
+        closing.disablesAnimations = true
+        withTransaction(closing) {
+            press?.menuPhotoID = nil
         }
-        Button("Remove from Tray", systemImage: "trash", role: .destructive) {
-            actions.remove(photo.id)
-        }
+    }
+
+    private func menuGone() {
+        let action = afterMenu
+        afterMenu = nil
+        action?()
     }
 
     /// Takes it off its one place, or asks which to take it off when there are several, once any
@@ -163,6 +213,17 @@ struct TrayThumbnail: View {
         } else {
             actions.placeHint
         }
+    }
+}
+
+/// A thumbnail tapped through a tap gesture rather than a button's own tracking of the finger, which
+/// carries on under a finger held on the tray, so lifting it would also tap the photo it landed on.
+/// The tray's press cancels the tap gesture as it begins.
+private struct TrayThumbnailStyle: PrimitiveButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(.rect)
+            .onTapGesture(perform: configuration.trigger)
     }
 }
 

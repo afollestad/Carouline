@@ -43,6 +43,8 @@
 				Storage/CLAUDE.md,
 				Tour/AGENTS.md,
 				Tour/CLAUDE.md,
+				Tray/AGENTS.md,
+				Tray/CLAUDE.md,
 			);
 			target = 5E7A5E700000000000000010 /* Carouline */;
 		};

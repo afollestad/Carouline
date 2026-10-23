@@ -53,6 +53,10 @@ final class DebugSettings {
     let selectedLayer: (slide: Int, layer: Int)?
     /// A photo in the open project to hold on launch, to place by tapping a cell.
     let heldPhoto: Hold?
+    /// A tray photo in the open project, by its place in the tray, to show magnified on launch, as a
+    /// finger held on it does. It stays so, with the tray held still, until the next launch, since
+    /// no finger lifts from it.
+    let pressedTrayPhoto: Int?
     let sheet: Sheet?
 
     /// A photo to hold on launch.
@@ -73,7 +77,8 @@ final class DebugSettings {
     /// `-DebugSelectCell` (a photo to frame in it, as slide and cell indexes like `2,0`),
     /// `-DebugSelectLayer` (a layer to move in it, as slide and layer indexes like `2,0`, layers
     /// counted from the bottom), `-DebugHoldPhoto` (a photo in it to hold for placing, as slide and
-    /// cell indexes like `2,0`, or as `tray,` and its place in the tray from 0, like `tray,1`) and
+    /// cell indexes like `2,0`, or as `tray,` and its place in the tray from 0, like `tray,1`),
+    /// `-DebugPressTrayPhoto` (a tray photo in it to show magnified, by its place from 0) and
     /// `-DebugSheet` (`newProject`, or `customRatio` for its custom page, on the list, or `layout`,
     /// `export`, `layers`, `addLayer` or `editLayer` in the open project, the last three for
     /// `-DebugSelectLayer`'s slide or else the first, and `editLayer` for its layer) from
@@ -98,6 +103,7 @@ final class DebugSettings {
         let layer = (arguments["DebugSelectLayer"] as? String)?.split(separator: ",").compactMap { Int($0) } ?? []
         selectedLayer = layer.count == 2 ? (layer[0], layer[1]) : nil
         heldPhoto = (arguments["DebugHoldPhoto"] as? String).flatMap(Self.hold(from:))
+        pressedTrayPhoto = (arguments["DebugPressTrayPhoto"] as? String).flatMap { Int($0) }
         sheet = (arguments["DebugSheet"] as? String).flatMap(Sheet.init(rawValue:))
     }
 

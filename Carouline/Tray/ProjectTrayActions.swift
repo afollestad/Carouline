@@ -36,6 +36,11 @@ struct ProjectTrayActions {
             },
             place: place,
             hold: { hold(held($0)) },
+            drop: { photoID, address in
+                Task {
+                    await library.land(held(photoID), at: address)
+                }
+            },
             startSlide: { startSlide(held($0)) },
             remove: { photoID in
                 withAnimation {

@@ -5,42 +5,39 @@
 
 import SwiftUI
 
-/// A tray photo shown large, as a long press on its thumbnail lifts it: the whole photo, its shape,
-/// and the slides it's on.
+/// A tray photo atop its actions' popover, as a lift after holding it opens them: the whole photo,
+/// its shape, and the slides it's on.
 struct TrayPhotoPreview: View {
     let photo: TrayPhoto
     let projectID: UUID
     /// The slides it's on, as "Slides 2 and 5", or nil when it's on none.
     let usedOn: String?
-    @State private var isMissing = false
 
-    /// Large enough to judge a photo by, and within what a phone's menu leaves for its preview.
-    private static let maximumSize = CGSize(width: 320, height: 400)
+    /// Large enough to make out which photo it is, and small enough to leave a phone's screen room
+    /// for the actions under it.
+    private static let maximumSize = CGSize(width: 240, height: 160)
 
     var body: some View {
-        // Whole, at its own shape, rather than within the thumbnails' range of shapes.
-        var whole = photo.image
-        whole.crop = ImageCrop()
-        return VStack(alignment: .leading, spacing: 0) {
-            CellPhoto(image: whole, projectID: projectID, isMissing: $isMissing) { absence in
-                PlaceholderCell(background: .white, isLoading: absence == .loading)
-            }
-            .frame(width: size.width, height: size.height)
+        let size = Self.size(of: photo.image.pixelSize, fitting: Self.maximumSize)
+        VStack(alignment: .leading, spacing: 8) {
+            WholeTrayPhoto(photo: photo, projectID: projectID)
+                .frame(width: size.width, height: size.height)
+                .clipShape(.rect(cornerRadius: 8))
             Text(caption)
                 .font(.footnote)
                 .foregroundStyle(Color.primary)
-                .padding(12)
         }
-        .frame(width: size.width)
+        // In line with the actions' icons.
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
-    /// The photo's own shape, as large as fits `maximumSize`.
-    private var size: CGSize {
-        let pixels = photo.image.pixelSize
+    /// A photo of `pixels`, at its own shape, as large as fits `maximumSize`.
+    static func size(of pixels: CGSize, fitting maximumSize: CGSize) -> CGSize {
         guard pixels.width > 0, pixels.height > 0 else {
-            return Self.maximumSize
+            return maximumSize
         }
-        let scale = min(Self.maximumSize.width / pixels.width, Self.maximumSize.height / pixels.height)
+        let scale = min(maximumSize.width / pixels.width, maximumSize.height / pixels.height)
         return CGSize(width: (pixels.width * scale).rounded(), height: (pixels.height * scale).rounded())
     }
 

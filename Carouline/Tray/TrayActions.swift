@@ -16,6 +16,8 @@ struct TrayActions {
     let place: (UUID) -> Void
     /// Holds a photo for a cell to be tapped.
     let hold: (UUID) -> Void
+    /// Puts a photo carried up off the tray in the cell it's let go over.
+    let drop: (UUID, CellAddress) -> Void
     /// Starts a new slide with a photo in its first cell.
     let startSlide: (UUID) -> Void
     let remove: (UUID) -> Void
@@ -36,6 +38,7 @@ struct TrayActions {
         addDropped: { _ in },
         place: { _ in },
         hold: { _ in },
+        drop: { _, _ in },
         startSlide: { _ in },
         remove: { _ in },
         removeFromSlides: { _, _ in },

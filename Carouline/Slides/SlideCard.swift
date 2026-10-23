@@ -47,6 +47,7 @@ struct SlideCard: View {
     /// as the options capsule beside it, where the glyph alone falls a little short.
     @ScaledMetric(relativeTo: .subheadline) private var iconSide: CGFloat = 18
     @Environment(ProjectTour.self) var tour: ProjectTour?
+    @Environment(TrayPress.self) private var trayPress: TrayPress?
     @Environment(\.shownPopovers) private var popovers
 
     /// The room between the slide and its caption, which a caption tip's arrow reaches across, to
@@ -63,6 +64,8 @@ struct SlideCard: View {
     var body: some View {
         // Measured only while the slide holds the selection, so a scroll measures nothing.
         let holdsSelection = session.selection?.slideID == slide.id || layerSession.selection?.slideID == slide.id
+        // And only while a tray photo is carried over the strip, for the cell it would land in.
+        let isCarriedOver = trayPress?.phase == .carrying
         VStack(spacing: Self.captionSpacing) {
             CardPhotos(
                 slide: slide,
@@ -92,8 +95,17 @@ struct SlideCard: View {
             } action: { frame in
                 frames?.frames[slide.id] = frame.map { SlideFrame(frame: $0, size: size) }
             }
+            .onGeometryChange(for: CGRect?.self) { proxy in
+                isCarriedOver ? proxy.frame(in: .global) : nil
+            } action: { frame in
+                let card = frame.map {
+                    TrayPress.Card(frame: SlideFrame(frame: $0, size: size), slide: slide, projectID: projectID, importing: importingIndexes)
+                }
+                trayPress?.setCard(card, for: slide.id)
+            }
             .onDisappear {
                 frames?.frames[slide.id] = nil
+                trayPress?.setCard(nil, for: slide.id)
             }
             .reportsPanoramaFront(slide.id, span: slide.span, to: layerSession)
             .overlay {
@@ -413,8 +425,11 @@ private struct CardPhotos: View {
     let isAnythingSelected: Bool
     /// The cell a drop over the slide would land in.
     let dropTarget: Int?
+    @Environment(TrayPress.self) private var trayPress: TrayPress?
 
     var body: some View {
+        // Here rather than on the card, so a tray photo carried from cell to cell redraws the cells alone.
+        let target = dropTarget ?? trayPress?.target.flatMap { $0.slideID == slide.id ? $0.index : nil }
         let isStyling = layerSession.stylingSlideID == slide.id
         let style = isStyling ? layerSession.slideStyle : slide.style
         let blur = LayerGeometry.blurRadius(isStyling ? layerSession.slideBlur : slide.blur, slideWidth: size.width / CGFloat(max(1, slide.span)))
@@ -432,7 +447,7 @@ private struct CardPhotos: View {
                 isPanorama: slide.layout == .panorama,
                 isAnythingSelected: isAnythingSelected,
                 blur: blur,
-                isDropTarget: dropTarget == index,
+                isDropTarget: target == index,
                 stripReach: StripMiddle.reach(span: slide.span, cardWidth: size.width)
             )
         }

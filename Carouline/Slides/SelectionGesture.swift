@@ -10,6 +10,17 @@ import SwiftUI
 struct SlideFrame {
     let frame: CGRect
     let size: CGSize
+
+    /// `slide` here as layers measure it, with how many of its points a point on screen covers.
+    func canvas(of slide: Slide) -> LayerCanvas {
+        LayerCanvas(size: size, span: slide.span, screenPoint: size.width / frame.width)
+    }
+
+    /// `point`, in the space the frame was measured in, in the slide's own coordinates.
+    func canvasPoint(_ point: CGPoint) -> CGPoint {
+        let screenPoint = size.width / frame.width
+        return CGPoint(x: (point.x - frame.minX) * screenPoint, y: (point.y - frame.minY) * screenPoint)
+    }
 }
 
 /// The frames of the slides holding a selection, as their cards report them. Not observed, so a
@@ -256,8 +267,8 @@ struct SelectionGesture: ViewModifier {
               let slide = project.slides.first(where: { $0.id == target.slideID }) else {
             return false
         }
-        let canvas = canvas(of: slide, in: frame)
-        let point = canvasPoint(point, in: frame)
+        let canvas = frame.canvas(of: slide)
+        let point = frame.canvasPoint(point)
         switch target {
         case .layer(let address):
             guard var layer = layer(at: address, on: slide) else {
@@ -301,7 +312,7 @@ struct SelectionGesture: ViewModifier {
               let slide = project.slides.first(where: { $0.id == target.slideID }) else {
             return
         }
-        let canvas = canvas(of: slide, in: frame)
+        let canvas = frame.canvas(of: slide)
         let screenPoint = canvas.screenPoint
         let scaled = { (size: CGSize) in CGSize(width: size.width * screenPoint, height: size.height * screenPoint) }
         let pinch = touches.pinch
@@ -314,7 +325,7 @@ struct SelectionGesture: ViewModifier {
             // carries on as far as the strip has scrolled under the finger at its edge.
             let translation = scaled(touches.translation)
             let drag = touches.isIndirect ? nil : LayerDrag(
-                start: canvasPoint(start, in: frame),
+                start: frame.canvasPoint(start),
                 translation: CGSize(width: translation.width + tracker.edgeScrolled, height: translation.height),
                 pinchTranslation: pinch.map { scaled($0.translation) }
             )
@@ -327,11 +338,11 @@ struct SelectionGesture: ViewModifier {
                 tracker.photoSegment = segment.count
             }
             let drag = touches.isIndirect ? nil : LayerDrag(
-                start: canvasPoint(start, in: frame),
+                start: frame.canvasPoint(start),
                 translation: scaled(segment.translation),
                 pinchTranslation: pinch == nil ? nil : scaled(segment.translation)
             )
-            let zoom = pinch == nil ? nil : segment.magnification.map { (magnification: $0, start: canvasPoint(segment.anchor, in: frame)) }
+            let zoom = pinch == nil ? nil : segment.magnification.map { (magnification: $0, start: frame.canvasPoint(segment.anchor)) }
             framePhoto(at: address, on: slide, canvas: canvas, drag: drag, pinch: zoom)
         }
     }
@@ -426,20 +437,8 @@ struct SelectionGesture: ViewModifier {
         return layer
     }
 
-    /// The slide at `frame` as layers measure it, with how many of its points a point on screen
-    /// covers there.
-    private func canvas(of slide: Slide, in frame: SlideFrame) -> LayerCanvas {
-        LayerCanvas(size: frame.size, span: slide.span, screenPoint: frame.size.width / frame.frame.width)
-    }
-
     /// The style `slide` draws with now: the one its editor is trying out, or its own.
     private func style(of slide: Slide) -> SlideStyle {
         layerSession.stylingSlideID == slide.id ? layerSession.slideStyle : slide.style
-    }
-
-    /// `point`, in the gesture's space, in the coordinates of the slide at `frame`.
-    private func canvasPoint(_ point: CGPoint, in frame: SlideFrame) -> CGPoint {
-        let screenPoint = frame.size.width / frame.frame.width
-        return CGPoint(x: (point.x - frame.frame.minX) * screenPoint, y: (point.y - frame.frame.minY) * screenPoint)
     }
 }

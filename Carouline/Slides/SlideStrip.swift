@@ -72,6 +72,7 @@ struct SlideStrip: View {
     /// Where the strip is scrolled to, which `StripScrolling` keeps in step with `position`.
     @State private var scroll = ScrollPosition()
     @State private var tracked = TrackedScroll()
+    @Environment(TrayPress.self) private var trayPress: TrayPress?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -90,9 +91,11 @@ struct SlideStrip: View {
                     .padding(.bottom, SelectionBar.reservedHeight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                // A tray photo carried over the slides brings them forward as a drop does.
+                let hoverSlideID = dropHoverSlideID ?? trayPress?.hoverSlideID
                 strip(screenPoint: 1 / fit.scale)
-                    .task(id: dropHoverSlideID) {
-                        await bringDropHoverForward()
+                    .task(id: hoverSlideID) {
+                        await bringForward(hovered: hoverSlideID)
                     }
             }
         }
@@ -140,6 +143,9 @@ struct SlideStrip: View {
             proxy.frame(in: .global)
         } action: { frame in
             safeFrame = frame
+        }
+        .onChange(of: barColumnWidth > 0 ? safeFrame.maxX : nil, initial: true) { _, edge in
+            trayPress?.setStripTrailingEdge(edge)
         }
         .background {
             Color.clear
@@ -305,8 +311,8 @@ struct SlideStrip: View {
 
     /// Brings the slide a drop rests over to the front, since the strip doesn't scroll for a drag
     /// along its edge. After a moment, so a drag passing over a neighbor on its way leaves it.
-    private func bringDropHoverForward() async {
-        guard let slideID = dropHoverSlideID, project.frontSlide(at: position)?.id != slideID else {
+    private func bringForward(hovered slideID: UUID?) async {
+        guard let slideID, project.frontSlide(at: position)?.id != slideID else {
             return
         }
         try? await Task.sleep(for: Self.dropHoverDelay)
@@ -413,25 +419,6 @@ private struct TrailingClip: Shape {
     func path(in rect: CGRect) -> Path {
         let open = rect.insetBy(dx: -Self.reach, dy: -Self.reach)
         return Path(isClipping ? open.divided(atDistance: rect.maxX - open.minX, from: .minXEdge).slice : open)
-    }
-}
-
-private struct AddSlideButton: View {
-    let size: CGFloat
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label("Add Slide", systemImage: "plus")
-                .labelStyle(.iconOnly)
-                .font(.title2.weight(.semibold))
-                .frame(width: size - 16, height: size - 16)
-        }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .accessibilityHint("Choose a layout for a new slide")
-        // Exactly `size` across, which the strip's snapping counts on to center it.
-        .frame(width: size, height: size)
     }
 }
 

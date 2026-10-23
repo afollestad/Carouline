@@ -78,10 +78,46 @@ struct PhotoTray: View {
     }
 
     private var photos: some View {
+        TrayPhotoStrip(project: project, importingCount: importingCount, actions: actions)
+            .overlay {
+                dropHighlight(in: Capsule())
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Tray")
+            .tourTarget(.trayPhotos)
+    }
+}
+
+extension PhotoTray {
+    /// A tint ring round `shape` while images from another app are over the tray.
+    @ViewBuilder
+    private func dropHighlight(in shape: some InsettableShape) -> some View {
+        if isDropTargeted {
+            shape
+                .strokeBorder(.tint, lineWidth: 3)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// The tray's photos along their capsule of glass, which a finger held on them magnifies one by
+/// one, scrolling by itself at either end, or carries up onto a cell. Apart from the tray, so the
+/// scroll a press drives each frame redraws the photos alone.
+private struct TrayPhotoStrip: View {
+    let project: Project
+    let importingCount: Int
+    let actions: TrayActions
+    @State private var scroll = ScrollPosition()
+    /// Scrolls the tray along each frame while a finger is held at either end.
+    @State private var edgeTicker = FrameTicker()
+    @Environment(TrayPress.self) private var press: TrayPress?
+    @Environment(\.shownPopovers) private var popovers
+
+    var body: some View {
         let holding = project.trayPhotoPlaces
         let count = project.tray.count
-        return ScrollView(.horizontal) {
-            LazyHStack(spacing: 8) {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: TrayLayout.spacing) {
                 ForEach(Array(project.tray.enumerated()), id: \.element.id) { index, photo in
                     let places = holding[photo.id] ?? []
                     TrayThumbnail(
@@ -102,34 +138,100 @@ struct PhotoTray: View {
                 }
             }
             // Padded rather than `contentMargins`, and past the glass's rounded ends.
-            .padding(.horizontal, 14)
-            .frame(height: Self.height)
+            .padding(.horizontal, TrayLayout.inset)
+            .frame(height: PhotoTray.height)
         }
+        .scrollPosition($scroll)
         .scrollIndicators(.hidden)
-        .frame(height: Self.height)
+        // Held still under a finger held on a photo, as it slides along, scrolling itself at the
+        // ends instead.
+        .scrollDisabled(press?.photoID != nil)
+        .frame(height: PhotoTray.height)
+        .onScrollGeometryChange(for: TrayScroll.self) { geometry in
+            TrayScroll(offset: geometry.visibleRect.minX, maxOffset: max(0, geometry.contentSize.width - geometry.visibleRect.width))
+        } action: { _, scroll in
+            press?.trayScrolled(to: scroll.offset, maxOffset: scroll.maxOffset)
+        }
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            press?.setCapsule(frame)
+        }
+        .onChange(of: TrayLayout(photos: project.tray, importingCount: importingCount), initial: true) { _, layout in
+            press?.setLayout(layout)
+        }
+        .gesture(TrayPressGesture(
+            onBegin: { location in
+                press?.begin(at: location)
+                followEdge()
+            },
+            onMove: { location in
+                press?.move(to: location)
+                followEdge()
+            },
+            onEnd: end(at:),
+            onCancel: {
+                edgeTicker.stop()
+                press?.cancel()
+            }
+        ))
+        .gesture(TraySecondaryClick { location in
+            if let photoID = press?.photo(at: location) {
+                openMenu(photoID)
+            }
+        })
+        .onDisappear {
+            edgeTicker.stop()
+            press?.cancel()
+        }
         // Glass doesn't clip what's on it, and a photo scrolled past its ends would show outside.
         // Clipped before the glass, since a clip after it leaves what's on the glass unclipped.
         .clipShape(.capsule)
         .glassEffect(.regular, in: .capsule)
-        .overlay {
-            dropHighlight(in: Capsule())
+    }
+
+    /// Scrolls the tray along each frame while the finger is at an end it can still scroll toward,
+    /// as the strip does along a panorama for a layer held at its edge.
+    private func followEdge() {
+        guard press?.isAtEdge == true else {
+            edgeTicker.stop()
+            return
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Tray")
-        .tourTarget(.trayPhotos)
+        if !edgeTicker.isRunning {
+            edgeTicker.start { seconds in
+                if let offset = press?.scrolled(by: seconds) {
+                    scroll.scrollTo(x: offset)
+                } else if press?.isAtEdge != true {
+                    edgeTicker.stop()
+                }
+            }
+        }
+    }
+
+    /// Lands a photo carried off the tray in the cell it's let go over, or opens the actions of one
+    /// lifted in the tray.
+    private func end(at location: CGPoint) {
+        edgeTicker.stop()
+        press?.move(to: location)
+        switch press?.end() {
+        case .menu(let photoID): openMenu(photoID)
+        case .drop(let photoID, let address): actions.drop(photoID, address)
+        case nil: break
+        }
+    }
+
+    /// Opens `photoID`'s actions, once any popover still closing has gone, which would cancel them.
+    private func openMenu(_ photoID: UUID) {
+        popovers.whenGone {
+            press?.menuPhotoID = photoID
+        }
     }
 }
 
-extension PhotoTray {
-    /// A tint ring round `shape` while images from another app are over the tray.
-    @ViewBuilder
-    private func dropHighlight(in shape: some InsettableShape) -> some View {
-        if isDropTargeted {
-            shape
-                .strokeBorder(.tint, lineWidth: 3)
-                .accessibilityHidden(true)
-        }
-    }
+/// Where the tray is scrolled to along its photos, and how far it scrolls.
+private struct TrayScroll: Equatable {
+    let offset: CGFloat
+    let maxOffset: CGFloat
 }
 
 #Preview("Photos") {

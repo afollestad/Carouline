@@ -38,6 +38,17 @@ extension SnapshotTests {
         let project = trayProject
         await assertScreenSnapshot(of: projectScreen(project, held: .tray(projectID: project.id, photoID: fixtureID(43))))
     }
+
+    /// A finger held on a tray photo, showing it large above its place in the tray.
+    @Test func magnifyingTrayPhoto() async {
+        await assertScreenSnapshot(of: projectScreen(trayProject, trayPress: TrayPress(scrubbing: fixtureID(43))))
+    }
+
+    /// A tray photo carried up over the front slide's cell, which marks where it would land.
+    @Test func carryingTrayPhoto() async {
+        let press = TrayPress(carrying: fixtureID(43), at: CGPoint(x: 201, y: 400))
+        await assertScreenSnapshot(of: projectScreen(trayProject, trayPress: press))
+    }
 }
 
 extension ScreenSnapshotting {

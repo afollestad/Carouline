@@ -6,8 +6,9 @@
 import QuartzCore
 import SwiftUI
 
-/// How a layer dragged to the strip's edge scrolls it along a panorama, which runs past the
-/// screen's sides, so the layer can go anywhere along it.
+/// How a finger held at a scroll view's edge scrolls it: the strip along a panorama, which runs past
+/// the screen's sides, for a layer dragged there, so the layer can go anywhere along it, or the tray
+/// along its photos, for one held there.
 nonisolated enum EdgeScroll {
     /// A fingertip in from either edge, as far in as a finger can rest and still be on the screen.
     static let zone = LayerGeometry.minimumTarget

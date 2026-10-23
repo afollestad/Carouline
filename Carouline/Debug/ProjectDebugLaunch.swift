@@ -7,9 +7,9 @@
 import SwiftUI
 
 /// Selects `-DebugSelectCell`'s photo or `-DebugSelectLayer`'s layer in the open project, holds
-/// `-DebugHoldPhoto`'s photo, and opens `-DebugSheet`'s sheet, after a moment, since a
-/// presentation on the first frame doesn't render, and the strip can't scroll to a slide before it
-/// has measured the slides.
+/// `-DebugHoldPhoto`'s photo, magnifies `-DebugPressTrayPhoto`'s, and opens `-DebugSheet`'s sheet,
+/// after a moment, since a presentation on the first frame doesn't render, and the strip can't
+/// scroll to a slide before it has measured the slides.
 struct ProjectDebugLaunch: ViewModifier {
     let library: ProjectLibrary
     let projectID: UUID
@@ -21,6 +21,7 @@ struct ProjectDebugLaunch: ViewModifier {
     let present: (ProjectPresentation) -> Void
     let hold: (HeldPhoto) -> Void
     @Environment(DebugSettings.self) private var debug: DebugSettings?
+    @Environment(TrayPress.self) private var trayPress: TrayPress?
 
     func body(content: Content) -> some View {
         content.task {
@@ -30,7 +31,7 @@ struct ProjectDebugLaunch: ViewModifier {
 
     private func open() async {
         guard debug?.selectedCell != nil || debug?.selectedLayer != nil || debug?.heldPhoto != nil
-            || (debug?.sheet?.opensInProject) == true else {
+            || debug?.pressedTrayPhoto != nil || (debug?.sheet?.opensInProject) == true else {
             return
         }
         try? await Task.sleep(for: .milliseconds(500))
@@ -38,6 +39,7 @@ struct ProjectDebugLaunch: ViewModifier {
         if let held = debug?.heldPhoto.flatMap(heldPhoto) {
             hold(held)
         }
+        magnifyTrayPhoto()
         if let (slide, cell) = debug?.selectedCell, slides.indices.contains(slide) {
             selectCell(CellAddress(projectID: projectID, slideID: slides[slide].id, index: cell))
         }
@@ -52,6 +54,14 @@ struct ProjectDebugLaunch: ViewModifier {
         case .addLayer: layerSlideID.map { layerActions.openSheet($0, [.add]) }
         case .editLayer: selectedLayer().map { layerActions.edit($0) }
         case .newProject, .customRatio, nil: break
+        }
+    }
+
+    /// Magnifies `-DebugPressTrayPhoto`'s photo, if the tray has it.
+    private func magnifyTrayPhoto() {
+        let tray = library.project(projectID)?.tray ?? []
+        if let index = debug?.pressedTrayPhoto, tray.indices.contains(index) {
+            trayPress?.magnify(tray[index].id)
         }
     }
 
