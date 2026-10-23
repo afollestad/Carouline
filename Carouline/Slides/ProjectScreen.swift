@@ -275,8 +275,10 @@ struct ProjectScreen: View {
                 // Saved first, so an unsaved edit can't put back what the new width shifts.
                 session.saveLiveCrop(to: library)
                 layerSession.saveLivePlacement(to: library)
+                // At once, as the strip follows the photo along it at once, so what's in view holds
+                // still, which a scroll animated beside the panorama's own animation can't do.
+                library.setSpan(span, of: slideID, in: projectID)
                 withAnimation {
-                    library.setSpan(span, of: slideID, in: projectID)
                     // Brought to the front, as a move is, should the menu be a neighbor's.
                     stripPosition = .slide(slideID)
                 }

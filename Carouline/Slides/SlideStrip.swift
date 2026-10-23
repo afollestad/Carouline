@@ -215,7 +215,16 @@ struct SlideStrip: View {
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
         }
-        .modifier(StripScrolling(position: $position, scroll: $scroll, stops: stops, snapping: snapping, tracked: tracked))
+        .modifier(StripScrolling(
+            position: $position,
+            scroll: $scroll,
+            stops: stops,
+            snapping: snapping,
+            tracked: tracked,
+            slides: project.slides,
+            slideSize: project.aspectRatio.exportSize,
+            slideWidth: slideWidth
+        ))
         // Held while a gesture moves the selection, so a drag on it moves it rather than the strip,
         // while one off it scrolls the strip as usual.
         .scrollDisabled(holdsStill || (layersSlideID != nil && !scrollsAlongLayersSlide))
@@ -332,6 +341,7 @@ struct SlideStrip: View {
         if scrolled != 0 {
             // Ahead of the scroll's report, so the next frame's builds on it.
             tracked.offset = offset
+            tracked.destination = nil
             scroll.scrollTo(x: offset)
         }
         return scrolled

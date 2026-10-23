@@ -95,4 +95,41 @@ struct StripScrollingTests {
 
         #expect(deleted.offset(keeping: .slide(first), at: 0, from: stops) == 0)
     }
+
+    /// A slide reshaping in the middle shifts the strip along it as far as its layers, no further
+    /// than it rests along it, as from a single slide's rest to where its middle lands on a panorama.
+    @Test func shiftsAlongAReshapedSlideNoFurtherThanItRests() {
+        #expect(stops.offset(shifting: 320, by: 300, along: .slide(panorama)) == 620)
+        #expect(stops.offset(shifting: 320, by: -100, along: .slide(panorama)) == 320)
+        #expect(stops.offset(shifting: 900, by: 300, along: .slide(panorama)) == 920)
+        #expect(stops.offset(shifting: 320, by: 300, along: .slide(UUID())) == nil)
+    }
+
+    /// The slide in the middle turned into a panorama moves the strip along it as far as its
+    /// photo's middle moves, while one turned beside it leaves the strip where it is.
+    @Test func followsTheSlideInTheMiddleAsItReshapes() {
+        let photo = Cell(image: PlacedImage(assetIdentifier: nil, pixelWidth: 6000, pixelHeight: 1500))
+        let ends = [Slide(id: first, layout: .single), Slide(id: last, layout: .single)]
+        func state(_ middle: Slide) -> StripState {
+            StripState(
+                position: nil,
+                stops: StripStops(
+                    items: [.slide(first), .slide(panorama), .slide(last), .add],
+                    stops: StripSnapping.stops(spans: [1, middle.span, 1], slideWidth: 300, spacing: 20, addButtonSize: 56)
+                ),
+                slides: [ends[0], middle, ends[1]]
+            )
+        }
+        let single = state(Slide(id: panorama, layout: .single, cells: [photo]))
+        let wide = state(Slide(id: panorama, layout: .panorama, span: 5, cells: [photo]))
+        let size = AspectRatio.portrait.exportSize
+
+        let middle = wide.rest(from: single, at: 320, slideSize: size, slideWidth: 300)
+        let beside = wide.rest(from: single, at: 0, slideSize: size, slideWidth: 300)
+
+        #expect(abs(middle.offset - 920) < 1e-9)
+        #expect(middle.reshaped)
+        #expect(beside.offset == 0)
+        #expect(!beside.reshaped)
+    }
 }
