@@ -18,9 +18,11 @@ nonisolated struct StripSnapping: ScrollTargetBehavior {
         var origin: CGFloat = 0
         var stops: [ClosedRange<CGFloat>] = []
         for span in spans {
-            let width = slideWidth * CGFloat(max(1, span))
-            stops.append(origin...(origin + width - slideWidth))
-            origin += width + spacing
+            let span = CGFloat(max(1, span))
+            // Its slides past the first added to its start, since taking a slide off its end can
+            // round below its start, and a range that ends before it starts traps.
+            stops.append(origin...(origin + slideWidth * (span - 1)))
+            origin += slideWidth * span + spacing
         }
         let addButton = origin + (addButtonSize - slideWidth) / 2
         return stops + [addButton...addButton]

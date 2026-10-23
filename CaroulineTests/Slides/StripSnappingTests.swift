@@ -18,6 +18,13 @@ struct StripSnappingTests {
         #expect(stops == [0...0, 320...920, 1240...1240, 1438...1438])
     }
 
+    /// A slide's stop is its start alone, even for a width that rounds `start + width - width` below
+    /// its start, as 344.4 points, 82% of a 420-point strip, does on the third slide.
+    @Test func stopsOnASlideForAnyWidth() {
+        let stops = StripSnapping.stops(spans: [1, 1, 1], slideWidth: 344.4, spacing: 20, addButtonSize: 56)
+        #expect(stops.dropLast().allSatisfy { $0.lowerBound == $0.upperBound })
+    }
+
     @Test func restsWhereItIsAlongAPanorama() {
         #expect(StripSnapping.rest(for: 600, among: stops) == 600)
     }
