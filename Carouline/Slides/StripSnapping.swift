@@ -5,26 +5,41 @@
 
 import SwiftUI
 
+/// A card in the strip: `span` slides side by side in its middle, and `width` wide, as wide as
+/// them, or as its caption where that's wider, as under a phone's slides in landscape.
+nonisolated struct StripCard: Equatable {
+    let span: Int
+    let width: CGFloat
+
+    /// How far in from the card's edges its slides `slideWidth` wide sit: half what its caption
+    /// widens it by.
+    func inset(slideWidth: CGFloat) -> CGFloat {
+        max(0, width - slideWidth * CGFloat(max(1, span))) / 2
+    }
+}
+
 /// Snaps a scroll of the strip to the nearest of `stops`, or rests it where it is within one, as
 /// along a panorama.
 nonisolated struct StripSnapping: ScrollTargetBehavior {
     let stops: [ClosedRange<CGFloat>]
 
-    /// Where the strip rests for each slide, then the add button, past the leading padding that
+    /// Where the strip rests for each card, then the add button, past the leading padding that
     /// rests the first slide's middle in the screen's: each slide's middle in the screen's, and
     /// anywhere from a panorama's first slide's middle to its last's, so the strip scrolls freely
-    /// along one wider than the screen.
-    static func stops(spans: [Int], slideWidth: CGFloat, spacing: CGFloat, addButtonSize: CGFloat) -> [ClosedRange<CGFloat>] {
+    /// along one wider than the screen. Each card's slides sit in its middle, past `inset`.
+    static func stops(cards: [StripCard], slideWidth: CGFloat, spacing: CGFloat, addButtonSize: CGFloat) -> [ClosedRange<CGFloat>] {
+        // Measured from the first card's slides rather than its edge, as the leading padding is.
+        let lead = cards.first?.inset(slideWidth: slideWidth) ?? 0
         var origin: CGFloat = 0
         var stops: [ClosedRange<CGFloat>] = []
-        for span in spans {
-            let span = CGFloat(max(1, span))
+        for card in cards {
+            let start = origin + card.inset(slideWidth: slideWidth) - lead
             // Its slides past the first added to its start, since taking a slide off its end can
             // round below its start, and a range that ends before it starts traps.
-            stops.append(origin...(origin + slideWidth * (span - 1)))
-            origin += slideWidth * span + spacing
+            stops.append(start...(start + slideWidth * CGFloat(max(1, card.span) - 1)))
+            origin += card.width + spacing
         }
-        let addButton = origin + (addButtonSize - slideWidth) / 2
+        let addButton = origin - lead + (addButtonSize - slideWidth) / 2
         return stops + [addButton...addButton]
     }
 

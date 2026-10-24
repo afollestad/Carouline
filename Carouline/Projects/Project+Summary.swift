@@ -39,6 +39,12 @@ extension ClosedRange<Int> {
         count == 1 ? "Slide \(lowerBound)" : "Slides \(lowerBound)–\(upperBound)"
     }
 
+    /// `slidesName` with every digit a zero, as "Slide 00" for slides 10 to 99, which a caption
+    /// naming any slides of that shape is as wide as, since its digits are tabular.
+    var slidesNameShape: String {
+        String(slidesName.map { $0.isNumber ? "0" : $0 })
+    }
+
     /// `slidesName` as VoiceOver should read it, rather than trusting it to read the dash.
     var spokenSlidesName: String {
         count == 1 ? "Slide \(lowerBound)" : "Slides \(lowerBound) to \(upperBound)"

@@ -18,7 +18,7 @@ struct StripScrollingTests {
     private var stops: StripStops {
         StripStops(
             items: [.slide(first), .slide(panorama), .slide(last), .add],
-            stops: StripSnapping.stops(spans: [1, 3, 1], slideWidth: 300, spacing: 20, addButtonSize: 56)
+            stops: StripSnapping.stops(cards: .cards(spans: [1, 3, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
         )
     }
 
@@ -46,7 +46,7 @@ struct StripScrollingTests {
     @Test func keepsThePlaceAlongAPanoramaThatMoves() {
         let moved = StripStops(
             items: [.slide(panorama), .slide(first), .slide(last), .add],
-            stops: StripSnapping.stops(spans: [3, 1, 1], slideWidth: 300, spacing: 20, addButtonSize: 56)
+            stops: StripSnapping.stops(cards: .cards(spans: [3, 1, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
         )
 
         #expect(moved.offset(keeping: .slide(panorama), at: 400, from: stops) == 80)
@@ -56,7 +56,7 @@ struct StripScrollingTests {
     @Test func keepsAPlaceAlongANarrowedPanoramaWithinIt() {
         let narrowed = StripStops(
             items: [.slide(first), .slide(panorama), .slide(last), .add],
-            stops: StripSnapping.stops(spans: [1, 2, 1], slideWidth: 300, spacing: 20, addButtonSize: 56)
+            stops: StripSnapping.stops(cards: .cards(spans: [1, 2, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
         )
 
         #expect(narrowed.offset(keeping: .slide(panorama), at: 900, from: stops) == 620)
@@ -68,7 +68,7 @@ struct StripScrollingTests {
         let added = UUID()
         let more = StripStops(
             items: [.slide(first), .slide(panorama), .slide(last), .slide(added), .add],
-            stops: StripSnapping.stops(spans: [1, 3, 1, 1], slideWidth: 300, spacing: 20, addButtonSize: 56)
+            stops: StripSnapping.stops(cards: .cards(spans: [1, 3, 1, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
         )
 
         #expect(more.offset(keeping: .slide(added), at: 1438, from: stops) == 1560)
@@ -90,7 +90,7 @@ struct StripScrollingTests {
     @Test func restsOnTheNearestOnceTheFrontIsGone() {
         let deleted = StripStops(
             items: [.slide(panorama), .slide(last), .add],
-            stops: StripSnapping.stops(spans: [3, 1], slideWidth: 300, spacing: 20, addButtonSize: 56)
+            stops: StripSnapping.stops(cards: .cards(spans: [3, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
         )
 
         #expect(deleted.offset(keeping: .slide(first), at: 0, from: stops) == 0)
@@ -115,21 +115,54 @@ struct StripScrollingTests {
                 position: nil,
                 stops: StripStops(
                     items: [.slide(first), .slide(panorama), .slide(last), .add],
-                    stops: StripSnapping.stops(spans: [1, middle.span, 1], slideWidth: 300, spacing: 20, addButtonSize: 56)
+                    stops: StripSnapping.stops(cards: .cards(spans: [1, middle.span, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
                 ),
-                slides: [ends[0], middle, ends[1]]
+                slides: [ends[0], middle, ends[1]],
+                slideWidth: 300
             )
         }
         let single = state(Slide(id: panorama, layout: .single, cells: [photo]))
         let wide = state(Slide(id: panorama, layout: .panorama, span: 5, cells: [photo]))
         let size = AspectRatio.portrait.exportSize
 
-        let middle = wide.rest(from: single, at: 320, slideSize: size, slideWidth: 300)
-        let beside = wide.rest(from: single, at: 0, slideSize: size, slideWidth: 300)
+        let middle = wide.rest(from: single, at: 320, slideSize: size)
+        let beside = wide.rest(from: single, at: 0, slideSize: size)
 
         #expect(abs(middle.offset - 920) < 1e-9)
-        #expect(middle.reshaped)
+        #expect(middle.atOnce)
         #expect(beside.offset == 0)
-        #expect(!beside.reshaped)
+        #expect(!beside.atOnce)
+    }
+
+    /// A caption measured wider than the first slide widens its card, which moves the strip along
+    /// the panorama in the middle at once, keeping what's in view where it was.
+    @Test func keepsTheMiddleStillAtOnceAsACaptionWidensACard() {
+        let slides = [Slide(id: first, layout: .single), Slide(id: panorama, layout: .panorama, span: 3), Slide(id: last, layout: .single)]
+        let cards = [StripCard(span: 1, width: 360)] + .cards(spans: [3, 1])
+        let widened = StripStops(
+            items: stops.items,
+            stops: StripSnapping.stops(cards: cards, slideWidth: 300, spacing: 20, addButtonSize: 56)
+        )
+        let old = StripState(position: nil, stops: stops, slides: slides, slideWidth: 300)
+        let new = StripState(position: nil, stops: widened, slides: slides, slideWidth: 300)
+
+        let rest = new.rest(from: old, at: 400, slideSize: AspectRatio.portrait.exportSize)
+
+        #expect(rest.offset == 430)
+        #expect(rest.atOnce)
+    }
+
+    /// The slides' width changing, as on turning the screen, moves the strip as the slides moving
+    /// do, animated.
+    @Test func animatesAlongANewSlideWidth() {
+        let slides = [Slide(id: first, layout: .single), Slide(id: panorama, layout: .panorama, span: 3), Slide(id: last, layout: .single)]
+        let narrower = StripStops(
+            items: stops.items,
+            stops: StripSnapping.stops(cards: .cards(spans: [1, 3, 1], slideWidth: 200), slideWidth: 200, spacing: 20, addButtonSize: 56)
+        )
+        let old = StripState(position: nil, stops: stops, slides: slides, slideWidth: 300)
+        let new = StripState(position: nil, stops: narrower, slides: slides, slideWidth: 200)
+
+        #expect(!new.rest(from: old, at: 400, slideSize: AspectRatio.portrait.exportSize).atOnce)
     }
 }

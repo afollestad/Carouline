@@ -62,7 +62,7 @@ nonisolated struct StripStops: Equatable {
 /// where it is as slides come, go or change width around it, and moves along it as far as its
 /// layers shift as it reshapes, so what was in view stays. Animated, as everything that moves it
 /// or its slides from elsewhere is, since a scroll position takes no animation from the change that
-/// set it, except following a slide reshaping, which happens at once.
+/// set it, except following a slide reshaping, or a caption widening its card, which happen at once.
 struct StripScrolling: ViewModifier {
     @Binding var position: StripItem?
     @Binding var scroll: ScrollPosition
@@ -98,7 +98,7 @@ struct StripScrolling: ViewModifier {
             }
             // One handler, so a position written from elsewhere and the slides changing with it are
             // settled in one order.
-            .onChange(of: StripState(position: position, stops: stops, slides: slides)) { old, new in
+            .onChange(of: StripState(position: position, stops: stops, slides: slides, slideWidth: slideWidth)) { old, new in
                 move(from: old, to: new)
             }
     }
@@ -119,15 +119,15 @@ struct StripScrolling: ViewModifier {
         // Where an animated scroll is headed, rather than wherever it's got to and whatever it's
         // passing, which `tracked.front` follows.
         let base = tracked.destination ?? tracked.offset
-        let rest = new.rest(from: old, at: base, slideSize: slideSize, slideWidth: slideWidth)
+        let rest = new.rest(from: old, at: base, slideSize: slideSize)
         if rest.offset != base {
-            // At once with a slide reshaping at once, unless the strip is already on its way.
-            scroll(to: rest.offset, animated: !rest.reshaped || tracked.destination != nil)
+            // At once with a slide or a card reshaping at once, unless the strip is already on its way.
+            scroll(to: rest.offset, animated: !rest.atOnce || tracked.destination != nil)
         }
     }
 
     /// Animated in step with the slides moving around the one in front, or at once with the slide
-    /// in front reshaping, so what's in view holds still.
+    /// in front reshaping, or a caption widening a card, so what's in view holds still.
     private func scroll(to offset: CGFloat, animated: Bool) {
         guard animated else {
             // Ahead of the scroll's report, so a change before it builds on it.
@@ -164,17 +164,20 @@ final class TrackedScroll {
 }
 
 /// What moves the strip from elsewhere: an item written to its position, and the slides, whose
-/// stops change with them.
+/// stops change with them, as they do with the slides' width on screen and their captions'.
 nonisolated struct StripState: Equatable {
     let position: StripItem?
     let stops: StripStops
     let slides: [Slide]
+    /// One slide's width on screen.
+    let slideWidth: CGFloat
 
-    /// Where the strip rests once the slides change from `old`'s, from `base` among those: the item
-    /// there kept where it was, and moved along it as far as its layers shift if it reshaped, on
-    /// slides `slideWidth` points wide that export at `slideSize`. Whether it reshaped, which a
-    /// slide does at once.
-    func rest(from old: StripState, at base: CGFloat, slideSize: CGSize, slideWidth: CGFloat) -> (offset: CGFloat, reshaped: Bool) {
+    /// Where the strip rests once the slides or their stops change from `old`'s, from `base` among
+    /// those: the item there kept where it was, and moved along it as far as its layers shift if it
+    /// reshaped, on slides that export at `slideSize`. Whether it moves there at once: as the slide
+    /// reshapes, or as a caption widens its card, which both happen at once. The stops changing with
+    /// the slides' width, as on turning the screen, are animated as the slides moving are.
+    func rest(from old: StripState, at base: CGFloat, slideSize: CGSize) -> (offset: CGFloat, atOnce: Bool) {
         let front = old.stops.item(at: base) ?? old.stops.items.first
         let kept = stops.offset(keeping: front, at: base, from: old.stops)
         guard case .slide(let slideID) = front,
@@ -182,7 +185,7 @@ nonisolated struct StripState: Equatable {
               let after = slides.first(where: { $0.id == slideID }),
               let shift = after.shift(from: before, slideSize: slideSize),
               let shifted = stops.offset(shifting: kept, by: shift.dx * slideWidth, along: .slide(slideID)) else {
-            return (kept, false)
+            return (kept, slides == old.slides && slideWidth == old.slideWidth)
         }
         return (shifted, true)
     }

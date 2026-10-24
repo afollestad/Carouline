@@ -3,8 +3,9 @@
 ### Strip layout and scrolling
 
 - Keep `SlideStrip`'s layout size fixed while a layers sheet is open, and shrink and move its slides with `scaleEffect` and `offset`, as `RoomFit` does. Slides laid out at a new size decode their photos again for it, on every frame the sheet moves.
-- Lay the strip out in an `HStack`, never a lazy stack, and build only the slides near its middle, as `builtSlides` does, with a `SlidePlaceholder` for the rest. A lazy stack guesses the widths of slides it hasn't built, so they sit off the stops the strip scrolls by.
-- Shape anything beside or in place of a slide in the strip like a card, padding it by `captionSpace` below as the add button and `SlidePlaceholder` are, since the strip centers each card whole, caption included.
+- Lay the strip out in an `HStack`, never a lazy stack, and build a `SlideCard`, caption included, for every slide, with `buildsPhotos` only near its middle, as `builtSlides` sets it. A lazy stack, or a stand-in without the caption, sits off the stops the strip scrolls by.
+- Lay each card out at `cardWidth(of:numbers:)`, its slides' width or its caption's from `CaptionWidths` where that's wider, and take the stops and the leading padding from the same widths. A card that widens as the strip scrolls, as one measuring its own caption would, leaves an animated scroll short of where it was headed.
+- Shape anything beside a slide in the strip like a card, padding it by `captionSpace` below as the add button is, since the strip lines each card up by its whole height, caption included.
 - Clip the strip and its content shape where iPhone Duo's column of bar buttons starts, with `TrailingClip`, since a clip alone still lets taps reach the slides it hides. Its scroll view reaches under the column even when padded clear of the safe area there with `ignoresSafeArea`, and no scroll edge effect softens what's under it.
 - Scroll the strip by offset through `StripScrolling`, never `scrollPosition(id:)`, and keep what sits on a panorama in view with `followsStripMiddle`'s `offset`, never a `visualEffect`. A scroll view finds the item whose middle is nearest its own, the slide beside a panorama wider than the screen, and a popover, tour anchor or tap stays where layout put it under a visual effect.
 

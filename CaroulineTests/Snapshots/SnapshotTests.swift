@@ -98,6 +98,49 @@ extension ScreenSnapshotting {
         )
     }
 
+    /// A slide then a panorama, which a strip short enough, as a phone's in landscape is, makes
+    /// narrower than their captions.
+    var narrowSlidesProject: Project {
+        Project(
+            id: fixtureID(20),
+            name: "Hallway",
+            aspectRatio: .tallPortrait,
+            slides: [
+                Slide(id: fixtureID(22), layout: .single, cells: [photo(250, 1536, 2048)]),
+                Slide(id: fixtureID(23), layout: .panorama, span: 2, cells: [photo(251, 3072, 2048)])
+            ],
+            createdAt: created
+        )
+    }
+
+    /// `project`'s slides alone, in a strip `height` tall in the middle of the screen, resting on
+    /// the first slide.
+    func slideStrip(_ project: Project, height: CGFloat) -> some View {
+        SlideStrip(
+            project: project,
+            position: .constant(nil),
+            importingCells: [],
+            cellActions: .preview,
+            session: CropSession(),
+            layerSession: LayerSession(),
+            layerActions: .preview,
+            layersSlideID: nil,
+            onBackgroundTap: {},
+            onAddSlide: {},
+            onChangeLayout: { _ in },
+            onMove: { _, _ in },
+            onDelete: { _ in },
+            onSetSpan: { _, _ in }
+        )
+        .frame(height: height)
+        .frame(maxHeight: .infinity)
+        .background {
+            GlowBackdrop()
+                .ignoresSafeArea()
+        }
+        .environment(\.imageLoader, imageLoader)
+    }
+
     /// `project`'s screen in its navigation stack, from a library holding just it, with
     /// `selection` selected to frame, `layerSession`'s layer selected, `missing` images' copies
     /// missing, and `loading` images' still loading.

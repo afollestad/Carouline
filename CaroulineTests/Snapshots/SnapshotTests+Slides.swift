@@ -77,6 +77,13 @@ extension SnapshotTests {
         await assertScreenSnapshot(of: projectScreen(project, selection: selection))
     }
 
+    /// Slides narrower than their captions, as on a phone in landscape: the first rests in the
+    /// middle of a card its caption widens, and the panorama's caption stays on the panorama.
+    /// Tighter than the default, which a caption moved by its overflow alone would pass.
+    @Test func captionsWiderThanSlides() async {
+        await assertScreenSnapshot(of: slideStrip(narrowSlidesProject, height: 340), precision: 0.998)
+    }
+
     @Test func emptyPanorama() async {
         await assertScreenSnapshot(of: projectScreen(landscapePanorama))
     }

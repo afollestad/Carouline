@@ -6,7 +6,8 @@
 import SwiftUI
 import TipKit
 
-/// One slide in the strip: its cells, and the caption under it with the slide's options.
+/// One slide in the strip: its cells, and the caption under it with the slide's options, as wide
+/// as the strip lays it out, which is the slide's width or its caption's where that's wider.
 struct SlideCard: View {
     let slide: Slide
     let projectID: UUID
@@ -16,6 +17,9 @@ struct SlideCard: View {
     let canMoveLeft: Bool
     let canMoveRight: Bool
     let size: CGSize
+    /// Whether the card builds its photos and layers, as only those near the strip's middle do, so
+    /// a project's photos never all decode at once. The rest show a `SlidePlaceholder`.
+    var buildsPhotos = true
     /// How many of the slide's points a point on screen covers, as the strip scales it.
     var screenPoint: CGFloat = 1
     /// Where the strip's selection gesture finds the slide while it holds the selection.
@@ -36,6 +40,9 @@ struct SlideCard: View {
     var acceptsDrops = false
     /// Tells the strip whether a drop hovers over the slide.
     var onDropHover: (_ slideID: UUID, _ isOver: Bool) -> Void = { _, _ in }
+    /// Tells the strip the caption's own width, which it finds every caption's buttons and their
+    /// room from, past their labels.
+    var onCaptionWidth: (CGFloat) -> Void = { _ in }
     @State private var isConfirmingDelete = false
     /// Which of the caption's popovers is open, if either.
     @State private var openPopover: CaptionPopoverKind?
@@ -55,6 +62,8 @@ struct SlideCard: View {
     private static let captionSpacing: CGFloat = 12
     /// A fingertip's target, which the caption's row holds whatever its glass's height.
     static let captionHeight: CGFloat = 44
+    /// The caption's text, which `CaptionLabelWidths` measures its labels in.
+    static let captionFont: Font = .subheadline.weight(.medium)
 
     /// How far what follows the strip's middle along a panorama moves either way, as its caption does.
     var stripReach: CGFloat {
@@ -62,23 +71,31 @@ struct SlideCard: View {
     }
 
     var body: some View {
-        // Measured only while the slide holds the selection, so a scroll measures nothing.
-        let holdsSelection = session.selection?.slideID == slide.id || layerSession.selection?.slideID == slide.id
+        // Measured only while the slide holds the selection, so a scroll measures nothing, and only
+        // while it's built, so a selection scrolled far off isn't moved by a pinch on the strip.
+        let holdsSelection = buildsPhotos && (session.selection?.slideID == slide.id || layerSession.selection?.slideID == slide.id)
         // And only while a tray photo is carried over the strip, for the cell it would land in.
-        let isCarriedOver = trayPress?.phase == .carrying
+        let isCarriedOver = buildsPhotos && trayPress?.phase == .carrying
         VStack(spacing: Self.captionSpacing) {
-            CardPhotos(
-                slide: slide,
-                projectID: projectID,
-                numbers: numbers,
-                size: size,
-                importingCells: importingCells,
-                cellActions: cellActions,
-                session: session,
-                layerSession: layerSession,
-                isAnythingSelected: isAnythingSelected,
-                dropTarget: dropTarget
-            )
+            // One view either way, so the modifiers on it stay put as the card builds its photos.
+            ZStack {
+                if buildsPhotos {
+                    CardPhotos(
+                        slide: slide,
+                        projectID: projectID,
+                        numbers: numbers,
+                        size: size,
+                        importingCells: importingCells,
+                        cellActions: cellActions,
+                        session: session,
+                        layerSession: layerSession,
+                        isAnythingSelected: isAnythingSelected,
+                        dropTarget: dropTarget
+                    )
+                } else {
+                    SlidePlaceholder(size: size, background: slide.style.background)
+                }
+            }
             .frame(width: size.width, height: size.height)
             // From the slide, or a panorama's slide in view, rather than the card, where the system's
             // dialog pointed on a phone, since under the caption alone there isn't room for it.
@@ -109,24 +126,26 @@ struct SlideCard: View {
             }
             .reportsPanoramaFront(slide.id, span: slide.span, to: layerSession)
             .overlay {
-                SlideLayers(
-                    layers: slide.layers,
-                    projectID: projectID,
-                    slideID: slide.id,
-                    span: slide.span,
-                    background: slide.style.background,
-                    size: size,
-                    interaction: LayerInteraction(
-                        session: layerSession,
-                        actions: layerActions,
-                        selectedLayerID: layerSession.selection?.slideID == slide.id ? layerSession.selection?.layerID : nil,
-                        isAnythingSelected: isAnythingSelected,
-                        isDrafting: layerSession.draftSlideID == slide.id,
-                        screenPoint: screenPoint,
-                        heldPhoto: cellActions.held,
-                        placeHeld: cellActions.landInLayer
+                if buildsPhotos {
+                    SlideLayers(
+                        layers: slide.layers,
+                        projectID: projectID,
+                        slideID: slide.id,
+                        span: slide.span,
+                        background: slide.style.background,
+                        size: size,
+                        interaction: LayerInteraction(
+                            session: layerSession,
+                            actions: layerActions,
+                            selectedLayerID: layerSession.selection?.slideID == slide.id ? layerSession.selection?.layerID : nil,
+                            isAnythingSelected: isAnythingSelected,
+                            isDrafting: layerSession.draftSlideID == slide.id,
+                            screenPoint: screenPoint,
+                            heldPhoto: cellActions.held,
+                            placeHeld: cellActions.landInLayer
+                        )
                     )
-                )
+                }
             }
             // Over the layers, so a cut still shows across one that crosses it.
             .overlay {
@@ -154,11 +173,13 @@ struct SlideCard: View {
             }
             .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
             // Over the layers, which the layer tip points at, and past the shadow, under which a
-            // tip's close button doesn't draw.
+            // tip's close button doesn't draw. Only on a built card, as the one in front always is.
             .overlay {
-                tourTips
-                    // From the slide, as glass over a slide takes its scheme.
-                    .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
+                if buildsPhotos {
+                    tourTips
+                        // From the slide, as glass over a slide takes its scheme.
+                        .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
+                }
             }
             // Over the layers, which would otherwise take a drop on the cell under them.
             .onDrop(of: SlideDrop.types, delegate: SlideDrop(
@@ -171,20 +192,23 @@ struct SlideCard: View {
                 onHover: onDropHover,
                 actions: cellActions
             ))
-            .accessibilityElement(children: .contain)
+            // One element for a slide without its photos, still found and scrolled to by its label.
+            .accessibilityElement(children: buildsPhotos ? .contain : .ignore)
             .accessibilityLabel("\(spokenNumbers) of \(count), \(slide.layout.name)\(spokenLayers)")
             // Over the caption, which comes after it, so a tip grown past a short slide still shows
             // and takes its taps.
             .zIndex(1)
-            // Only a panorama's as wide as the card, so a slide still widens for a caption wider than it.
+            // Measured at its own width, rather than squeezed into a card the strip hasn't widened
+            // for it yet, and moved within the card, as wide as the strip lays it out.
             caption
+                .fixedSize(horizontal: true, vertical: false)
+                .onGeometryChange(for: CGFloat.self, of: \.size.width, action: onCaptionWidth)
                 .followsStripMiddle(reach: stripReach)
-                .frame(width: stripReach > 0 ? size.width : nil)
         }
         // Over the slide and its caption, where the tip finds the caption's buttons. Not while
-        // one of their popovers is open over it.
+        // one of their popovers is open over it, nor on a card that isn't built.
         .overlayPreferenceValue(TourTargetBounds.self) { targets in
-            if openPopover == nil {
+            if buildsPhotos, openPopover == nil {
                 captionTip(at: targets)
                     // From the slide, as glass over a slide takes its scheme.
                     .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
@@ -225,7 +249,10 @@ struct SlideCard: View {
                     popovers.whenGone { openPopover = .options }
                 } label: {
                     HStack(spacing: 8) {
+                        // Tabular, so the caption is as wide as any other of its `slidesNameShape`,
+                        // which the strip lays its card out by before it's measured.
                         Text(numbersText)
+                            .monospacedDigit()
                         Image(systemName: "ellipsis")
                     }
                 }
@@ -249,7 +276,7 @@ struct SlideCard: View {
                     CaptionPopover(groups: [layerChoices], header: { EmptyView() }, onGone: { popoverGone(finishing: .layers) })
                 }
             }
-            .font(.subheadline.weight(.medium))
+            .font(Self.captionFont)
             .foregroundStyle(Color.primary)
             .buttonStyle(.glass)
         }
@@ -407,63 +434,6 @@ struct SlideCard: View {
             default: "\(photoNote) Its \(layers) layers are deleted too."
             }
         }
-    }
-}
-
-/// A slide's cells, each with its photo or the way to add one. The only part of the card that
-/// reads a blur or style the layers sheet is editing, so each step redraws the photos alone,
-/// rather than the card, which on a wide screen hosts the sheet's popover.
-private struct CardPhotos: View {
-    let slide: Slide
-    let projectID: UUID
-    let numbers: ClosedRange<Int>
-    let size: CGSize
-    let importingCells: Set<CellAddress>
-    let cellActions: CellActions
-    let session: CropSession
-    let layerSession: LayerSession
-    let isAnythingSelected: Bool
-    /// The cell a drop over the slide would land in.
-    let dropTarget: Int?
-    @Environment(TrayPress.self) private var trayPress: TrayPress?
-
-    var body: some View {
-        // Here rather than on the card, so a tray photo carried from cell to cell redraws the cells alone.
-        let target = dropTarget ?? trayPress?.target.flatMap { $0.slideID == slide.id ? $0.index : nil }
-        let isStyling = layerSession.stylingSlideID == slide.id
-        let style = isStyling ? layerSession.slideStyle : slide.style
-        let blur = LayerGeometry.blurRadius(isStyling ? layerSession.slideBlur : slide.blur, slideWidth: size.width / CGFloat(max(1, slide.span)))
-        SlideView(slide: slide, style: style, revealsEmptyCells: true) { index in
-            let address = CellAddress(projectID: projectID, slideID: slide.id, index: index)
-            CellView(
-                cell: slide.cells[index],
-                address: address,
-                background: style.background,
-                position: position(of: index),
-                emptyCellCount: slide.emptyCellCount(skipping: importingIndexes),
-                isImporting: importingCells.contains(address),
-                actions: cellActions,
-                session: session,
-                isPanorama: slide.layout == .panorama,
-                isAnythingSelected: isAnythingSelected,
-                blur: blur,
-                isDropTarget: target == index,
-                stripReach: StripMiddle.reach(span: slide.span, cardWidth: size.width)
-            )
-        }
-    }
-
-    private func position(of index: Int) -> String {
-        if slide.layout == .panorama {
-            "panorama photo on slides \(numbers.lowerBound) to \(numbers.upperBound)"
-        } else {
-            "slide \(numbers.lowerBound), photo \(index + 1) of \(slide.cells.count)"
-        }
-    }
-
-    /// The cells with a photo on its way in, which a pick can't fill.
-    private var importingIndexes: Set<Int> {
-        Set(slide.cells.indices.filter { importingCells.contains(CellAddress(projectID: projectID, slideID: slide.id, index: $0)) })
     }
 }
 

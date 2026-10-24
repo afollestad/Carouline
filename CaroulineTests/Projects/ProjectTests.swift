@@ -33,6 +33,13 @@ struct ProjectTests {
         #expect((3...3).slidesName == "Slide 3")
     }
 
+    /// Names of as many digits share a shape, which their captions are as wide as.
+    @Test func shapesSlidesNamesByTheirDigits() {
+        #expect((3...3).slidesNameShape == "Slide 0")
+        #expect((17...17).slidesNameShape == "Slide 00")
+        #expect((9...10).slidesNameShape == "Slides 0–00")
+    }
+
     @Test func summarizesAShapeOfTheUsersOwnByItsOrientation() throws {
         let shape = try #require(AspectRatio(width: 5, height: 7, pixelWidth: 2000, pixelHeight: 2800))
         let project = Project(name: "Shop", aspectRatio: shape)

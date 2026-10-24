@@ -69,6 +69,9 @@ struct SlideStrip: View {
     @State private var screenFrame: CGRect = .zero
     /// The slide a drop hovers over, which comes to the front once the drop rests there.
     @State private var dropHoverSlideID: UUID?
+    /// How wide the captions are, which widen their cards where they're wider than their slides,
+    /// as under a phone's slides in landscape.
+    @State private var captionWidths = CaptionWidths()
     /// Where the strip is scrolled to, which `StripScrolling` keeps in step with `position`.
     @State private var scroll = ScrollPosition()
     @State private var tracked = TrackedScroll()
@@ -103,6 +106,9 @@ struct SlideStrip: View {
             proxy.size
         } action: { size in
             self.size = size
+        }
+        .background {
+            CaptionLabelWidths(widths: $captionWidths.labels)
         }
         .scaleEffect(fit.scale, anchor: .top)
         .offset(y: fit.offset)
@@ -209,27 +215,18 @@ struct SlideStrip: View {
             // build their photos and layers.
             HStack(spacing: Self.spacing) {
                 ForEach(Array(project.slides.enumerated()), id: \.element.id) { index, slide in
-                    if built.contains(index) {
-                        card(for: slide, at: index, numbers: numbers[index], screenPoint: screenPoint)
-                    } else {
-                        SlidePlaceholder(
-                            size: cardSize(span: slide.span),
-                            background: slide.style.background,
-                            label: "\(numbers[index].spokenSlidesName) of \(project.carouselSlideCount), \(slide.layout.name)"
-                        )
-                        // Over room as tall as a caption's, so it sits as its card does.
-                        .padding(.bottom, Self.captionSpace)
-                    }
+                    card(for: slide, at: index, numbers: numbers[index], buildsPhotos: built.contains(index), screenPoint: screenPoint)
                 }
                 AddSlideButton(size: Self.addButtonSize, action: onAddSlide)
                     // Over room as tall as a caption's, so it centers on the slides beside it rather
                     // than on them and their captions.
                     .padding(.bottom, Self.captionSpace)
             }
-            // Room for the first slide and the add button each to reach the middle. Padding
-            // rather than `contentMargins`, which stop view-aligned scrolling from snapping and
-            // shift a centered `scrollPosition` off the middle of the screen.
-            .padding(.leading, max(0, (size.width - slideWidth) / 2))
+            // Room for the first slide and the add button each to reach the middle, the slide inside
+            // a card its caption widens. Padding rather than `contentMargins`, which stop
+            // view-aligned scrolling from snapping and shift a centered `scrollPosition` off the
+            // middle of the screen.
+            .padding(.leading, max(0, (size.width - slideWidth) / 2 - (cards.first?.inset(slideWidth: slideWidth) ?? 0)))
             .padding(.trailing, max(0, (size.width - Self.addButtonSize) / 2))
             .padding(.bottom, SelectionBar.reservedHeight)
             .frame(maxHeight: .infinity)
@@ -264,8 +261,9 @@ struct SlideStrip: View {
         .contentShape(TrailingClip(isClipping: barColumnWidth > 0))
     }
 
-    /// The slide at `index` in the strip, numbered `numbers` in the carousel.
-    private func card(for slide: Slide, at index: Int, numbers: ClosedRange<Int>, screenPoint: CGFloat) -> some View {
+    /// The slide at `index` in the strip, numbered `numbers` in the carousel, with its photos and
+    /// layers if it `buildsPhotos`.
+    private func card(for slide: Slide, at index: Int, numbers: ClosedRange<Int>, buildsPhotos: Bool, screenPoint: CGFloat) -> some View {
         SlideCard(
             slide: slide,
             projectID: project.id,
@@ -274,6 +272,7 @@ struct SlideStrip: View {
             canMoveLeft: index > 0,
             canMoveRight: index < project.slides.count - 1,
             size: cardSize(span: slide.span),
+            buildsPhotos: buildsPhotos,
             screenPoint: screenPoint,
             frames: slideFrames,
             importingCells: importingCells,
@@ -294,8 +293,18 @@ struct SlideStrip: View {
                 } else if dropHoverSlideID == slideID {
                     dropHoverSlideID = nil
                 }
+            },
+            onCaptionWidth: { width in
+                // Written only when it changes, as every card reports its caption.
+                var widths = captionWidths
+                widths.sample(width, naming: numbers)
+                if widths != captionWidths {
+                    captionWidths = widths
+                }
             }
         )
+        // As the stops expect it, rather than as wide as its caption makes it on its own.
+        .frame(width: cardWidth(of: slide, numbers: numbers))
         // Over its neighbors, which come later or earlier in the stack, so a tour tip grown past a
         // narrow slide still shows and takes its taps.
         .zIndex(project.frontSlide(at: position)?.id == slide.id ? 1 : 0)
@@ -345,7 +354,7 @@ struct SlideStrip: View {
         StripStops(
             items: project.slides.map { .slide($0.id) } + [.add],
             stops: StripSnapping.stops(
-                spans: project.slides.map(\.span),
+                cards: cards,
                 slideWidth: slideWidth,
                 spacing: Self.spacing,
                 addButtonSize: Self.addButtonSize
@@ -392,6 +401,17 @@ struct SlideStrip: View {
         cardSize(span: 1).width
     }
 
+    /// The slides' cards, as wide as the strip lays them out and rests by.
+    private var cards: [StripCard] {
+        zip(project.slides, project.slideNumbers).map { StripCard(span: $0.span, width: cardWidth(of: $0, numbers: $1)) }
+    }
+
+    /// A card's width: its slides', or its caption's where that's wider, as under a phone's slides
+    /// in landscape, with its slides in the middle.
+    private func cardWidth(of slide: Slide, numbers: ClosedRange<Int>) -> CGFloat {
+        max(cardSize(span: slide.span).width, captionWidths.width(naming: numbers) ?? 0)
+    }
+
     private func cardSize(span: Int) -> CGSize {
         Self.cardSize(span: span, aspectRatio: project.aspectRatio, isRegular: horizontalSizeClass == .regular, in: size)
     }
@@ -405,20 +425,6 @@ struct SlideStrip: View {
         let maxHeight = max(0, size.height - captionSpace - SelectionBar.reservedHeight - 32)
         let width = max(0, min(maxWidth, maxHeight * ratio))
         return CGSize(width: width * CGFloat(max(1, span)), height: width / ratio)
-    }
-}
-
-/// Clips off what's past the trailing edge, when `isClipping`, leaving the other edges open, so
-/// slides still reach under the leading safe area and the bars above and below.
-private struct TrailingClip: Shape {
-    /// Far enough past the open edges to hold anything drawn beyond them.
-    private static let reach: CGFloat = 10_000
-
-    let isClipping: Bool
-
-    func path(in rect: CGRect) -> Path {
-        let open = rect.insetBy(dx: -Self.reach, dy: -Self.reach)
-        return Path(isClipping ? open.divided(atDistance: rect.maxX - open.minX, from: .minXEdge).slice : open)
     }
 }
 
