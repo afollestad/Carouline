@@ -111,7 +111,13 @@ struct SlideCard: View {
             .background {
                 Color.clear
                     .frame(width: size.width - 2 * stripReach)
-                    .confirmationPopover("Delete \(numbersText)?", isPresented: $isConfirmingDelete, message: deletionMessage) {
+                    // Lowered as the confirmation starts to close, rather than once it has gone.
+                    .confirmationPopover(
+                        "Delete \(numbersText)?",
+                        isPresented: $isConfirmingDelete,
+                        message: deletionMessage,
+                        onClosing: lift.lower
+                    ) {
                         Button(deleteTitle, role: .destructive) {
                             lift.isDeleting = true
                             onDelete()

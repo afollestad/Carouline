@@ -10,18 +10,20 @@ extension View {
     /// confirmation dialog is, whose buttons each close it and act at once. In place of
     /// `confirmationDialog`, which runs its action only once it has finished closing: about 0.55 s
     /// after the tap, or 1.1 s from a title bar button, well after it looks gone, so the change it
-    /// asked about lagged behind it.
+    /// asked about lagged behind it. `onClosing` runs as it starts to close, however it's closed,
+    /// where a tap outside it sets `isPresented` false only once it has gone.
     func confirmationPopover<Actions: View>(
         _ title: String,
         isPresented: Binding<Bool>,
         message: String? = nil,
+        onClosing: (() -> Void)? = nil,
         @ViewBuilder actions: () -> Actions
     ) -> some View {
         // Built now, in the body of the view it comes from, so that view tracks what they read, as
         // it wouldn't from a closure run only once the popover shows, which then shows stale state.
         let actions = actions()
         return popover(isPresented: isPresented) {
-            ConfirmationPopover(title: title, message: message, actions: actions)
+            ConfirmationPopover(title: title, message: message, onClosing: onClosing, actions: actions)
         }
     }
 }
@@ -30,6 +32,7 @@ extension View {
 struct ConfirmationPopover<Actions: View>: View {
     let title: String
     let message: String?
+    var onClosing: (() -> Void)?
     let actions: Actions
     @Environment(\.screenMetrics) private var screen
     /// The screen's text size. The strip caps its own, which a popover from a slide would otherwise
@@ -52,6 +55,13 @@ struct ConfirmationPopover<Actions: View>: View {
         // a sheet.
         .presentationCompactAdaptation(.popover)
         .countsAsPopover()
+        // Outside `ViewThatFits`, which may build both its choices.
+        .background {
+            if let onClosing {
+                ClosingReader(onClosing: onClosing)
+                    .accessibilityHidden(true)
+            }
+        }
     }
 
     private var content: some View {
@@ -137,6 +147,36 @@ private struct DialogButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(configuration.isPressed ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: .capsule)
             .contentShape(.capsule)
+    }
+}
+
+/// Tells `onClosing` as soon as the popover it's in starts to close, from UIKit's own word, where
+/// SwiftUI's `isPresented` and `onDisappear` only say so once it has gone, half a second after a tap
+/// outside it.
+private struct ClosingReader: UIViewControllerRepresentable {
+    let onClosing: () -> Void
+
+    final class Controller: UIViewController {
+        var onClosing: () -> Void = {}
+
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            // Behind the popover's content, where it would only take touches meant for it.
+            view.isUserInteractionEnabled = false
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            onClosing()
+        }
+    }
+
+    func makeUIViewController(context: Context) -> Controller {
+        Controller()
+    }
+
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.onClosing = onClosing
     }
 }
 
