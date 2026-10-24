@@ -35,9 +35,14 @@ nonisolated struct StripStops: Equatable {
 
     /// The offset that keeps `item`, at `offset` in `old`'s layout, where it was along its stop,
     /// as slides come, go, move or change width around it. A new item, which the strip was moved to
-    /// as it was added, rests in the middle, and once the item's gone, the nearest stop does.
+    /// as it was added, rests in the middle, and once the item's gone, the one that took its place
+    /// rests at its start, rather than the stop nearest `offset`, which past a deleted panorama's
+    /// middle is beyond the slide after it.
     func offset(keeping item: StripItem?, at offset: CGFloat, from old: StripStops) -> CGFloat {
         guard let item, let index = items.firstIndex(of: item) else {
+            if let next = front(replacing: item, from: old), let nextIndex = items.firstIndex(of: next) {
+                return stops[nextIndex].lowerBound
+            }
             return StripSnapping.rest(for: offset, among: stops)
         }
         let stop = stops[index]
@@ -46,6 +51,15 @@ nonisolated struct StripStops: Equatable {
         }
         let moved = offset - old.stops[oldIndex].lowerBound + stop.lowerBound
         return min(max(moved, stop.lowerBound), stop.upperBound)
+    }
+
+    /// What takes `front`'s place once it's gone from `old`: the item now where it was, or the add
+    /// button after the last slide. Nil while `front` is still here, or wasn't in `old`.
+    func front(replacing front: StripItem?, from old: StripStops) -> StripItem? {
+        guard let front, !items.contains(front), let oldIndex = old.items.firstIndex(of: front), !items.isEmpty else {
+            return nil
+        }
+        return items[min(oldIndex, items.count - 1)]
     }
 
     /// `offset` moved by `distance`, no further than `item` rests along its stop, or nil for an
@@ -104,7 +118,9 @@ struct StripScrolling: ViewModifier {
     }
 
     /// Brings an item written to `position` from elsewhere to the middle, or else keeps the item in
-    /// the middle where it is as the slides change, moved along it as far as its layers shift.
+    /// the middle where it is as the slides change, moved along it as far as its layers shift. Once
+    /// that item's gone, hands the middle to what took its place, which often rests where it was,
+    /// so no scroll reports it.
     private func move(from old: StripState, to new: StripState) {
         // Only an item written from elsewhere, not one the strip reported.
         if new.position != old.position, let item = new.position, item != tracked.front,
@@ -123,6 +139,10 @@ struct StripScrolling: ViewModifier {
         if rest.offset != base {
             // At once with a slide or a card reshaping at once, unless the strip is already on its way.
             scroll(to: rest.offset, animated: !rest.atOnce || tracked.destination != nil)
+        }
+        // The front `rest` kept, should it be gone, which the strip rests on at `base`.
+        if let next = new.stops.front(replacing: old.stops.item(at: base), from: old.stops) {
+            report(next)
         }
     }
 

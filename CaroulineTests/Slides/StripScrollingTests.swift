@@ -86,14 +86,86 @@ struct StripScrollingTests {
         #expect(stops.offset(movedBy: 50, along: .slide(panorama), from: 100) == 100)
     }
 
-    /// Once the slide in the middle is gone, the strip rests on the nearest left.
-    @Test func restsOnTheNearestOnceTheFrontIsGone() {
+    /// Once the slide in the middle is gone, the strip rests at the start of what took its place.
+    @Test func restsOnWhatTakesTheFrontsPlace() {
         let deleted = StripStops(
             items: [.slide(panorama), .slide(last), .add],
             stops: StripSnapping.stops(cards: .cards(spans: [3, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
         )
 
         #expect(deleted.offset(keeping: .slide(first), at: 0, from: stops) == 0)
+    }
+
+    /// The slide after a deleted one rests where it was, so no scroll reports it, and it takes the
+    /// middle from the deleted one.
+    @Test func handsTheFrontToTheSlideThatTakesItsPlace() {
+        let middle = UUID()
+        let three = StripStops(
+            items: [.slide(first), .slide(middle), .slide(last), .add],
+            stops: StripSnapping.stops(cards: .cards(spans: [1, 1, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
+        )
+        let deleted = StripStops(
+            items: [.slide(first), .slide(last), .add],
+            stops: StripSnapping.stops(cards: .cards(spans: [1, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
+        )
+
+        #expect(deleted.offset(keeping: .slide(middle), at: 320, from: three) == 320)
+        #expect(deleted.front(replacing: .slide(middle), from: three) == .slide(last))
+    }
+
+    /// A panorama deleted from along its middle or end hands the middle to the slide after it,
+    /// rather than the stop nearest where the strip was, which is past that slide.
+    @Test func handsADeletedPanoramasPlaceToTheSlideAfterIt() {
+        let slides = [Slide(id: first, layout: .single), Slide(id: panorama, layout: .panorama, span: 3), Slide(id: last, layout: .single)]
+        let old = StripState(position: nil, stops: stops, slides: slides, slideWidth: 300)
+        let new = StripState(
+            position: nil,
+            stops: StripStops(
+                items: [.slide(first), .slide(last), .add],
+                stops: StripSnapping.stops(cards: .cards(spans: [1, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
+            ),
+            slides: [slides[0], slides[2]],
+            slideWidth: 300
+        )
+
+        for offset: CGFloat in [620, 920] {
+            let rest = new.rest(from: old, at: offset, slideSize: AspectRatio.portrait.exportSize)
+            #expect(rest.offset == 320)
+            #expect(!rest.atOnce)
+        }
+        #expect(new.stops.front(replacing: .slide(panorama), from: stops) == .slide(last))
+    }
+
+    /// The last slide deleted hands the middle to the add button after it.
+    @Test func handsTheLastSlidesPlaceToTheAddButton() {
+        let deleted = StripStops(
+            items: [.slide(first), .slide(panorama), .add],
+            stops: StripSnapping.stops(cards: .cards(spans: [1, 3]), slideWidth: 300, spacing: 20, addButtonSize: 56)
+        )
+
+        #expect(deleted.front(replacing: .slide(last), from: stops) == .add)
+        #expect(deleted.offset(keeping: .slide(last), at: 1240, from: stops) == 1118)
+    }
+
+    /// A slide still in the strip keeps the middle, wherever the others went.
+    @Test func keepsTheFrontWhileItStays() {
+        let moved = StripStops(
+            items: [.slide(panorama), .slide(first), .slide(last), .add],
+            stops: StripSnapping.stops(cards: .cards(spans: [3, 1, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
+        )
+
+        #expect(moved.front(replacing: .slide(first), from: stops) == nil)
+    }
+
+    /// Nothing hands the middle on without a front, or for one the strip never had.
+    @Test func handsNothingOnWithoutAFront() {
+        let deleted = StripStops(
+            items: [.slide(panorama), .slide(last), .add],
+            stops: StripSnapping.stops(cards: .cards(spans: [3, 1]), slideWidth: 300, spacing: 20, addButtonSize: 56)
+        )
+
+        #expect(deleted.front(replacing: nil, from: stops) == nil)
+        #expect(deleted.front(replacing: .slide(UUID()), from: stops) == nil)
     }
 
     /// A slide reshaping in the middle shifts the strip along it as far as its layers, no further
