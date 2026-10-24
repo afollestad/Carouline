@@ -36,6 +36,18 @@ struct StripScrollingTests {
         #expect(stops.item(at: 1400) == .add)
     }
 
+    @Test func restsOnAStopOrAlongAPanorama() {
+        #expect(stops.rests(.slide(first), at: 0))
+        #expect(stops.rests(.slide(panorama), at: 600))
+        #expect(stops.rests(.add, at: 1438))
+    }
+
+    /// Stopped short of a slide, as a tap stopping the strip as it coasts leaves it.
+    @Test func restsNowhereBetweenStops() {
+        #expect(!stops.rests(.slide(first), at: 150))
+        #expect(!stops.rests(.slide(panorama), at: 1000))
+    }
+
     @Test func centersASlideOrAPanoramasMiddle() {
         #expect(stops.offset(centering: .slide(first)) == 0)
         #expect(stops.offset(centering: .slide(panorama)) == 620)

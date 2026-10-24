@@ -18,6 +18,13 @@ nonisolated struct StripStops: Equatable {
         StripSnapping.nearest(to: offset, among: stops).map { items[$0] }
     }
 
+    /// Whether the strip at `offset` rests with `item` in the middle: on its stop, or anywhere
+    /// along a panorama's, rather than stopped short of it. Within a point counts, as a rest can
+    /// land that near.
+    func rests(_ item: StripItem, at offset: CGFloat) -> Bool {
+        self.item(at: offset) == item && abs(StripSnapping.rest(for: offset, among: stops) - offset) <= 1
+    }
+
     /// The offset that rests `item` in the middle: a slide's stop, or a panorama's middle.
     func offset(centering item: StripItem) -> CGFloat? {
         items.firstIndex(of: item).map { (stops[$0].lowerBound + stops[$0].upperBound) / 2 }
@@ -149,7 +156,9 @@ struct StripScrolling: ViewModifier {
     /// Animated in step with the slides moving around the one in front, or at once with the slide
     /// in front reshaping, or a caption widening a card, so what's in view holds still.
     private func scroll(to offset: CGFloat, animated: Bool) {
-        guard animated else {
+        // At once, too, where the strip already is, which it never moves to reach, so a destination
+        // there would never clear.
+        guard animated, abs(offset - tracked.offset) > 1 else {
             // Ahead of the scroll's report, so a change before it builds on it.
             tracked.offset = offset
             tracked.destination = nil

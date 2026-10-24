@@ -123,7 +123,7 @@ nonisolated struct LayoutTip: Tip {
 nonisolated struct SlideMenuTip: Tip {
     var title: Text { Text("Slide Options") }
     var message: Text? {
-        Text("Move the slide, delete it, or set a panorama's width.").foregroundStyle(Color.primary)
+        Text("Move the slide, delete it, or set a panorama's width. You can also swipe a slide up to delete it.").foregroundStyle(Color.primary)
     }
     var image: Image? { Image(systemName: "ellipsis.circle") }
     var actions: [Action] { [nextAction()] }

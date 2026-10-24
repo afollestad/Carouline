@@ -264,7 +264,9 @@ struct SlideStrip: View {
     /// The slide at `index` in the strip, numbered `numbers` in the carousel, with its photos and
     /// layers if it `buildsPhotos`.
     private func card(for slide: Slide, at index: Int, numbers: ClosedRange<Int>, buildsPhotos: Bool, screenPoint: CGFloat) -> some View {
-        SlideCard(
+        // Once a layers sheet has gone, as one still closing leaves the slides touchable.
+        let isIdle = layersSlideID == nil && !isAnythingSelected && cellActions.held == nil && layerSession.sheetRoom == 0
+        return SlideCard(
             slide: slide,
             projectID: project.id,
             numbers: numbers,
@@ -285,7 +287,9 @@ struct SlideStrip: View {
             onMove: { onMove(slide.id, $0) },
             onDelete: { onDelete(slide.id) },
             onSetSpan: { onSetSpan(slide.id, $0) },
-            acceptsDrops: layersSlideID == nil && !isAnythingSelected && cellActions.held == nil,
+            acceptsDrops: isIdle,
+            swipesToDelete: isIdle && !isScrolling && project.isFront(slide.id, at: position),
+            restsInMiddle: { tracked.destination == nil && stops.rests(.slide(slide.id), at: tracked.offset) },
             onDropHover: { slideID, isOver in
                 // Left alone when a drop leaves a slide after entering the next.
                 if isOver {

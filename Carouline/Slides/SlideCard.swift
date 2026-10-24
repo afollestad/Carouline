@@ -36,14 +36,21 @@ struct SlideCard: View {
     let onDelete: () -> Void
     let onSetSpan: (Int) -> Void
     /// Whether the slide takes photos dropped on it: not while anything is selected or held, nor
-    /// while a slide's layers are open.
+    /// while a slide's layers are open or still closing.
     var acceptsDrops = false
+    /// Whether a swipe up the slide asks to delete it: only the slide in front, while nothing is
+    /// selected, held or open and the strip holds still.
+    var swipesToDelete = false
+    /// Whether the strip rests with the slide in the middle, checked as a swipe decides and again
+    /// as it lifts, since a strip stopped short of a slide still calls it the one in front.
+    var restsInMiddle: () -> Bool = { false }
     /// Tells the strip whether a drop hovers over the slide.
     var onDropHover: (_ slideID: UUID, _ isOver: Bool) -> Void = { _, _ in }
     /// Tells the strip the caption's own width, which it finds every caption's buttons and their
     /// room from, past their labels.
     var onCaptionWidth: (CGFloat) -> Void = { _ in }
     @State private var isConfirmingDelete = false
+    @State private var lift = SlideLift()
     /// Which of the caption's popovers is open, if either.
     @State private var openPopover: CaptionPopoverKind?
     /// What a choice in the caption's popover does once the popover has gone.
@@ -96,6 +103,8 @@ struct SlideCard: View {
                     SlidePlaceholder(size: size, background: slide.style.background)
                 }
             }
+            // Before the confirmation's background, whose Delete would take it too.
+            .disabled(lift.isLifted)
             .frame(width: size.width, height: size.height)
             // From the slide, or a panorama's slide in view, rather than the card, where the system's
             // dialog pointed on a phone, since under the caption alone there isn't room for it.
@@ -103,7 +112,11 @@ struct SlideCard: View {
                 Color.clear
                     .frame(width: size.width - 2 * stripReach)
                     .confirmationPopover("Delete \(numbersText)?", isPresented: $isConfirmingDelete, message: deletionMessage) {
-                        Button(deleteTitle, role: .destructive, action: onDelete)
+                        Button(deleteTitle, role: .destructive) {
+                            lift.isDeleting = true
+                            onDelete()
+                        }
+                        .onAppear { lift.hasShownAsk = true }
                     }
                     .followsStripMiddle(reach: stripReach)
             }
@@ -145,6 +158,7 @@ struct SlideCard: View {
                             placeHeld: cellActions.landInLayer
                         )
                     )
+                    .disabled(lift.isLifted)
                 }
             }
             // Over the layers, so a cut still shows across one that crosses it.
@@ -172,6 +186,13 @@ struct SlideCard: View {
                     .strokeBorder(.separator, lineWidth: 0.5)
             }
             .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+            // On the slide alone, not its tips or caption.
+            .gesture(lift.swipeUp(
+                isEnabled: swipesToDelete && !lift.isAsking,
+                canBegin: { [restsInMiddle, trayPress] in restsInMiddle() && trayPress?.photoID == nil },
+                slideHeight: size.height,
+                onAsk: { popovers.whenGone { if lift.isAsking { isConfirmingDelete = true } } }
+            ))
             // Over the layers, which the layer tip points at, and past the shadow, under which a
             // tip's close button doesn't draw. Only on a built card, as the one in front always is.
             .overlay {
@@ -186,7 +207,7 @@ struct SlideCard: View {
                 slide: slide,
                 projectID: projectID,
                 canvas: LayerCanvas(size: size, span: slide.span, screenPoint: screenPoint),
-                isEnabled: acceptsDrops,
+                isEnabled: acceptsDrops && !lift.isAsking,
                 importing: importingIndexes,
                 targetedCell: $dropTarget,
                 onHover: onDropHover,
@@ -214,6 +235,8 @@ struct SlideCard: View {
                     .environment(\.colorScheme, slide.style.background.isLight ? .light : .dark)
             }
         }
+        // The caption and its tips rise with the slide.
+        .modifier(LiftEffect(lift: lift, slideHeight: size.height, isConfirming: $isConfirmingDelete, isEnabled: swipesToDelete))
         // A wide screen's popover pointing at its slide, from the card, not its caption's glass
         // button, whose style the popover would take on. A sheet comes from the screen.
         .popover(isPresented: layerActions.showsPopover ? layerActions.isShowingSheet(slide.id) : .constant(false)) {
