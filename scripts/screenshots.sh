@@ -83,12 +83,10 @@ status_bar_time="${status_bar_time%??}:${status_bar_time: -2}"
 states=(
   "1-projects|"
   "2-project|-DebugOpenProject 0"
-  "3-layout|-DebugOpenProject 0 -DebugSheet layout"
-  "4-photo|-DebugOpenProject 0 -DebugSelectCell 1,1"
-  "5-layers|-DebugOpenProject 0 -DebugSelectLayer 2,1 -DebugSheet layers"
-  "6-panorama|-DebugOpenProject 0 -DebugSelectLayer 3,0"
-  "7-export|-DebugOpenProject 0 -DebugSheet export"
-  "8-new-project|-DebugSheet newProject"
+  "3-layers|-DebugOpenProject 0 -DebugSelectLayer 2,1 -DebugSheet layers"
+  "4-panorama|-DebugOpenProject 0 -DebugSelectLayer 3,0"
+  "5-export|-DebugOpenProject 0 -DebugSheet export"
+  "6-new-project|-DebugSheet newProject"
 )
 
 if [ "$build_first" -eq 1 ]; then
