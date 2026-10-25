@@ -6,7 +6,7 @@
 import SwiftUI
 
 /// The project screen's Share button, with the popover it opens on a wide screen. A phone's export
-/// sheet comes from the screen, as a sheet that keeps the height it's dragged to.
+/// sheet comes from the screen, as a sheet rather than this popover adapted to one.
 struct ProjectToolbar: ToolbarContent {
     let project: Project
     let exporter: SlideExporter
@@ -29,7 +29,7 @@ struct ProjectToolbar: ToolbarContent {
             .accessibilityHint("Saves the slides to Photos or shares them to another app")
             .popover(isPresented: $isExporting) {
                 ExportSheet(project: project, exporter: exporter)
-                    .frame(idealWidth: 420, idealHeight: 480)
+                    .frame(idealWidth: 420)
                     .onDisappear(perform: onPopoverGone)
                     .countsAsPopover()
             }

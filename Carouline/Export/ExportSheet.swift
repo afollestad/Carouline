@@ -11,12 +11,18 @@ struct ExportSheet: View {
     let exporter: any SlideExporting
     @State private var phase = Phase.preparing
     @State private var saving = SaveState.idle
+    /// How tall the title bar and the content are, which the sheet and the popover fit, rather than
+    /// leaving blank space below the buttons. A stand-in until the first layout measures it.
+    @State private var height: CGFloat = 480
     @Environment(\.photoSaver) private var photoSaver
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
 
     /// Instagram's limit for a carousel, the most common place these go.
     private static let carouselLimit = 20
+    /// The previews' height, which the spinner holds while they're prepared, so the sheet opens at
+    /// about the height it keeps.
+    private static let previewHeight: CGFloat = 140
 
     private enum Phase {
         case preparing
@@ -34,13 +40,12 @@ struct ExportSheet: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            ScrollView {
                 switch phase {
                 case .preparing:
-                    ProgressView(project.carouselSlideCount == 1 ? "Preparing 1 slide…" : "Preparing \(project.carouselSlideCount) slides…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    content(nil)
                 case .ready(let result):
-                    ready(result)
+                    content(result)
                 case .failed:
                     ContentUnavailableView(
                         "Couldn't Prepare Slides",
@@ -50,6 +55,13 @@ struct ExportSheet: View {
                 }
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                // With the title bar the content scrolls under, but not a phone's bottom safe area,
+                // which its sheet reaches over past its height.
+                geometry.contentInsets.top + geometry.contentSize.height
+            } action: { _, height in
+                self.height = height
+            }
             .navigationTitle("Export")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -58,6 +70,8 @@ struct ExportSheet: View {
                 }
             }
         }
+        // A popover's height, which a sheet's detent sets instead.
+        .frame(idealHeight: height)
         .task {
             do {
                 phase = .ready(try await exporter.export(project))
@@ -68,46 +82,56 @@ struct ExportSheet: View {
         .sensoryFeedback(.success, trigger: saving) { _, state in
             state == .saved
         }
-        .presentationDetents([.medium, .large])
+        // Taller only shows blank space, and content taller than the screen scrolls in a sheet
+        // already at its full height.
+        .presentationDetents([.height(height)])
         .foregroundStyle(Color.primary)
         .tint(.accentColor)
     }
 
-    private func ready(_ result: ExportResult) -> some View {
-        ScrollView {
-            VStack(spacing: 20) {
+    /// The previews and buttons, or, while the slides are prepared, a spinner in the previews'
+    /// place and the buttons disabled.
+    private func content(_ result: ExportResult?) -> some View {
+        VStack(spacing: 20) {
+            if let result {
                 preview(result)
                 notes(result)
-                VStack(spacing: 12) {
-                    Button {
+            } else {
+                ProgressView(project.carouselSlideCount == 1 ? "Preparing 1 slide…" : "Preparing \(project.carouselSlideCount) slides…")
+                    .frame(maxWidth: .infinity, minHeight: Self.previewHeight)
+            }
+            VStack(spacing: 12) {
+                Button {
+                    if let result {
                         Task {
                             await save(result.files)
                         }
-                    } label: {
-                        saveLabel
-                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.glassProminent)
-                    .disabled(saving == .saving || saving == .saved)
-                    ShareLink(items: result.files) {
-                        Label("Share…", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.glass)
-                    .accessibilityHint("Sends every slide, in order, to another app")
+                } label: {
+                    saveLabel
+                        .frame(maxWidth: .infinity)
                 }
-                .controlSize(.large)
-                .padding(.horizontal)
-                if saving == .denied {
-                    deniedNote
-                } else if saving == .failed {
-                    Text("Carouline couldn't save the slides. Try again.")
-                        .font(.footnote)
-                        .foregroundStyle(Color.primary)
+                .buttonStyle(.glassProminent)
+                .disabled(result == nil || saving == .saving || saving == .saved)
+                ShareLink(items: result?.files ?? []) {
+                    Label("Share…", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.glass)
+                .disabled(result == nil)
+                .accessibilityHint("Sends every slide, in order, to another app")
             }
-            .padding(.vertical)
+            .controlSize(.large)
+            .padding(.horizontal)
+            if saving == .denied {
+                deniedNote
+            } else if saving == .failed {
+                Text("Carouline couldn't save the slides. Try again.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.primary)
+            }
         }
+        .padding(.vertical)
     }
 
     private func preview(_ result: ExportResult) -> some View {
@@ -118,7 +142,7 @@ struct ExportSheet: View {
                         Image(decorative: thumbnail, scale: 1)
                             .resizable()
                             .aspectRatio(project.aspectRatio.widthOverHeight, contentMode: .fit)
-                            .frame(height: 140)
+                            .frame(height: Self.previewHeight)
                             .overlay {
                                 Rectangle()
                                     .strokeBorder(.separator, lineWidth: 0.5)

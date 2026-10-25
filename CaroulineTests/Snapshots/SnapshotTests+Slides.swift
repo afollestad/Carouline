@@ -59,6 +59,12 @@ extension SnapshotTests {
         try await assertScreenSnapshot(of: exportSheet(projects[0]))
     }
 
+    /// A spinner in the previews' place and the buttons disabled, so the sheet opens at about the
+    /// height it keeps.
+    @Test func exportPreparing() async {
+        await assertScreenSnapshot(of: preparingExportSheet(projects[0]))
+    }
+
     @Test func newSlideSheet() async {
         await assertScreenSnapshot(of: LayoutSheet(aspectRatio: .portrait, current: nil) { _ in 0 } onChoose: { _ in })
     }

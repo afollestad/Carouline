@@ -432,6 +432,12 @@ extension ScreenSnapshotting {
             .environment(\.photoSaver, MockPhotoSaver())
     }
 
+    /// `project`'s export sheet while its slides are still being written.
+    func preparingExportSheet(_ project: Project) -> some View {
+        ExportSheet(project: project, exporter: PendingExport())
+            .environment(\.photoSaver, MockPhotoSaver())
+    }
+
     /// Draws every fixture photo but one, whose copy reads as missing.
     var imageLoader: MockImageLoader {
         MockImageLoader(missing: [fixtureID(missingPhotoNumber)])
@@ -479,5 +485,13 @@ private struct FinishedExport: SlideExporting {
 
     func export(_ project: Project) async throws -> ExportResult {
         result
+    }
+}
+
+/// An export that never finishes, leaving the sheet preparing until it goes, which cancels it.
+private struct PendingExport: SlideExporting {
+    func export(_ project: Project) async throws -> ExportResult {
+        try await Task.sleep(for: .seconds(3600))
+        throw CancellationError()
     }
 }
