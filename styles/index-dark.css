@@ -1,0 +1,48 @@
+/* Dark theme: the app's dark glow, its violets and mint dimmed toward night.
+   Don't forget to update the theme colors in scripts/dark-mode.js if --bg changes,
+   and re-export images/og-image.png, which bakes it in as its canvas. */
+
+:root {
+    color-scheme: dark;
+
+    --bg: #0f0a1f;
+    --fg: #f1edf8;
+    --secondary: #b8aecb;
+    /* AccentColor's dark variant, 5.9:1 on --bg. */
+    --accent: #a078ee;
+    /* The accent lifted for small text on glass. */
+    --accent-text: #c9b3ff;
+    /* Links in running text are the icon's mint, as the policy's were on af.codes. */
+    --link: #bdf3d6;
+    --hairline: rgba(241, 237, 248, .12);
+    --surface: rgba(255, 255, 255, .04);
+    --callout: #1b2b26;
+    --glass: rgba(255, 255, 255, .07);
+    --glass-border: rgba(255, 255, 255, .14);
+    --glass-shadow: rgba(0, 0, 0, .35);
+    --icon-shadow: rgba(0, 0, 0, .45);
+    --device-rim: #3d3550;
+    --device-shadow: rgba(0, 0, 0, .55);
+    --ribbon-shadow: rgba(0, 0, 0, .35);
+    /* The icon's violet through its lavender to its mint. */
+    --title-gradient: linear-gradient(100deg, #b99aff 5%, #c494fa 45%, #bdf3d6 95%);
+}
+
+html {
+    background: var(--bg);
+}
+
+.theme-toggle .icon-sun {
+    display: block;
+}
+
+/* GlowBackdrop's dark corners: violet top left and right and bottom right,
+   mint bottom left, and a teal at the middle of the right edge. */
+body::before {
+    background:
+        radial-gradient(60% 55% at 0% 0%, #3b2b7a, rgba(59, 43, 122, 0) 70%),
+        radial-gradient(55% 50% at 100% 0%, #291f5e, rgba(41, 31, 94, 0) 70%),
+        radial-gradient(45% 45% at 100% 50%, #1a2e38, rgba(26, 46, 56, 0) 70%),
+        radial-gradient(60% 55% at 0% 100%, #1c3b33, rgba(28, 59, 51, 0) 70%),
+        radial-gradient(60% 55% at 100% 100%, #3b2b80, rgba(59, 43, 128, 0) 70%);
+}

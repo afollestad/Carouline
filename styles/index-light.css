@@ -1,0 +1,48 @@
+/* Light theme: the app's light glow, its violets and mint washed nearly to
+   white.
+   Don't forget to update the theme colors in scripts/dark-mode.js if --bg changes. */
+
+:root {
+    color-scheme: light;
+
+    --bg: #faf7ff;
+    --fg: #241c35;
+    --secondary: #5f566d;
+    /* AccentColor's light variant, 4.8:1 on white. */
+    --accent: #7957e7;
+    /* The accent deepened for small text on glass, at least 6.7:1 on its frost. */
+    --accent-text: #5c3bb8;
+    --link: #5c3bb8;
+    --hairline: rgba(36, 28, 53, .12);
+    --surface: #ffffff;
+    --callout: #eaf8f0;
+    --glass: rgba(255, 255, 255, .55);
+    --glass-border: rgba(36, 28, 53, .1);
+    --glass-shadow: rgba(66, 40, 140, .18);
+    --icon-shadow: rgba(66, 40, 140, .22);
+    --device-rim: #a9a4b8;
+    --device-shadow: rgba(52, 30, 110, .3);
+    --ribbon-shadow: rgba(52, 30, 110, .14);
+    /* The icon's violet to its lavender, deepened at both ends to hold 3:1 for
+       large text on the glow. */
+    --title-gradient: linear-gradient(100deg, #5c3bb8 5%, #7957e7 55%, #9a63e6 95%);
+}
+
+html {
+    background: var(--bg);
+}
+
+.theme-toggle .icon-moon {
+    display: block;
+}
+
+/* GlowBackdrop's light corners: violet top left and right and bottom right,
+   mint bottom left and at the middle of the right edge. */
+body::before {
+    background:
+        radial-gradient(60% 55% at 0% 0%, #e6dbfc, rgba(230, 219, 252, 0) 70%),
+        radial-gradient(55% 50% at 100% 0%, #ede6fc, rgba(237, 230, 252, 0) 70%),
+        radial-gradient(45% 45% at 100% 50%, #e8f7f0, rgba(232, 247, 240, 0) 70%),
+        radial-gradient(60% 55% at 0% 100%, #def7eb, rgba(222, 247, 235, 0) 70%),
+        radial-gradient(60% 55% at 100% 100%, #e3d9fa, rgba(227, 217, 250, 0) 70%);
+}
