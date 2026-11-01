@@ -15,6 +15,9 @@
     --link: #5c3bb8;
     --hairline: rgba(36, 28, 53, .12);
     --surface: #ffffff;
+    /* Behind the logo, at least 3:1 with its main blues, #0057d5 and #0186fb.
+       Matches af.codes. */
+    --logo-circle: #ffffff;
     --callout: #eaf8f0;
     --glass: rgba(255, 255, 255, .55);
     --glass-border: rgba(36, 28, 53, .1);

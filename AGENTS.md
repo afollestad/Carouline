@@ -29,6 +29,7 @@ Encode screenshots as lossless WebP (`cwebp -lossless -z 9`), since lossy ringin
 - `images/app-icon-light.png` and `-dark.png` are Icon Composer renders of `Carouline/AppIcon.icon` on `main`, with the plate and corner mask already in them, scaled to 256x256: `"/Applications/Icon Composer.app/Contents/Executables/ictool" Carouline/AppIcon.icon --export-image --output-file out.png --platform iOS --rendition Default --width 1024 --height 1024 --scale 1`, with `--rendition Dark` for the dark one.
 - `favicon.png` is the light render at 96x96, in both appearances. Safari draws its own backdrop behind a favicon too dark for its tab bar, and reads icon links once at load, so a themed favicon could neither look right nor follow the toggle.
 - `apple-touch-icon.png` is the light render at 180x180, flattened onto `#F9F9FB`, the middle of its plate's gradient. iOS masks it itself and fills transparent corners with black.
+- The header's logo is `https://af.codes/images/af.png`, so there's no copy here. It sits uncropped on a circle filled with `--logo-circle`, white in the light theme and near-black in the dark one, with a drop shadow in `--icon-shadow`. Its values in the theme sheets match af.codes' and hold at least 3:1 with the logo's main blues, `#0057d5` and `#0186fb`, so change them together.
 
 ### Link preview
 
