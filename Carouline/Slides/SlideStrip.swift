@@ -105,7 +105,11 @@ struct SlideStrip: View {
         .onGeometryChange(for: CGSize.self) { proxy in
             proxy.size
         } action: { size in
-            self.size = size
+            // At once, as without a sheet, so `fit` animates for the sheet's room alone, not for the
+            // sizes a strip appearing under an open sheet measures, which grow its slides from nothing.
+            withTransaction(\.disablesAnimations, true) {
+                self.size = size
+            }
         }
         .background {
             CaptionLabelWidths(widths: $captionWidths.labels)
