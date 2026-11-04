@@ -1,8 +1,19 @@
-# Carouline
+<p align="center">
+  <picture>
+    <source srcset="docs/images/app-icon-dark.png" media="(prefers-color-scheme: dark)">
+    <img src="docs/images/app-icon-light.png" alt="" width="128" height="128">
+  </picture>
+</p>
 
-[![Download on the App Store](docs/assets/app-store-badge.svg)](https://apps.apple.com/us/app/carouline/id6822795714)
+<h1 align="center">Carouline</h1>
 
-Carouline is a native iOS app for photo carousels. Pick a slide shape, or a ratio and export size of your own, gather photos into a tray to look them over, lay out each slide with one to four photos from the tray, the camera or your library, or cut one wide photo across several slides as a panorama, then save the set to Photos or share it to any app that takes several images at once.
+<p align="center">A native iOS app for photo carousels.</p>
+
+<p align="center">
+  <a href="https://apps.apple.com/us/app/carouline/id6822795714"><img src="docs/assets/app-store-badge.svg" alt="Download on the App Store"></a>
+</p>
+
+Pick a slide shape, or a ratio and export size of your own, gather photos into a tray to look them over, lay out each slide with one to four photos from the tray, the camera or your library, or cut one wide photo across several slides as a panorama, then save the set to Photos or share it to any app that takes several images at once.
 
 ## Development
 
