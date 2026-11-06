@@ -23,12 +23,15 @@ html {
 }
 
 /* The body has no background of its own, so the glow behind it, fixed to the
-   window like the app's backdrop behind its screens, shows through. */
+   window like the app's backdrop behind its screens, shows through.
+   break-word only splits a word too long for a line of its own, as on a phone
+   with enlarged text, and leaves every layout's widths alone. */
 body {
     margin: 0;
     font-family: var(--font);
     line-height: 1.5;
     color: var(--fg);
+    overflow-wrap: break-word;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -178,10 +181,12 @@ button:focus-visible {
     filter: drop-shadow(0 .6rem 1.2rem var(--icon-shadow));
 }
 
+/* Its floor gives way to 17vw only on a phone with enlarged text, where the
+   name would otherwise be wider than the page. */
 .hero-copy h1 {
     display: inline-block;
     margin-top: 1.5rem;
-    font-size: clamp(2.75rem, 7vw, 4.25rem);
+    font-size: clamp(min(2.75rem, 17vw), 7vw, 4.25rem);
     font-weight: 700;
     letter-spacing: -.035em;
     line-height: 1.1;
@@ -224,20 +229,26 @@ button:focus-visible {
 }
 
 /* Apple's badge artwork, unaltered and at least the 40px tall its guidelines
-   ask for. Its own rounded corners set the ghost button's radius. */
+   ask for. Its own rounded corners set the ghost button's radius. contain
+   scales it down whole, rather than squashing it, when a phone with enlarged
+   text caps its width. */
 .app-store img {
     width: auto;
     height: 3rem;
+    object-fit: contain;
 }
 
-/* Glass, like the app's floating chrome, over the glow. */
+/* Glass, like the app's floating chrome, over the glow. A minimum height and
+   wrapping labels, so on a phone with enlarged text it grows taller rather
+   than wider than the page; a flex row wraps whole buttons first. */
 .btn-ghost {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: .5rem;
-    height: 3rem;
-    padding: 0 1.2rem;
+    min-height: 3rem;
+    max-width: 100%;
+    padding: .4rem 1.2rem;
     border: 1px solid var(--glass-border);
     background: var(--glass);
     -webkit-backdrop-filter: blur(12px) saturate(160%);
@@ -246,7 +257,10 @@ button:focus-visible {
     font-size: .95rem;
     font-weight: 600;
     text-decoration: none;
-    white-space: nowrap;
+}
+
+.btn-ghost svg {
+    flex-shrink: 0;
 }
 
 /* Two-line label, shorter together than the button, so it stays level with
