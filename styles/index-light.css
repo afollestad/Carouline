@@ -10,6 +10,8 @@
     --secondary: #5f566d;
     /* AccentColor's light variant, 4.8:1 on white. */
     --accent: #7957e7;
+    /* 4.8:1 on --accent. */
+    --on-accent: #ffffff;
     /* The accent deepened for small text on glass, at least 6.7:1 on its frost. */
     --accent-text: #5c3bb8;
     --link: #5c3bb8;

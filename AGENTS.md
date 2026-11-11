@@ -43,4 +43,4 @@ Encode screenshots as lossless WebP (`cwebp -lossless -z 9`), since lossy ringin
 
 ## Content
 
-- Keep the App Store badge Apple's artwork, unaltered, and at least 40px tall, as its guidelines ask.
+- Keep the App Store link a `.btn-primary` with the Apple logo and "Download on the App Store", matching the sibling sites' download buttons; don't bring back Apple's badge artwork.

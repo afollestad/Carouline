@@ -10,6 +10,8 @@
     --secondary: #b8aecb;
     /* AccentColor's dark variant, 5.9:1 on --bg. */
     --accent: #a078ee;
+    /* --bg, 5.9:1 on --accent; white falls to 3.3:1. */
+    --on-accent: #0f0a1f;
     /* The accent lifted for small text on glass. */
     --accent-text: #c9b3ff;
     /* Links in running text are the icon's mint, as the policy's were on af.codes. */
