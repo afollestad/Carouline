@@ -403,8 +403,10 @@ button:focus-visible {
     text-align: center;
 }
 
+/* Sets feature copy in two or three lines on desktop, at the width the
+   sibling sites share. */
 .section-centered .feature-copy {
-    max-width: 36rem;
+    max-width: 42rem;
     margin-left: auto;
     margin-right: auto;
 }
@@ -422,6 +424,7 @@ button:focus-visible {
     font-size: 1.1rem;
     line-height: 1.6;
     color: var(--secondary);
+    text-wrap: pretty;
 }
 
 /* Section labels are glass capsules like the app's slide captions, with the
