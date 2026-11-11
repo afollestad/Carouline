@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source srcset="docs/images/app-icon-dark.png" media="(prefers-color-scheme: dark)">
-    <img src="docs/images/app-icon-light.png" alt="" width="128" height="128">
+    <img src="docs/images/app-icon-light.png" alt="" width="96" height="96">
   </picture>
 </p>
 
@@ -13,18 +13,18 @@
   <a href="https://apps.apple.com/us/app/carouline/id6822795714"><img src="docs/assets/app-store-badge.svg" alt="Download on the App Store"></a>
 </p>
 
-Pick a slide shape, or a ratio and export size of your own, gather photos into a tray to look them over, lay out each slide with one to four photos from the tray, the camera or your library, or cut one wide photo across several slides as a panorama, then save the set to Photos or share it to any app that takes several images at once.
+Pick a slide shape or your own ratio, gather photos into a tray, and lay out each slide with one to four photos, or cut one wide photo across several slides as a panorama. Then save the set to Photos or share it to any app that takes several images at once.
 
 ## Development
 
 ```sh
-./scripts/setup.sh             # Install SwiftLint, xcsift, AXe and duoctl, a lint pre-commit hook, and the simulators the scripts run on
-./scripts/build.sh             # Build for the iOS Simulator (--device <udid> for an iPhone or iPad)
-./scripts/run.sh -b            # Build, install, and launch on a reachable iPhone or iPad, else the simulator (-s for the simulator; -d <name or UDID> for a device; omit -b to relaunch the last build; pass launch arguments after --)
+./scripts/setup.sh             # Install tools, a lint pre-commit hook, and the simulators the scripts use
+./scripts/build.sh             # Build for the iOS Simulator
+./scripts/run.sh -b            # Build and launch on a reachable iPhone or iPad, else the simulator (-s for the simulator)
 ./scripts/test.sh              # Run unit and snapshot tests
 ./scripts/snapshots.sh verify  # Compare snapshots against their baselines (record to update them)
 ./scripts/lint.sh              # Run SwiftLint
-./scripts/screenshots.sh -b    # Build, then capture the demo projects for the App Store on iPhone 18 Pro, iPad Pro 13-inch and iPhone Duo (--dark for dark mode)
+./scripts/screenshots.sh -b    # Build, then capture App Store screenshots (--dark for dark mode)
 ```
 
 ## License
